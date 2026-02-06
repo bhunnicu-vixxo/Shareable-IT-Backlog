@@ -10,11 +10,14 @@
     "start": "node dist/server.js",
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write src",
+    "test": "vitest --pool=threads src",
+    "test:run": "vitest run --pool=threads src",
     "migrate:up": "node-pg-migrate up --migrations-dir ../database/migrations",
     "migrate:down": "node-pg-migrate down --migrations-dir ../database/migrations",
     "migrate:create": "node-pg-migrate create --migrations-dir ../database/migrations --migration-file-language sql"
   },
   "dependencies": {
+    "@linear/sdk": "^73.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -42,6 +45,7 @@
     "prettier": "^3.8.1",
     "tsx": "^4.19.0",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.18.0"
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^4.0.18"
   }
 }
