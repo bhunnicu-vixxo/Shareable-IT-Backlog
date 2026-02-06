@@ -1,14 +1,20 @@
 {
-  "name": "linear-import-script",
+  "name": "shareable-linear-backlog",
   "version": "1.0.0",
-  "description": "Script to import epics and stories from markdown into Linear",
-  "main": "import-to-linear.js",
+  "private": true,
+  "description": "Shareable Linear Backlog — web app for business users to view IT backlog",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
+    "dev": "concurrently --kill-others-on-fail -n fe,be -c cyan,green \"npm run dev -w frontend\" \"npm run dev -w backend\"",
+    "dev:debug": "concurrently --kill-others-on-fail -n fe,be -c cyan,green \"npm run dev -w frontend\" \"npm run dev:debug -w backend\"",
     "import": "node import-to-linear.js",
     "update-issue": "node update-linear-issue.js"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.19.0"
   },
   "keywords": [
     "linear",
@@ -17,5 +23,8 @@
     "stories"
   ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
 }

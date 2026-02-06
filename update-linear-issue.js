@@ -9,6 +9,58 @@
  *   $env:LINEAR_API_KEY="lin_api_xxx"; node update-linear-issue.js VIX-329 --status "In Progress" --implementation "Started work on..." --testing "Need to test..." --comment "Additional notes"
  */
 
+// Allow reading key from local env files (never committed).
+// Preference order:
+// 1) existing process.env.LINEAR_API_KEY (explicit shell env)
+// 2) backend/.env
+// 3) .env (repo root)
+function tryLoadLinearApiKeyFromEnvFiles() {
+  if (process.env.LINEAR_API_KEY) return
+
+  const fs = require('fs')
+  const path = require('path')
+
+  const candidates = [
+    path.join(process.cwd(), 'backend', '.env'),
+    path.join(process.cwd(), '.env'),
+  ]
+
+  for (const filePath of candidates) {
+    try {
+      if (!fs.existsSync(filePath)) continue
+      const content = fs.readFileSync(filePath, 'utf8')
+
+      for (const rawLine of content.split(/\r?\n/)) {
+        const line = rawLine.trim()
+        if (!line || line.startsWith('#')) continue
+        if (!/^LINEAR_API_KEY\s*=/.test(line) && !/^LINEAR_API_KEY\s*=/.test(line.replace(/\s+/g, ''))) {
+          // Handle weird whitespace cases (e.g., "LINEAR_API_KEY= lin_api_..." or "LINEAR_API_KEY = lin_api_...")
+          if (!/^LINEAR_API_KEY\s*=/.test(line.replace(/\s*=\s*/, '='))) continue
+        }
+
+        const normalized = line.replace(/\s*=\s*/, '=')
+        let value = normalized.split('=').slice(1).join('=').trim()
+        // Strip optional quotes
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
+          value = value.slice(1, -1)
+        }
+
+        if (value) {
+          process.env.LINEAR_API_KEY = value
+          return
+        }
+      }
+    } catch {
+      // ignore and try next candidate
+    }
+  }
+}
+
+tryLoadLinearApiKeyFromEnvFiles()
+
 const LINEAR_API_KEY = process.env.LINEAR_API_KEY;
 const LINEAR_API_URL = 'https://api.linear.app/graphql';
 

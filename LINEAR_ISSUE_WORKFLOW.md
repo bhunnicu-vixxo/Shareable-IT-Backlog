@@ -26,6 +26,16 @@ node update-linear-issue.js VIX-329 --comment "Blocked on API endpoint - waiting
 node update-linear-issue.js VIX-329 --status "Done"
 ```
 
+### Recommended (so you don't keep re-entering it)
+
+Store your API key in your **local** `backend/.env` file (this file is gitignored and should never be committed):
+
+```env
+LINEAR_API_KEY=lin_api_xxx
+```
+
+Both `update-linear-issue.js` and `import-to-linear.js` will automatically load `LINEAR_API_KEY` from `backend/.env` if it is not already set in your shell environment.
+
 ## Usage
 
 ### Basic Syntax

@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Backend",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "--inspect", "src/server.ts"],
+      "cwd": "${workspaceFolder}/backend",
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "name": "Debug Frontend (Chrome)",
+      "type": "pwa-chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend/src",
+      "preLaunchTask": "Start Frontend Dev Server"
+    },
+    {
+      "name": "Debug Backend (Attach)",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "cwd": "${workspaceFolder}/backend"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug All",
+      "configurations": ["Debug Backend", "Debug Frontend (Chrome)"]
+    }
+  ]
+}
