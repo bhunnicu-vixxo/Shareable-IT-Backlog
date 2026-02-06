@@ -16,3 +16,9 @@ user_name: Rhunnicutt
 communication_language: English
 document_output_language: English
 output_folder: "{project-root}/_bmad-output"
+
+# GitHub publishing target
+# Used by workflows/agents when instructing commit/push behavior.
+github_repo_url: "https://github.com/bhunnicu-vixxo/Shareable-IT-Backlog"
+github_git_remote: "https://github.com/bhunnicu-vixxo/Shareable-IT-Backlog.git"
+github_default_branch: "main"
