@@ -20,6 +20,7 @@
     <action>Read COMPLETE story file</action>
     <action>Set {{story_key}} = extracted key from filename (e.g., "1-2-user-authentication.md" → "1-2-user-authentication") or story
       metadata</action>
+    <action>Extract {{linear_issue_id}} from the "Linear Issue ID:" field in the story file header</action>
     <action>Parse sections: Story, Acceptance Criteria, Tasks/Subtasks, Dev Agent Record → File List, Change Log</action>
 
     <!-- Discover actual changes via git -->
@@ -214,13 +215,34 @@
       <output>ℹ️ Story status updated (no sprint tracking configured)</output>
     </check>
 
+    <!-- LINEAR INTEGRATION: Update Linear based on review outcome -->
+    <check if="{{linear_issue_id}} is not empty">
+      <check if="{{new_status}} == 'done'">
+        <action>Update Linear issue {{linear_issue_id}} status to "Done" using the Linear MCP tool (update_issue with state "Done")</action>
+        <action>Add a comment to Linear issue {{linear_issue_id}} using the Linear MCP tool (create_comment):
+          "Code review complete for story {{story_key}}. All issues resolved. Story marked as Done."
+        </action>
+        <output>📋 Linear issue {{linear_issue_id}} moved to **Done**</output>
+      </check>
+      <check if="{{new_status}} == 'in-progress'">
+        <action>Add a comment to Linear issue {{linear_issue_id}} using the Linear MCP tool (create_comment):
+          "Code review complete for story {{story_key}}. {{action_count}} action items require follow-up. Story returned to in-progress."
+        </action>
+        <output>📋 Linear issue {{linear_issue_id}} updated - code review findings require follow-up</output>
+      </check>
+    </check>
+    <check if="{{linear_issue_id}} is empty">
+      <output>ℹ️ No Linear Issue ID found in story file - skipping Linear status update</output>
+    </check>
+
     <output>**✅ Review Complete!**
 
       **Story Status:** {{new_status}}
+      **Linear Issue ID:** {{linear_issue_id}}
       **Issues Fixed:** {{fixed_count}}
       **Action Items Created:** {{action_count}}
 
-      {{#if new_status == "done"}}Code review complete!{{else}}Address the action items and continue development.{{/if}}
+      {{#if new_status == "done"}}Code review complete! Linear issue moved to Done.{{else}}Address the action items and continue development.{{/if}}
     </output>
   </step>
 

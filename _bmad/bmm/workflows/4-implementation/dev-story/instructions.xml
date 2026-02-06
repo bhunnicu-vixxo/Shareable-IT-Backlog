@@ -120,6 +120,7 @@
     <anchor id="task_check" />
 
     <action>Parse sections: Story, Acceptance Criteria, Tasks/Subtasks, Dev Notes, Dev Agent Record, File List, Change Log, Status</action>
+    <action>Extract {{linear_issue_id}} from the "Linear Issue ID:" field in the story file header</action>
 
     <action>Load comprehensive context from story file's Dev Notes section</action>
     <action>Extract developer guidance from Dev Notes: architecture requirements, previous learnings, technical specifications</action>
@@ -187,7 +188,7 @@
     </check>
   </step>
 
-  <step n="4" goal="Mark story in-progress" tag="sprint-status">
+  <step n="4" goal="Mark story in-progress and update Linear" tag="sprint-status">
     <check if="{{sprint_status}} file exists">
       <action>Load the FULL file: {{sprint_status}}</action>
       <action>Read all development_status entries to find {{story_key}}</action>
@@ -218,6 +219,15 @@
     <check if="{{sprint_status}} file does NOT exist">
       <output>ℹ️ No sprint status file exists - story progress will be tracked in story file only</output>
       <action>Set {{current_sprint_status}} = "no-sprint-tracking"</action>
+    </check>
+
+    <!-- LINEAR INTEGRATION: Move issue to In Progress -->
+    <check if="{{linear_issue_id}} is not empty">
+      <action>Update Linear issue {{linear_issue_id}} status to "In Progress" using the Linear MCP tool (update_issue with state "In Progress")</action>
+      <output>📋 Linear issue {{linear_issue_id}} moved to **In Progress**</output>
+    </check>
+    <check if="{{linear_issue_id}} is empty">
+      <output>ℹ️ No Linear Issue ID found in story file - skipping Linear status update</output>
     </check>
   </step>
 
@@ -363,6 +373,14 @@
       </output>
     </check>
 
+    <!-- LINEAR INTEGRATION: Update Linear that implementation is complete -->
+    <check if="{{linear_issue_id}} is not empty">
+      <action>Add a comment to Linear issue {{linear_issue_id}} using the Linear MCP tool (create_comment):
+        "Implementation complete for story {{story_key}}. All tasks and acceptance criteria satisfied. Story is now in code review."
+      </action>
+      <output>📋 Linear issue {{linear_issue_id}} updated - implementation complete, ready for review</output>
+    </check>
+
     <!-- Final validation gates -->
     <action if="any task is incomplete">HALT - Complete remaining tasks before marking ready for review</action>
     <action if="regression failures exist">HALT - Fix regression issues before completing</action>
@@ -399,6 +417,15 @@
       - Run `code-review` workflow for peer review
       - Optional: Run TEA `*automate` to expand guardrail tests
     </action>
+
+    <!-- LINEAR INTEGRATION: Update Linear when code is committed -->
+    <check if="{{linear_issue_id}} is not empty">
+      <action>Check if there are uncommitted changes via `git status --porcelain`</action>
+      <action>If user commits code (or code has already been committed), add a comment to Linear issue {{linear_issue_id}} using the Linear MCP tool (create_comment):
+        "Code committed for story {{story_key}}. Implementation changes are in the repository."
+      </action>
+      <output>📋 Linear issue {{linear_issue_id}} updated - code committed</output>
+    </check>
 
     <output>💡 **Tip:** For best results, run `code-review` using a **different** LLM than the one that implemented this story.</output>
     <check if="{sprint_status} file exists">

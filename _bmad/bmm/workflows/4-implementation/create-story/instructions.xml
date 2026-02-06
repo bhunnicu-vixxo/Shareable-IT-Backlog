@@ -256,6 +256,22 @@
     </action>
   </step>
 
+  <step n="4b" goal="Collect Linear Issue ID for story tracking">
+    <critical>📋 LINEAR INTEGRATION - Every story MUST have a Linear Issue ID for lifecycle tracking!</critical>
+    <critical>The Linear Issue ID is the primary identifier the user will use to refer to stories (e.g., "SLB-42", "PROJ-17")</critical>
+
+    <ask>What is the Linear Issue ID for this story? (e.g., SLB-42, PROJ-17)</ask>
+    <action>Store the user-provided Linear Issue ID as {{linear_issue_id}}</action>
+    <action>This ID will be written into the story file header and used for all subsequent Linear status updates</action>
+
+    <check if="user does not provide a Linear Issue ID or says none/skip">
+      <output>⚠️ No Linear Issue ID provided. The story file will have an empty Linear Issue ID field.
+        You can add it later by editing the story file header.
+        Linear status updates will be skipped for this story until an ID is provided.</output>
+      <action>Set {{linear_issue_id}} = ""</action>
+    </check>
+  </step>
+
   <step n="5" goal="Create comprehensive story file">
     <critical>📝 CREATE ULTIMATE STORY FILE - The developer's master implementation guide!</critical>
 
@@ -329,8 +345,17 @@
       **Story Details:**
       - Story ID: {{story_id}}
       - Story Key: {{story_key}}
+      - Linear Issue ID: {{linear_issue_id}}
       - File: {{story_file}}
       - Status: ready-for-dev
+
+      **Linear Lifecycle Tracking:**
+      The following Linear status updates will occur automatically throughout the story lifecycle:
+      - `dev-story` start → Linear moved to **In Progress**
+      - `dev-story` complete (implementation done) → Linear updated
+      - Code committed → Linear updated
+      - `code-review` complete → Linear updated
+      - Story marked done → Linear moved to **Done**
 
       **Next Steps:**
       1. Review the comprehensive story in {{story_file}}

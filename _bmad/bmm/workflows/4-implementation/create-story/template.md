@@ -1,5 +1,6 @@
 # Story {{epic_num}}.{{story_num}}: {{story_title}}
 
+Linear Issue ID: {{linear_issue_id}}
 Status: ready-for-dev
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
