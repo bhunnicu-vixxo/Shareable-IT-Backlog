@@ -1,0 +1,6 @@
+/* Global CSS reset - Chakra UI provides its own reset via Provider */
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}

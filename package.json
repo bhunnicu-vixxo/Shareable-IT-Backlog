@@ -1,0 +1,21 @@
+{
+  "name": "linear-import-script",
+  "version": "1.0.0",
+  "description": "Script to import epics and stories from markdown into Linear",
+  "main": "import-to-linear.js",
+  "scripts": {
+    "import": "node import-to-linear.js",
+    "update-issue": "node update-linear-issue.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "linear",
+    "import",
+    "epics",
+    "stories"
+  ],
+  "author": "",
+  "license": "ISC"
+}

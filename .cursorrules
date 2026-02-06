@@ -1,0 +1,39 @@
+# Cursor Rules for Shareable Linear Backlog
+
+## Linear Issue Management
+
+When the user mentions starting work on a Linear issue (e.g., "work on VIX-329", "grab issue VIX-329", "start VIX-329"):
+
+1. **Automatically update the Linear issue** using `update-linear-issue.js`:
+   - Set status to "In Progress"
+   - Add initial implementation notes: "Starting work on this issue. Reviewing requirements and setting up development environment."
+
+2. **During development**, when the user makes progress or completes features:
+   - Update implementation notes with progress: "Completed [feature]. Working on [next feature]."
+   - Add testing notes when testing: "Tested [feature] - [results]. Need to test: [remaining items]."
+
+3. **When the user indicates completion** (e.g., "done with VIX-329", "complete VIX-329", "finished VIX-329"):
+   - Set status to "Done"
+   - Add final implementation notes summarizing what was completed
+   - Add final testing notes summarizing test results
+
+## Usage Pattern
+
+```powershell
+# When starting work
+node update-linear-issue.js <ISSUE_ID> --status "In Progress" --implementation "Starting work..."
+
+# During development
+node update-linear-issue.js <ISSUE_ID> --implementation "Progress update..."
+node update-linear-issue.js <ISSUE_ID> --testing "Testing notes..."
+
+# When completing
+node update-linear-issue.js <ISSUE_ID> --status "Done" --implementation "All work complete" --testing "All tests passing"
+```
+
+## Important Notes
+
+- Always check for LINEAR_API_KEY environment variable before running the script
+- Extract issue identifier from user's message (format: VIX-XXX or similar)
+- Use descriptive implementation and testing notes
+- Update issues proactively as work progresses, not just at start/end
