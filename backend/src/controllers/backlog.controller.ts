@@ -2,6 +2,56 @@ import type { Request, Response, NextFunction } from 'express'
 import { backlogService } from '../services/backlog/backlog.service.js'
 import { logger } from '../utils/logger.js'
 
+/** Linear IDs are UUIDs (v4). Validate before sending to the API. */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Handle GET /api/backlog-items/:id
+ *
+ * Returns a single backlog item with its comments.
+ * Returns 400 when the id is missing or malformed.
+ * Returns 404 when the item does not exist.
+ */
+export const getBacklogItemById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { id } = req.params
+    if (!id || !UUID_REGEX.test(id)) {
+      res.status(400).json({
+        error: {
+          message: 'Invalid or missing parameter: id must be a valid UUID.',
+          code: 'INVALID_PARAMETER',
+        },
+      })
+      return
+    }
+
+    logger.debug(
+      { controller: 'backlog', handler: 'getBacklogItemById', id },
+      'Handling GET /api/backlog-items/:id',
+    )
+
+    const result = await backlogService.getBacklogItemById(id)
+
+    if (!result) {
+      res.status(404).json({
+        error: {
+          message: 'Backlog item not found',
+          code: 'NOT_FOUND',
+        },
+      })
+      return
+    }
+
+    res.json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 /**
  * Handle GET /api/backlog-items
  *

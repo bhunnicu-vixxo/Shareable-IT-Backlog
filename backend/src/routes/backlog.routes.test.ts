@@ -8,6 +8,7 @@ import type { PaginatedResponse } from '../types/api.types.js'
 vi.mock('../services/backlog/backlog.service.js', () => ({
   backlogService: {
     getBacklogItems: vi.fn(),
+    getBacklogItemById: vi.fn(),
   },
 }))
 
@@ -21,13 +22,25 @@ vi.mock('../utils/logger.js', () => ({
   },
 }))
 
+import type { CommentDto } from '../types/linear-entities.types.js'
 import { backlogService } from '../services/backlog/backlog.service.js'
-import { getBacklogItems } from '../controllers/backlog.controller.js'
+import { getBacklogItems, getBacklogItemById } from '../controllers/backlog.controller.js'
 
 const mockGetBacklogItems = vi.mocked(backlogService.getBacklogItems)
+const mockGetBacklogItemById = vi.mocked(backlogService.getBacklogItemById)
 
-function createMockRequest(query: Record<string, string> = {}): Request {
-  return { query } as unknown as Request
+function createMockRequest(
+  overrides: { query?: Record<string, string>; params?: Record<string, string> } | Record<string, string> = {},
+): Request {
+  const hasQuery = overrides && typeof overrides === 'object' && 'query' in overrides
+  const hasParams = overrides && typeof overrides === 'object' && 'params' in overrides
+  const query = hasQuery ? (overrides as { query?: Record<string, string> }).query : undefined
+  const params = hasParams ? (overrides as { params?: Record<string, string> }).params : undefined
+  const rest = hasQuery || hasParams ? {} : (overrides as Record<string, string>)
+  return {
+    query: query ?? rest,
+    params: params ?? {},
+  } as unknown as Request
 }
 
 function createMockResponse(): Response & { statusCode: number; body: unknown } {
@@ -69,6 +82,7 @@ function createMockBacklogItem(overrides: Partial<BacklogItemDto> = {}): Backlog
     dueDate: null,
     sortOrder: 1.0,
     url: 'https://linear.app/vixxo/issue/VIX-1',
+    isNew: false,
     ...overrides,
   }
 }
@@ -218,5 +232,93 @@ describe('BacklogController.getBacklogItems', () => {
     await getBacklogItems(req, res as unknown as Response, mockNext)
 
     expect(res.body).toEqual(emptyResponse)
+  })
+})
+
+describe('BacklogController.getBacklogItemById', () => {
+  let mockNext: NextFunction
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockNext = vi.fn()
+  })
+
+  it('should return item and comments with 200 status', async () => {
+    const validUuid = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    const mockItem = createMockBacklogItem({ id: validUuid })
+    const mockComments: CommentDto[] = [
+      {
+        id: 'comment-1',
+        body: 'Test comment',
+        createdAt: '2026-02-05T10:00:00.000Z',
+        updatedAt: '2026-02-05T10:00:00.000Z',
+        userId: null,
+        userName: 'User',
+      },
+    ]
+    mockGetBacklogItemById.mockResolvedValue({ item: mockItem, comments: mockComments })
+
+    const req = createMockRequest({ params: { id: validUuid } })
+    const res = createMockResponse()
+
+    await getBacklogItemById(req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toEqual({ item: mockItem, comments: mockComments })
+    expect(mockGetBacklogItemById).toHaveBeenCalledWith(validUuid)
+  })
+
+  it('should return 404 when item does not exist', async () => {
+    const validUuid = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+    mockGetBacklogItemById.mockResolvedValue(null)
+
+    const req = createMockRequest({ params: { id: validUuid } })
+    const res = createMockResponse()
+
+    await getBacklogItemById(req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(404)
+    expect(res.body).toEqual({
+      error: { message: 'Backlog item not found', code: 'NOT_FOUND' },
+    })
+  })
+
+  it('should return 400 when id is missing', async () => {
+    const req = createMockRequest({ params: {} })
+    const res = createMockResponse()
+
+    await getBacklogItemById(req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(400)
+    expect(res.body).toEqual({
+      error: { message: 'Invalid or missing parameter: id must be a valid UUID.', code: 'INVALID_PARAMETER' },
+    })
+    expect(mockGetBacklogItemById).not.toHaveBeenCalled()
+  })
+
+  it('should return 400 when id is not a valid UUID', async () => {
+    const req = createMockRequest({ params: { id: 'not-a-uuid' } })
+    const res = createMockResponse()
+
+    await getBacklogItemById(req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(400)
+    expect(res.body).toEqual({
+      error: { message: 'Invalid or missing parameter: id must be a valid UUID.', code: 'INVALID_PARAMETER' },
+    })
+    expect(mockGetBacklogItemById).not.toHaveBeenCalled()
+  })
+
+  it('should call next with error when service throws', async () => {
+    const validUuid = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    const serviceError = new Error('Service failure')
+    mockGetBacklogItemById.mockRejectedValue(serviceError)
+
+    const req = createMockRequest({ params: { id: validUuid } })
+    const res = createMockResponse()
+
+    await getBacklogItemById(req, res as unknown as Response, mockNext)
+
+    expect(mockNext).toHaveBeenCalledWith(serviceError)
   })
 })

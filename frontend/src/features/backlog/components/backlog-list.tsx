@@ -1,6 +1,8 @@
+import { useState, useMemo, useRef } from 'react'
 import { Box, Button, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { useBacklogItems } from '../hooks/use-backlog-items'
 import { BacklogItemCard } from './backlog-item-card'
+import { ItemDetailModal } from './item-detail-modal'
 
 /**
  * Loading skeleton matching the BacklogItemCard layout.
@@ -100,6 +102,18 @@ function BacklogErrorState({
  */
 export function BacklogList() {
   const { data, isLoading, isError, error, refetch } = useBacklogItems()
+  const [showNewOnly, setShowNewOnly] = useState(false)
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const lastClickedCardRef = useRef<HTMLDivElement | null>(null)
+
+  const items = data?.items ?? []
+
+  // Client-side filter — O(n), instant re-render, no API call
+  const displayedItems = useMemo(
+    () => (showNewOnly ? items.filter((item) => item.isNew) : items),
+    [items, showNewOnly],
+  )
 
   if (isLoading) {
     return (
@@ -119,23 +133,86 @@ export function BacklogList() {
     )
   }
 
-  const items = data?.items ?? []
-  const totalCount = data?.totalCount ?? 0
-
   if (items.length === 0) {
     return <BacklogEmptyState onRetry={() => void refetch()} />
   }
 
+  const newItemCount = items.filter((item) => item.isNew).length
+
   return (
     <Box>
-      <Text fontSize="sm" color="gray.500" mb="4">
-        Showing {totalCount} {totalCount === 1 ? 'item' : 'items'}
-      </Text>
-      <VStack gap="4" align="stretch">
-        {items.map((item) => (
-          <BacklogItemCard key={item.id} item={item} />
-        ))}
-      </VStack>
+      {/* Filter controls and result count */}
+      <Flex justifyContent="space-between" alignItems="center" mb="4" flexWrap="wrap" gap="2">
+        <Text fontSize="sm" color="gray.500">
+          {showNewOnly
+            ? `Showing ${displayedItems.length} new ${displayedItems.length === 1 ? 'item' : 'items'}`
+            : `Showing ${items.length} ${items.length === 1 ? 'item' : 'items'}`}
+        </Text>
+        {newItemCount > 0 && (
+          <HStack gap="1">
+            <Button
+              size="sm"
+              variant={showNewOnly ? 'solid' : 'outline'}
+              onClick={() => setShowNewOnly(!showNewOnly)}
+              aria-pressed={showNewOnly}
+              aria-label={showNewOnly ? 'Show all items' : 'Show only new items'}
+            >
+              {showNewOnly ? 'Show all' : `New only (${newItemCount})`}
+            </Button>
+          </HStack>
+        )}
+      </Flex>
+
+      {/* Filtered items or empty filter state */}
+      {displayedItems.length === 0 && showNewOnly ? (
+        <Flex
+          direction="column"
+          alignItems="center"
+          justifyContent="center"
+          p="12"
+          borderWidth="1px"
+          borderRadius="md"
+          borderColor="gray.200"
+          textAlign="center"
+        >
+          <Text fontWeight="bold" fontSize="lg" mb="2">
+            No new items
+          </Text>
+          <Text color="gray.500" mb="4">
+            All items have been reviewed. Remove the filter to see all items.
+          </Text>
+          <Button onClick={() => setShowNewOnly(false)} variant="outline" size="sm">
+            Show all items
+          </Button>
+        </Flex>
+      ) : (
+        <>
+          <VStack gap="4" align="stretch">
+            {displayedItems.map((item) => (
+              <Box
+                key={item.id}
+                ref={(el: HTMLDivElement | null) => {
+                  cardRefs.current[item.id] = el
+                }}
+              >
+                <BacklogItemCard
+                  item={item}
+                  onClick={() => {
+                    lastClickedCardRef.current = cardRefs.current[item.id] ?? null
+                    setSelectedItemId(item.id)
+                  }}
+                />
+              </Box>
+            ))}
+          </VStack>
+          <ItemDetailModal
+            isOpen={!!selectedItemId}
+            itemId={selectedItemId}
+            onClose={() => setSelectedItemId(null)}
+            triggerRef={lastClickedCardRef}
+          />
+        </>
+      )}
     </Box>
   )
 }

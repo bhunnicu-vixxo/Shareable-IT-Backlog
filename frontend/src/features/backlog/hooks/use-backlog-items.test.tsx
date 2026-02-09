@@ -37,6 +37,7 @@ const mockResponse: BacklogListResponse = {
       dueDate: null,
       sortOrder: 1.0,
       url: 'https://linear.app/vixxo/issue/VIX-1',
+      isNew: false,
     },
   ],
   pageInfo: { hasNextPage: false, endCursor: null },

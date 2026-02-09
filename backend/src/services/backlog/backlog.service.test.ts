@@ -8,21 +8,33 @@ import { LinearConfigError } from '../../utils/linear-errors.js'
 vi.mock('../sync/linear-client.service.js', () => ({
   linearClient: {
     getIssuesByProject: vi.fn(),
+    getIssueById: vi.fn(),
+    getIssueComments: vi.fn(),
   },
 }))
 
 // Mock the linear-transformers module
 vi.mock('../sync/linear-transformers.js', () => ({
   toBacklogItemDtos: vi.fn(),
+  toBacklogItemDto: vi.fn(),
+  toCommentDtos: vi.fn(),
 }))
 
 // Import after mocking
 import { linearClient } from '../sync/linear-client.service.js'
-import { toBacklogItemDtos } from '../sync/linear-transformers.js'
+import {
+  toBacklogItemDtos,
+  toBacklogItemDto,
+  toCommentDtos,
+} from '../sync/linear-transformers.js'
 import { BacklogService } from './backlog.service.js'
 
 const mockGetIssuesByProject = vi.mocked(linearClient.getIssuesByProject)
+const mockGetIssueById = vi.mocked(linearClient.getIssueById)
+const mockGetIssueComments = vi.mocked(linearClient.getIssueComments)
 const mockToBacklogItemDtos = vi.mocked(toBacklogItemDtos)
+const mockToBacklogItemDto = vi.mocked(toBacklogItemDto)
+const mockToCommentDtos = vi.mocked(toCommentDtos)
 
 function createMockBacklogItem(overrides: Partial<BacklogItemDto> = {}): BacklogItemDto {
   return {
@@ -47,6 +59,7 @@ function createMockBacklogItem(overrides: Partial<BacklogItemDto> = {}): Backlog
     dueDate: null,
     sortOrder: 1.0,
     url: 'https://linear.app/vixxo/issue/VIX-1',
+    isNew: false,
     ...overrides,
   }
 }
@@ -72,7 +85,7 @@ describe('BacklogService', () => {
       await service.getBacklogItems()
 
       expect(mockGetIssuesByProject).toHaveBeenCalledWith('test-project-id', {
-        first: 50,
+        first: 20,
         after: undefined,
       })
     })
@@ -201,7 +214,7 @@ describe('BacklogService', () => {
       await service.getBacklogItems({ projectId: 'custom-project-id' })
 
       expect(mockGetIssuesByProject).toHaveBeenCalledWith('custom-project-id', {
-        first: 50,
+        first: 20,
         after: undefined,
       })
     })
@@ -228,6 +241,48 @@ describe('BacklogService', () => {
       expect(result.items).toEqual([])
       expect(result.totalCount).toBe(0)
       expect(result.pageInfo.hasNextPage).toBe(false)
+    })
+  })
+
+  describe('getBacklogItemById', () => {
+    it('should return item and comments when issue exists', async () => {
+      const mockIssue = { id: 'issue-123' } as never
+      const mockComments = [{ id: 'comment-1' }] as never[]
+      mockGetIssueById.mockResolvedValue({ data: mockIssue, rateLimit: null })
+      mockGetIssueComments.mockResolvedValue({ data: mockComments, rateLimit: null })
+      mockToBacklogItemDto.mockResolvedValue(createMockBacklogItem({ id: 'issue-123' }))
+      mockToCommentDtos.mockResolvedValue([
+        { id: 'comment-1', body: 'A comment', createdAt: '2026-02-05T10:00:00.000Z', updatedAt: '2026-02-05T10:00:00.000Z', userId: null, userName: 'User' },
+      ])
+
+      const result = await service.getBacklogItemById('issue-123')
+
+      expect(result).not.toBeNull()
+      expect(result?.item.id).toBe('issue-123')
+      expect(result?.comments).toHaveLength(1)
+      expect(mockGetIssueById).toHaveBeenCalledWith('issue-123')
+      expect(mockGetIssueComments).toHaveBeenCalledWith('issue-123')
+    })
+
+    it('should return null when issue does not exist', async () => {
+      mockGetIssueById.mockResolvedValue({ data: null, rateLimit: null })
+
+      const result = await service.getBacklogItemById('non-existent-id')
+
+      expect(result).toBeNull()
+      expect(mockGetIssueComments).not.toHaveBeenCalled()
+    })
+
+    it('should return empty comments array when issue has no comments', async () => {
+      const mockIssue = { id: 'issue-456' } as never
+      mockGetIssueById.mockResolvedValue({ data: mockIssue, rateLimit: null })
+      mockGetIssueComments.mockResolvedValue({ data: [], rateLimit: null })
+      mockToBacklogItemDto.mockResolvedValue(createMockBacklogItem({ id: 'issue-456' }))
+      mockToCommentDtos.mockResolvedValue([])
+
+      const result = await service.getBacklogItemById('issue-456')
+
+      expect(result?.comments).toEqual([])
     })
   })
 })

@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@/utils/test-utils'
+import { render, screen, waitFor, fireEvent } from '@/utils/test-utils'
 import { BacklogList } from './backlog-list'
-import type { BacklogListResponse, BacklogItem } from '../types/backlog.types'
+import type {
+  BacklogListResponse,
+  BacklogItem,
+  BacklogDetailResponse,
+  BacklogItemComment,
+} from '../types/backlog.types'
 
 function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
   return {
@@ -23,6 +28,7 @@ function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
     dueDate: null,
     sortOrder: 1.0,
     url: 'https://linear.app/vixxo/issue/VIX-1',
+    isNew: false,
     ...overrides,
   }
 }
@@ -144,6 +150,170 @@ describe('BacklogList', () => {
       screen.getByText('Data may not have been synced yet. Contact your admin to trigger a sync.'),
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+  })
+
+  it('shows "New only" filter button when new items exist', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Old item', isNew: false }),
+        createMockItem({ id: '2', title: 'Fresh item', isNew: true }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Fresh item')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: 'Show only new items' })).toBeInTheDocument()
+    expect(screen.getByText('New only (1)')).toBeInTheDocument()
+  })
+
+  it('does not show filter button when no new items exist', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', isNew: false }),
+        createMockItem({ id: '2', isNew: false }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Showing 2 items')).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/New only/)).not.toBeInTheDocument()
+  })
+
+  it('filters to show only new items when filter toggled', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Old item', isNew: false }),
+        createMockItem({ id: '2', title: 'New item A', isNew: true }),
+        createMockItem({ id: '3', title: 'New item B', isNew: true }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Old item')).toBeInTheDocument()
+    })
+
+    // Click the filter button
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+
+    // Old item should be hidden, new items visible
+    expect(screen.queryByText('Old item')).not.toBeInTheDocument()
+    expect(screen.getByText('New item A')).toBeInTheDocument()
+    expect(screen.getByText('New item B')).toBeInTheDocument()
+    expect(screen.getByText('Showing 2 new items')).toBeInTheDocument()
+  })
+
+  it('toggles back to show all items', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Old item', isNew: false }),
+        createMockItem({ id: '2', title: 'New item', isNew: true }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Old item')).toBeInTheDocument()
+    })
+
+    // Toggle on
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    expect(screen.queryByText('Old item')).not.toBeInTheDocument()
+
+    // Toggle off — "Show all" button appears when filter is active
+    fireEvent.click(screen.getByRole('button', { name: 'Show all items' }))
+    expect(screen.getByText('Old item')).toBeInTheDocument()
+    expect(screen.getByText('New item')).toBeInTheDocument()
+  })
+
+  it('shows correct singular count for 1 new item in filter mode', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Old item', isNew: false }),
+        createMockItem({ id: '2', title: 'Single new', isNew: true }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Old item')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    expect(screen.getByText('Showing 1 new item')).toBeInTheDocument()
+  })
+
+  it('opens detail modal when item is clicked', async () => {
+    const listResponse: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'issue-1', title: 'Detail item', identifier: 'VIX-1' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 1,
+    }
+    const detailResponse: BacklogDetailResponse = {
+      item: createMockItem({
+        id: 'issue-1',
+        title: 'Detail item',
+        identifier: 'VIX-1',
+        description: 'Item description here',
+      }),
+      comments: [] as BacklogItemComment[],
+    }
+
+    globalThis.fetch = vi.fn().mockImplementation((url: string | URL) => {
+      const urlStr = typeof url === 'string' ? url : url.toString()
+      const isDetailRequest = urlStr.includes('/backlog-items/') && urlStr.split('/').pop() !== 'backlog-items'
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(isDetailRequest ? detailResponse : listResponse),
+      })
+    })
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Detail item')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('Detail item'))
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Backlog item details')).toBeInTheDocument()
+    })
+
+    await waitFor(
+      () => {
+        expect(screen.getByText('Item description here')).toBeInTheDocument()
+      },
+      { timeout: 3000 },
+    )
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
   })
 
   it('renders priority badges with size hierarchy for mixed priorities', async () => {

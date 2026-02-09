@@ -1,7 +1,11 @@
-import type { BacklogItemDto } from '../../types/linear-entities.types.js'
+import type { BacklogItemDto, CommentDto } from '../../types/linear-entities.types.js'
 import type { PaginatedResponse } from '../../types/api.types.js'
 import { linearClient } from '../sync/linear-client.service.js'
-import { toBacklogItemDtos } from '../sync/linear-transformers.js'
+import {
+  toBacklogItemDto,
+  toBacklogItemDtos,
+  toCommentDtos,
+} from '../sync/linear-transformers.js'
 import { LinearConfigError } from '../../utils/linear-errors.js'
 import { logger } from '../../utils/logger.js'
 
@@ -85,6 +89,31 @@ export class BacklogService {
       },
       totalCount: sorted.length,
     }
+  }
+
+  /**
+   * Fetch a single backlog item by ID with its comments.
+   *
+   * Returns null when the issue does not exist (Linear returns null for non-existent issues).
+   */
+  async getBacklogItemById(
+    issueId: string,
+  ): Promise<{ item: BacklogItemDto; comments: CommentDto[] } | null> {
+    const issueResult = await linearClient.getIssueById(issueId)
+    if (!issueResult.data) return null
+
+    const [item, commentsResult] = await Promise.all([
+      toBacklogItemDto(issueResult.data),
+      linearClient.getIssueComments(issueId),
+    ])
+    const comments = await toCommentDtos(commentsResult.data ?? [])
+
+    logger.debug(
+      { service: 'backlog', operation: 'getBacklogItemById', issueId, commentCount: comments.length },
+      'Backlog item detail fetched',
+    )
+
+    return { item, comments }
   }
 }
 
