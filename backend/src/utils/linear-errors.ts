@@ -12,6 +12,7 @@ export type LinearApiErrorType =
   | 'AUTHENTICATION_ERROR'
   | 'PERMISSION_ERROR'
   | 'NOT_FOUND'
+  | 'RATE_LIMITED'
 
 export class LinearApiError extends Error {
   readonly code: string
@@ -49,8 +50,28 @@ export class LinearNetworkError extends Error {
 }
 
 export class LinearConfigError extends Error {
+  readonly statusCode: number = 400
+  readonly code: string = 'CONFIGURATION_ERROR'
+
   constructor(message: string) {
     super(message)
     this.name = 'LinearConfigError'
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Utility functions for downstream consumers                         */
+/* ------------------------------------------------------------------ */
+
+/** Check if a classified Linear error is retryable (transient). */
+export function isRetryableError(error: unknown): boolean {
+  if (error instanceof LinearNetworkError) return true
+  if (error instanceof LinearApiError && error.type === 'RATE_LIMITED') return true
+  return false
+}
+
+/** Check if a classified Linear error should NOT be retried. */
+export function isNonRetryableError(error: unknown): boolean {
+  if (!(error instanceof LinearApiError)) return false
+  return ['AUTHENTICATION_ERROR', 'PERMISSION_ERROR', 'NOT_FOUND', 'GRAPHQL_ERROR'].includes(error.type)
 }

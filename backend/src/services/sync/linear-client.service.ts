@@ -7,7 +7,7 @@ import {
 } from '@linear/sdk'
 
 import { getLinearConfig } from '../../config/linear.config.js'
-import type { RateLimitInfo, LinearQueryResult } from '../../types/linear.types.js'
+import type { FullRateLimitInfo, LinearQueryResult } from '../../types/linear.types.js'
 import {
   LinearApiError,
   LinearNetworkError,
@@ -15,6 +15,8 @@ import {
   type LinearApiErrorType,
 } from '../../utils/linear-errors.js'
 import { logger } from '../../utils/logger.js'
+import { rateLimiter } from './rate-limiter.js'
+import { retryHandler } from './retry-handler.js'
 
 /**
  * Abstraction over the Linear GraphQL API.
@@ -34,7 +36,6 @@ import { logger } from '../../utils/logger.js'
  */
 export class LinearClientService {
   private client: LinearClient | null = null
-  private lastRateLimitInfo: RateLimitInfo | null = null
 
   /* ------------------------------------------------------------------ */
   /*  Initialisation helpers                                             */
@@ -58,32 +59,14 @@ export class LinearClientService {
   /*  Rate-limit header parsing                                          */
   /* ------------------------------------------------------------------ */
 
-  private parseRateLimitHeaders(headers: Headers): RateLimitInfo | null {
-    const limit = headers.get('X-RateLimit-Requests-Limit')
-    const remaining = headers.get('X-RateLimit-Requests-Remaining')
-    const reset = headers.get('X-RateLimit-Requests-Reset')
-
-    if (!limit || !remaining || !reset) return null
-
-    return {
-      limit: parseInt(limit, 10),
-      remaining: parseInt(remaining, 10),
-      reset: parseInt(reset, 10),
-    }
-  }
-
-  private updateRateLimitFromHeaders(headers: Headers | null | undefined): void {
-    if (!headers) return
-    this.lastRateLimitInfo = this.parseRateLimitHeaders(headers)
-  }
-
   /**
    * The Linear SDK does not reliably expose response headers for high-level model
    * methods (e.g. `client.issues()`).
    *
-   * To meet Story 2.2 requirements, we perform a lightweight probe request after
-   * each SDK operation using the SDK's underlying GraphQL client `rawRequest`,
-   * which *does* return headers in its raw response.
+   * We perform a lightweight probe request after each SDK operation using the
+   * SDK's underlying GraphQL client `rawRequest`, which *does* return headers.
+   * All three rate-limit dimensions (request, complexity, endpoint) are now
+   * parsed by the shared `rateLimiter` instance.
    */
   private async refreshRateLimitInfo(): Promise<void> {
     const client = this.getClient()
@@ -95,14 +78,15 @@ export class LinearClientService {
       >(
         /* GraphQL */ 'query RateLimitProbe { viewer { id } }',
       )
-      this.updateRateLimitFromHeaders(raw.headers)
+      if (raw.headers) {
+        rateLimiter.updateFromHeaders(raw.headers)
+      }
     } catch (err: unknown) {
       // Do not fail the primary operation due to probe failure.
       logger.debug(
         { service: 'linear-client', operation: 'rateLimitProbe', error: err },
         'Rate limit probe failed',
       )
-      this.lastRateLimitInfo = null
     }
   }
 
@@ -116,14 +100,58 @@ export class LinearClientService {
   ): Promise<LinearQueryResult<T>> {
     const start = performance.now()
 
+    // Pre-flight throttle: delay if approaching rate limits
+    await rateLimiter.waitIfNeeded()
+
     try {
-      const data = await fn()
-      await this.refreshRateLimitInfo()
+      // Two-layer retry: outer = transient (network/5xx), inner = rate-limit
+      const result = await retryHandler.executeWithRetry(operation, async () => {
+        return await rateLimiter.executeWithRetry(async () => {
+          const fnResult = await fn()
+          await this.refreshRateLimitInfo()
+          return fnResult
+        })
+      })
       const durationMs = Math.round(performance.now() - start)
+
+      // Post-call observability logging
+      const state = rateLimiter.getState()
+      if (state?.requests) {
+        const pctRemaining = state.requests.remaining / state.requests.limit
+        if (pctRemaining < 0.20) {
+          logger.warn(
+            { service: 'linear-client', operation, rateLimit: state.requests },
+            'Approaching rate limit',
+          )
+        }
+      }
 
       logger.debug({ service: 'linear-client', operation, durationMs })
 
-      return { data, rateLimit: this.lastRateLimitInfo }
+      // Handle results that may include pageInfo (for paginated queries)
+      if (
+        result &&
+        typeof result === 'object' &&
+        'nodes' in result &&
+        'pageInfo' in result
+      ) {
+        const paginatedResult = result as {
+          nodes: unknown[]
+          pageInfo?: { hasNextPage?: boolean; endCursor?: string | null }
+        }
+        return {
+          data: paginatedResult.nodes as T,
+          rateLimit: rateLimiter.getState(),
+          pageInfo: paginatedResult.pageInfo
+            ? {
+                hasNextPage: paginatedResult.pageInfo.hasNextPage ?? false,
+                endCursor: paginatedResult.pageInfo.endCursor ?? null,
+              }
+            : undefined,
+        }
+      }
+
+      return { data: result as T, rateLimit: rateLimiter.getState() }
     } catch (error: unknown) {
       const durationMs = Math.round(performance.now() - start)
       throw this.classifyError(operation, error, durationMs)
@@ -143,10 +171,36 @@ export class LinearClientService {
     const parsed = this.parseSdkError(error)
 
     // If the SDK provided headers on an error response, capture them.
-    this.updateRateLimitFromHeaders(parsed.headers)
+    if (parsed.headers) {
+      rateLimiter.updateFromHeaders(parsed.headers)
+    }
 
-    // Network-level errors
-    if (parsed.linearType === LinearErrorType.NetworkError || this.isNetworkError(error)) {
+    // Rate-limit errors (Linear returns HTTP 400 with RATELIMITED GraphQL code)
+    if (rateLimiter.isRateLimited(error) || this.hasRateLimitedCode(parsed.raw)) {
+      const apiError = new LinearApiError({
+        message,
+        code: 'RATE_LIMITED',
+        type: 'RATE_LIMITED',
+        raw: parsed.raw ?? error,
+      })
+      logger.error({
+        service: 'linear-client',
+        operation,
+        error: apiError.message,
+        type: apiError.type,
+        durationMs,
+      })
+      return apiError
+    }
+
+    const isServerError = parsed.status !== undefined && parsed.status >= 500
+
+    // Network-level errors (including transient 5xx server errors)
+    if (
+      parsed.linearType === LinearErrorType.NetworkError ||
+      this.isNetworkError(error) ||
+      isServerError
+    ) {
       const networkError = this.buildNetworkError(message, error)
       logger.error({
         service: 'linear-client',
@@ -199,6 +253,27 @@ export class LinearClientService {
     } catch {
       return { status: undefined, linearType: undefined, headers: undefined, raw: undefined }
     }
+  }
+
+  /**
+   * Check if a parsed SDK error contains the RATELIMITED GraphQL error code.
+   */
+  private hasRateLimitedCode(raw: unknown): boolean {
+    if (!raw || typeof raw !== 'object') return false
+
+    try {
+      const parsed = raw as { raw?: { response?: { errors?: Array<{ extensions?: { code?: string } }> } } }
+      const errors = parsed.raw?.response?.errors
+      if (Array.isArray(errors)) {
+        return errors.some(
+          (e) => e.extensions?.code === 'RATELIMITED',
+        )
+      }
+    } catch {
+      // Swallow extraction errors
+    }
+
+    return false
   }
 
   private isNetworkError(error: unknown): boolean {
@@ -307,14 +382,53 @@ export class LinearClientService {
     const first = options?.first ?? 50
     const after = options?.after
 
-    return this.executeWithRateTracking('getIssuesByProject', async () => {
-      const connection = await client.issues({
-        filter: { project: { id: { eq: projectId } } },
-        first,
-        after,
+    // We need both nodes and pageInfo, so we'll execute the query manually
+    // to extract pageInfo while still using rate limiting
+    const start = performance.now()
+    await rateLimiter.waitIfNeeded()
+
+    try {
+      const connection = await retryHandler.executeWithRetry('getIssuesByProject', async () => {
+        return await rateLimiter.executeWithRetry(async () => {
+          const result = await client.issues({
+            filter: { project: { id: { eq: projectId } } },
+            first,
+            after,
+          })
+          await this.refreshRateLimitInfo()
+          return result
+        })
       })
-      return connection.nodes
-    })
+      const durationMs = Math.round(performance.now() - start)
+
+      // Post-call observability logging
+      const state = rateLimiter.getState()
+      if (state?.requests) {
+        const pctRemaining = state.requests.remaining / state.requests.limit
+        if (pctRemaining < 0.20) {
+          logger.warn(
+            { service: 'linear-client', operation: 'getIssuesByProject', rateLimit: state.requests },
+            'Approaching rate limit',
+          )
+        }
+      }
+
+      logger.debug({ service: 'linear-client', operation: 'getIssuesByProject', durationMs })
+
+      return {
+        data: connection.nodes,
+        rateLimit: rateLimiter.getState(),
+        pageInfo: connection.pageInfo
+          ? {
+              hasNextPage: connection.pageInfo.hasNextPage ?? false,
+              endCursor: connection.pageInfo.endCursor ?? null,
+            }
+          : undefined,
+      }
+    } catch (error: unknown) {
+      const durationMs = Math.round(performance.now() - start)
+      throw this.classifyError('getIssuesByProject', error, durationMs)
+    }
   }
 
   /**
@@ -336,7 +450,7 @@ export class LinearClientService {
         error instanceof LinearApiError &&
         error.type === 'NOT_FOUND'
       ) {
-        return { data: null, rateLimit: this.lastRateLimitInfo }
+        return { data: null, rateLimit: rateLimiter.getState() }
       }
       throw error
     }
@@ -358,11 +472,12 @@ export class LinearClientService {
   }
 
   /**
-   * Return the most recent rate-limit info captured from response headers.
-   * Returns `null` if no API calls have been made yet.
+   * Return the most recent full rate-limit info (all three dimensions)
+   * captured from response headers.  Returns `null` if no API calls have
+   * been made yet.
    */
-  getRateLimitInfo(): RateLimitInfo | null {
-    return this.lastRateLimitInfo
+  getRateLimitInfo(): FullRateLimitInfo | null {
+    return rateLimiter.getState()
   }
 }
 
