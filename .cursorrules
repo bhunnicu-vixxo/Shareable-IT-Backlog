@@ -1,5 +1,21 @@
 # Cursor Rules for Shareable Linear Backlog
 
+## CI/CD Auto-Fix Integration
+
+When CI tests fail (GitHub Actions / Bugbot), automatically fix common issues:
+
+1. **Detect failures**: Look for test errors, lint errors, or build failures
+2. **Auto-fix**: Apply fixes from `.cursor/rules/auto-fix-ci-failures.md`
+3. **Commit & push**: Use format `fix: [auto] resolve CI failure - [description]`
+4. **Loop**: Continue until all tests pass
+
+**User commands:**
+- "Fix CI failures" - Parse GitHub PR comments and fix all failures
+- "Auto-fix tests" - Fix all test failures automatically
+- "Fix lint errors" - Fix all linting errors automatically
+
+See `.cursor/rules/bugbot-integration.md` for full integration details.
+
 ## Linear Issue Management
 
 When the user mentions starting work on a Linear issue (e.g., "work on VIX-329", "grab issue VIX-329", "start VIX-329"):
