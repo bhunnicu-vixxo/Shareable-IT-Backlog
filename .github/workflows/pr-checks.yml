@@ -224,7 +224,67 @@ jobs:
         run: npm ci
 
       - name: Build backend
-        run: npm run build -w backend
+        id: build-backend
+        continue-on-error: true
+        run: |
+          npm run build -w backend 2>&1 | tee backend-build.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: Build frontend
-        run: npm run build -w frontend
+        id: build-frontend
+        continue-on-error: true
+        run: |
+          npm run build -w frontend 2>&1 | tee frontend-build.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Post build failures as PR comment
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## 🔨 Build Failures\n\n';
+            
+            if (fs.existsSync('backend-build.log')) {
+              const backendLog = fs.readFileSync('backend-build.log', 'utf8');
+              const failureSection = backendLog.slice(-6000);
+              comment += '### Backend Build Errors\n```\n' + failureSection + '\n```\n\n';
+              
+              // Extract TypeScript errors
+              const tsErrors = backendLog.match(/error TS\d+.*/g);
+              if (tsErrors) {
+                comment += '### TypeScript Errors\n';
+                tsErrors.slice(-10).forEach(err => {
+                  comment += `- ${err}\n`;
+                });
+                comment += '\n';
+              }
+            }
+            
+            if (fs.existsSync('frontend-build.log')) {
+              const frontendLog = fs.readFileSync('frontend-build.log', 'utf8');
+              const failureSection = frontendLog.slice(-6000);
+              comment += '### Frontend Build Errors\n```\n' + failureSection + '\n```\n\n';
+              
+              const tsErrors = frontendLog.match(/error TS\d+.*/g);
+              if (tsErrors) {
+                comment += '### TypeScript Errors\n';
+                tsErrors.slice(-10).forEach(err => {
+                  comment += `- ${err}\n`;
+                });
+                comment += '\n';
+              }
+            }
+            
+            comment += '---\n💡 **Cursor Auto-Fix**: Cursor can automatically fix build errors. Review the errors and ask Cursor to fix them.';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Fail if build failed
+        if: steps.build-backend.outputs.exit_code != '0' || steps.build-frontend.outputs.exit_code != '0'
+        run: exit 1
