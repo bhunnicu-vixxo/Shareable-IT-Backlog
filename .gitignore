@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
-package-lock.json
+# Keep root package-lock.json for CI/CD reproducibility (committed)
+# Ignore workspace-specific lock files (auto-generated)
+backend/package-lock.json
+frontend/package-lock.json
 yarn.lock
 pnpm-lock.yaml
 

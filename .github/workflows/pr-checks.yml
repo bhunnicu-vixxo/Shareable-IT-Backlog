@@ -25,15 +25,55 @@ jobs:
         with:
           node-version: '20.19.0'
           cache: 'npm'
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Lint backend
-        run: npm run lint -w backend
+        id: lint-backend
+        continue-on-error: true
+        run: |
+          npm run lint -w backend 2>&1 | tee backend-lint.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: Lint frontend
-        run: npm run lint -w frontend
+        id: lint-frontend
+        continue-on-error: true
+        run: |
+          npm run lint -w frontend 2>&1 | tee frontend-lint.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Post lint failures as PR comment
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## 🔍 Lint Failures\n\n';
+            
+            if (fs.existsSync('backend-lint.log')) {
+              const backendLog = fs.readFileSync('backend-lint.log', 'utf8');
+              comment += '### Backend Lint Errors\n```\n' + backendLog.slice(-4000) + '\n```\n\n';
+            }
+            
+            if (fs.existsSync('frontend-lint.log')) {
+              const frontendLog = fs.readFileSync('frontend-lint.log', 'utf8');
+              comment += '### Frontend Lint Errors\n```\n' + frontendLog.slice(-4000) + '\n```\n\n';
+            }
+            
+            comment += '---\n💡 **Cursor Auto-Fix**: Review the errors above. Cursor can automatically fix many linting issues.';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Fail if lint errors
+        if: steps.lint-backend.outputs.exit_code != '0' || steps.lint-frontend.outputs.exit_code != '0'
+        run: exit 1
 
   test-backend:
     name: Test Backend
@@ -49,12 +89,56 @@ jobs:
         with:
           node-version: '20.19.0'
           cache: 'npm'
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run backend tests
-        run: npm run test:run -w backend
+        id: test-backend
+        continue-on-error: true
+        run: |
+          npm run test:run -w backend 2>&1 | tee backend-test.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Post test failures as PR comment
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## ❌ Backend Test Failures\n\n';
+            
+            if (fs.existsSync('backend-test.log')) {
+              const testLog = fs.readFileSync('backend-test.log', 'utf8');
+              // Extract failure details (last 6000 chars to fit GitHub comment limits)
+              const failureSection = testLog.slice(-6000);
+              comment += '### Test Output\n```\n' + failureSection + '\n```\n\n';
+              
+              // Try to extract specific test failures
+              const failures = testLog.match(/FAIL\s+.*?\.test\.ts.*?\n[\s\S]*?(?=PASS|FAIL|Test Files|$)/g);
+              if (failures) {
+                comment += '### Failed Tests\n';
+                failures.slice(-5).forEach(f => {
+                  const testName = f.match(/FAIL\s+(.*?\.test\.ts)/)?.[1] || 'Unknown';
+                  comment += `- \`${testName}\`\n`;
+                });
+                comment += '\n';
+              }
+            }
+            
+            comment += '---\n💡 **Cursor Auto-Fix**: Cursor can automatically fix test failures. Review the errors and ask Cursor to fix them.';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Fail if tests failed
+        if: steps.test-backend.outputs.exit_code != '0'
+        run: exit 1
 
   test-frontend:
     name: Test Frontend
@@ -70,12 +154,54 @@ jobs:
         with:
           node-version: '20.19.0'
           cache: 'npm'
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run frontend tests
-        run: npm run test:run -w frontend
+        id: test-frontend
+        continue-on-error: true
+        run: |
+          npm run test:run -w frontend 2>&1 | tee frontend-test.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Post test failures as PR comment
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## ❌ Frontend Test Failures\n\n';
+            
+            if (fs.existsSync('frontend-test.log')) {
+              const testLog = fs.readFileSync('frontend-test.log', 'utf8');
+              const failureSection = testLog.slice(-6000);
+              comment += '### Test Output\n```\n' + failureSection + '\n```\n\n';
+              
+              const failures = testLog.match(/FAIL\s+.*?\.test\.tsx?.*?\n[\s\S]*?(?=PASS|FAIL|Test Files|$)/g);
+              if (failures) {
+                comment += '### Failed Tests\n';
+                failures.slice(-5).forEach(f => {
+                  const testName = f.match(/FAIL\s+(.*?\.test\.tsx?)/)?.[1] || 'Unknown';
+                  comment += `- \`${testName}\`\n`;
+                });
+                comment += '\n';
+              }
+            }
+            
+            comment += '---\n💡 **Cursor Auto-Fix**: Cursor can automatically fix test failures. Review the errors and ask Cursor to fix them.';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Fail if tests failed
+        if: steps.test-frontend.outputs.exit_code != '0'
+        run: exit 1
 
   build:
     name: Build
@@ -92,12 +218,73 @@ jobs:
         with:
           node-version: '20.19.0'
           cache: 'npm'
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build backend
-        run: npm run build -w backend
+        id: build-backend
+        continue-on-error: true
+        run: |
+          npm run build -w backend 2>&1 | tee backend-build.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: Build frontend
-        run: npm run build -w frontend
+        id: build-frontend
+        continue-on-error: true
+        run: |
+          npm run build -w frontend 2>&1 | tee frontend-build.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Post build failures as PR comment
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## 🔨 Build Failures\n\n';
+            
+            if (fs.existsSync('backend-build.log')) {
+              const backendLog = fs.readFileSync('backend-build.log', 'utf8');
+              const failureSection = backendLog.slice(-6000);
+              comment += '### Backend Build Errors\n```\n' + failureSection + '\n```\n\n';
+              
+              // Extract TypeScript errors
+              const tsErrors = backendLog.match(/error TS\d+.*/g);
+              if (tsErrors) {
+                comment += '### TypeScript Errors\n';
+                tsErrors.slice(-10).forEach(err => {
+                  comment += `- ${err}\n`;
+                });
+                comment += '\n';
+              }
+            }
+            
+            if (fs.existsSync('frontend-build.log')) {
+              const frontendLog = fs.readFileSync('frontend-build.log', 'utf8');
+              const failureSection = frontendLog.slice(-6000);
+              comment += '### Frontend Build Errors\n```\n' + failureSection + '\n```\n\n';
+              
+              const tsErrors = frontendLog.match(/error TS\d+.*/g);
+              if (tsErrors) {
+                comment += '### TypeScript Errors\n';
+                tsErrors.slice(-10).forEach(err => {
+                  comment += `- ${err}\n`;
+                });
+                comment += '\n';
+              }
+            }
+            
+            comment += '---\n💡 **Cursor Auto-Fix**: Cursor can automatically fix build errors. Review the errors and ask Cursor to fix them.';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Fail if build failed
+        if: steps.build-backend.outputs.exit_code != '0' || steps.build-frontend.outputs.exit_code != '0'
+        run: exit 1
