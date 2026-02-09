@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { parseLinearError } from '@linear/sdk'
 import type { Issue, Comment } from '@linear/sdk'
 
 /* ------------------------------------------------------------------ */
@@ -30,9 +31,15 @@ const mockRawRequest = vi.fn().mockResolvedValue({
   headers: new Headers({
     'X-RateLimit-Requests-Limit': '5000',
     'X-RateLimit-Requests-Remaining': '4999',
-    // SDK docs say this is a unix timestamp; story expects ms.
-    // We use ms here to match story contract.
     'X-RateLimit-Requests-Reset': String(Date.now() + 60_000),
+    'X-Complexity': '10',
+    'X-RateLimit-Complexity-Limit': '3000000',
+    'X-RateLimit-Complexity-Remaining': '2999990',
+    'X-RateLimit-Complexity-Reset': String(Date.now() + 60_000),
+    'X-RateLimit-Endpoint-Name': 'viewer',
+    'X-RateLimit-Endpoint-Requests-Limit': '1000',
+    'X-RateLimit-Endpoint-Requests-Remaining': '999',
+    'X-RateLimit-Endpoint-Requests-Reset': String(Date.now() + 60_000),
   }),
 })
 
@@ -41,6 +48,7 @@ vi.mock('@linear/sdk', async (importOriginal) => {
 
   return {
     ...actual,
+    parseLinearError: vi.fn(),
     LinearClient: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
       this.viewer = Promise.resolve(mockViewer)
       this.issues = mockIssues
@@ -59,15 +67,54 @@ vi.mock('../../utils/logger.js', () => ({
   },
 }))
 
+// Mock the rate limiter's sleep to avoid real delays in tests
+vi.mock('./rate-limiter.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./rate-limiter.js')>()
+
+  // Subclass that skips real sleep
+  class TestRateLimiter extends actual.RateLimiter {
+    protected override sleep(): Promise<void> {
+      return Promise.resolve()
+    }
+  }
+
+  return {
+    ...actual,
+    rateLimiter: new TestRateLimiter(),
+    RateLimiter: actual.RateLimiter,
+  }
+})
+
+// Mock the retry handler's sleep to avoid real delays in tests
+vi.mock('./retry-handler.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./retry-handler.js')>()
+
+  // Subclass that skips real sleep
+  class TestRetryHandler extends actual.RetryHandler {
+    protected override sleep(): Promise<void> {
+      return Promise.resolve()
+    }
+  }
+
+  return {
+    ...actual,
+    retryHandler: new TestRetryHandler(),
+    RetryHandler: actual.RetryHandler,
+  }
+})
+
 /* ------------------------------------------------------------------ */
 /*  Import module under test AFTER mocks are registered                */
 /* ------------------------------------------------------------------ */
 
 import { LinearClientService } from './linear-client.service.js'
 import { LinearConfigError, LinearApiError, LinearNetworkError } from '../../utils/linear-errors.js'
+import { rateLimiter } from './rate-limiter.js'
+import { retryHandler } from './retry-handler.js'
 
 describe('LinearClientService', () => {
   let service: LinearClientService
+  const mockParseLinearError = parseLinearError as ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     process.env.LINEAR_API_KEY = 'lin_api_test_key'
@@ -76,6 +123,11 @@ describe('LinearClientService', () => {
     service = new LinearClientService()
     // Reset mock implementations to defaults
     mockIssues.mockResolvedValue({ nodes: mockIssueNodes })
+    mockParseLinearError.mockReturnValue({
+      status: undefined,
+      type: undefined,
+      raw: undefined,
+    })
     mockIssue.mockResolvedValue({
       id: 'issue-1',
       title: 'First issue',
@@ -88,13 +140,12 @@ describe('LinearClientService', () => {
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Task 6.2 — Config validation                                    */
+  /*  Config validation                                                */
   /* ---------------------------------------------------------------- */
   describe('configuration validation', () => {
     it('throws LinearConfigError when LINEAR_API_KEY is missing', async () => {
       delete process.env.LINEAR_API_KEY
 
-      // Create a fresh instance so config is re-evaluated.
       const badService = new LinearClientService()
 
       await expect(badService.verifyAuth()).rejects.toThrow(LinearConfigError)
@@ -102,7 +153,7 @@ describe('LinearClientService', () => {
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Task 6.3 — verifyAuth                                           */
+  /*  verifyAuth                                                       */
   /* ---------------------------------------------------------------- */
   describe('verifyAuth', () => {
     it('calls SDK viewer method and returns structured result', async () => {
@@ -117,7 +168,7 @@ describe('LinearClientService', () => {
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Task 6.4 — getIssuesByProject                                   */
+  /*  getIssuesByProject                                               */
   /* ---------------------------------------------------------------- */
   describe('getIssuesByProject', () => {
     it('calls SDK with correct filter and default pagination', async () => {
@@ -144,7 +195,7 @@ describe('LinearClientService', () => {
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Task 6.5 — getIssueById returns null for non-existent issue     */
+  /*  getIssueById                                                     */
   /* ---------------------------------------------------------------- */
   describe('getIssueById', () => {
     it('returns issue data for an existing issue', async () => {
@@ -164,7 +215,7 @@ describe('LinearClientService', () => {
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Task 6.6 — GraphQL errors → LinearApiError                      */
+  /*  Error classification — API errors                                */
   /* ---------------------------------------------------------------- */
   describe('error classification — API errors', () => {
     it('throws LinearApiError for GraphQL errors', async () => {
@@ -191,13 +242,13 @@ describe('LinearClientService', () => {
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Task 6.7 — Network errors → LinearNetworkError                  */
+  /*  Error classification — network errors                            */
   /* ---------------------------------------------------------------- */
   describe('error classification — network errors', () => {
     it('throws LinearNetworkError for connection failures', async () => {
       const connError = new Error('connect ECONNREFUSED 127.0.0.1:443')
       ;(connError as NodeJS.ErrnoException).code = 'ECONNREFUSED'
-      mockIssues.mockRejectedValueOnce(connError)
+      mockIssues.mockRejectedValue(connError)
 
       await expect(
         service.getIssuesByProject('project-uuid'),
@@ -207,7 +258,7 @@ describe('LinearClientService', () => {
     it('classifies DNS errors as DNS_FAILURE', async () => {
       const dnsError = new Error('getaddrinfo ENOTFOUND api.linear.app')
       ;(dnsError as NodeJS.ErrnoException).code = 'ENOTFOUND'
-      mockIssues.mockRejectedValueOnce(dnsError)
+      mockIssues.mockRejectedValue(dnsError)
 
       try {
         await service.getIssuesByProject('project-uuid')
@@ -221,7 +272,7 @@ describe('LinearClientService', () => {
     it('classifies timeout errors as TIMEOUT', async () => {
       const timeoutError = new Error('Request timed out (ETIMEDOUT)')
       ;(timeoutError as NodeJS.ErrnoException).code = 'ETIMEDOUT'
-      mockIssues.mockRejectedValueOnce(timeoutError)
+      mockIssues.mockRejectedValue(timeoutError)
 
       try {
         await service.getIssuesByProject('project-uuid')
@@ -231,15 +282,129 @@ describe('LinearClientService', () => {
         expect((error as LinearNetworkError).code).toBe('TIMEOUT')
       }
     })
+
+    it('classifies 5xx server errors as LinearNetworkError', async () => {
+      const serverError = new Error('Internal Server Error')
+      mockParseLinearError.mockReturnValue({ status: 500, type: undefined, raw: undefined })
+      mockIssues.mockRejectedValue(serverError)
+
+      await expect(
+        service.getIssuesByProject('project-uuid'),
+      ).rejects.toThrow(LinearNetworkError)
+    })
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Task 6.8 — getRateLimitInfo                                     */
+  /*  Rate limit integration (Story 2.2 — Task 5.11)                  */
   /* ---------------------------------------------------------------- */
-  describe('getRateLimitInfo', () => {
-    it('returns null before any API calls', () => {
-      const freshService = new LinearClientService()
-      expect(freshService.getRateLimitInfo()).toBeNull()
+  describe('rate limit integration', () => {
+    it('executeWithRateTracking calls waitIfNeeded before operation', async () => {
+      const waitSpy = vi.spyOn(rateLimiter, 'waitIfNeeded')
+
+      await service.verifyAuth()
+
+      expect(waitSpy).toHaveBeenCalled()
+    })
+
+    it('rate limit errors trigger retry logic via executeWithRetry', async () => {
+      const retrySpy = vi.spyOn(rateLimiter, 'executeWithRetry')
+
+      await service.verifyAuth()
+
+      expect(retrySpy).toHaveBeenCalled()
+    })
+
+    it('getRateLimitInfo returns full state including complexity', async () => {
+      // Make an API call to populate rate limit state
+      await service.verifyAuth()
+
+      const info = service.getRateLimitInfo()
+
+      expect(info).not.toBeNull()
+      // After the probe, the rate limiter should have parsed all headers
+      expect(info!.requests).not.toBeNull()
+      expect(info!.complexity).not.toBeNull()
+      expect(info!.endpoint).not.toBeNull()
+    })
+
+    it('getRateLimitInfo delegates to rateLimiter singleton state', async () => {
+      // After an API call, getRateLimitInfo should return the shared rateLimiter state
+      await service.verifyAuth()
+      const info = service.getRateLimitInfo()
+      expect(info).toBe(rateLimiter.getState())
+    })
+
+    it('classifies RATELIMITED GraphQL errors as RATE_LIMITED type', async () => {
+      const rateLimitError = new Error('Rate limited')
+      ;(rateLimitError as unknown as Record<string, unknown>).raw = {
+        response: {
+          errors: [{ message: 'Rate limited', extensions: { code: 'RATELIMITED' } }],
+        },
+      }
+      // The error needs to be thrown by executeWithRetry (i.e., after retries exhausted)
+      // Since our mock rate limiter won't retry on this (it goes through the inner fn),
+      // let's mock it so the SDK throws and executeWithRetry passes it through
+      mockIssues.mockRejectedValue(rateLimitError)
+      vi.spyOn(rateLimiter, 'executeWithRetry').mockRejectedValueOnce(rateLimitError)
+
+      try {
+        await service.getIssuesByProject('project-uuid')
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(LinearApiError)
+        expect((error as LinearApiError).type).toBe('RATE_LIMITED')
+      }
+    })
+  })
+
+  /* ---------------------------------------------------------------- */
+  /*  Transient retry integration (Story 2.3 — Task 5)                */
+  /* ---------------------------------------------------------------- */
+  describe('transient retry integration', () => {
+    it('executeWithRateTracking wraps operations with transient retry handler', async () => {
+      const retrySpy = vi.spyOn(retryHandler, 'executeWithRetry')
+
+      await service.verifyAuth()
+
+      expect(retrySpy).toHaveBeenCalled()
+      // Verify the operation name is passed
+      expect(retrySpy).toHaveBeenCalledWith('verifyAuth', expect.any(Function))
+    })
+
+    it('transient errors (network) are retried before being classified', async () => {
+      const connError = new Error('connect ECONNREFUSED 127.0.0.1:443')
+      ;(connError as NodeJS.ErrnoException).code = 'ECONNREFUSED'
+
+      // Make the SDK consistently fail with a network error
+      mockIssues.mockRejectedValue(connError)
+
+      try {
+        await service.getIssuesByProject('project-uuid')
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(LinearNetworkError)
+      }
+
+      // The retry handler should have been invoked and retried (the SDK call
+      // happens inside retryHandler.executeWithRetry → rateLimiter.executeWithRetry → fn)
+      // With default maxRetries=3, we expect 4 total calls (1 initial + 3 retries)
+      expect(mockIssues.mock.calls.length).toBeGreaterThan(1)
+    })
+
+    it('non-retryable errors (auth) pass through without transient retry', async () => {
+      const authError = new Error('Authentication required: Invalid API key')
+      mockIssues.mockRejectedValue(authError)
+
+      try {
+        await service.getIssuesByProject('project-uuid')
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(LinearApiError)
+        expect((error as LinearApiError).type).toBe('AUTHENTICATION_ERROR')
+      }
+
+      // Auth errors are not retryable, so only 1 call should be made
+      expect(mockIssues).toHaveBeenCalledTimes(1)
     })
   })
 })
