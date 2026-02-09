@@ -11,6 +11,52 @@
 const fs = require('fs');
 const path = require('path');
 
+// Allow reading key from local env files (never committed).
+// Preference order:
+// 1) existing process.env.LINEAR_API_KEY (explicit shell env)
+// 2) backend/.env
+// 3) .env (repo root)
+function tryLoadLinearApiKeyFromEnvFiles() {
+  if (process.env.LINEAR_API_KEY) return
+
+  const candidates = [
+    path.join(process.cwd(), 'backend', '.env'),
+    path.join(process.cwd(), '.env'),
+  ]
+
+  for (const filePath of candidates) {
+    try {
+      if (!fs.existsSync(filePath)) continue
+      const content = fs.readFileSync(filePath, 'utf8')
+
+      for (const rawLine of content.split(/\r?\n/)) {
+        const line = rawLine.trim()
+        if (!line || line.startsWith('#')) continue
+        const normalized = line.replace(/\s*=\s*/, '=')
+        if (!/^LINEAR_API_KEY=/.test(normalized)) continue
+
+        let value = normalized.split('=').slice(1).join('=').trim()
+        // Strip optional quotes
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
+          value = value.slice(1, -1)
+        }
+
+        if (value) {
+          process.env.LINEAR_API_KEY = value
+          return
+        }
+      }
+    } catch {
+      // ignore and try next candidate
+    }
+  }
+}
+
+tryLoadLinearApiKeyFromEnvFiles()
+
 // Configuration
 const LINEAR_API_KEY = process.env.LINEAR_API_KEY;
 const LINEAR_API_URL = 'https://api.linear.app/graphql';
