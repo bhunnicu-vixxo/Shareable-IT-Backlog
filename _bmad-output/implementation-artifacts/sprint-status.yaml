@@ -72,8 +72,14 @@ development_status:
     status: done
     linear_id: "VIX-341"
     linear_url: "https://linear.app/vixxo/issue/VIX-341/implement-prioritystack-rank-visualization"
-  3-3-implement-new-item-flagging: backlog
-  3-4-implement-item-detail-view: backlog
+  3-3-implement-new-item-flagging:
+    status: done
+    linear_id: "VIX-342"
+    linear_url: "https://linear.app/vixxo/issue/VIX-342/implement-new-item-flagging"
+  3-4-implement-item-detail-view:
+    status: review
+    linear_id: "VIX-343"
+    linear_url: "https://linear.app/vixxo/issue/VIX-343/implement-item-detail-view"
   epic-3-retrospective: optional
 
   # Epic 4: Filtering & Search

@@ -1,0 +1,63 @@
+---
+description: Vixxo Brand Guidelines
+globs: ["**/*.html", "**/*.css", "**/tailwind.config.js"]
+alwaysApply: false
+---
+
+# Vixxo Brand Guide
+
+## Color Palette
+
+| Token | Hex | Tailwind Class | Usage |
+|-------|-----|----------------|-------|
+| Primary | #8E992E | `bg-vixxo-primary`, `text-vixxo-primary` | Primary actions, links, CTAs |
+| Secondary | #2C7B80 | `bg-vixxo-secondary`, `text-vixxo-secondary` | Secondary elements, hover states |
+| Tertiary/Accent | #956125 | `bg-vixxo-accent`, `text-vixxo-accent` | Highlights, badges, alerts |
+| Light | #D6DBDB | `bg-vixxo-light` | Page backgrounds |
+| Dark | #3D3D3D | `text-vixxo-dark` | Body text |
+
+## Status Colors
+
+| Status | Hex | Tailwind Class | Usage |
+|--------|-----|----------------|-------|
+| Success | #10B981 | `bg-green-500`, `text-green-500` | Confirmations, completed states |
+| Warning | #F59E0B | `bg-yellow-500`, `text-yellow-500` | Warnings, pending states |
+| Error | #EF4444 | `bg-red-500`, `text-red-500` | Errors, destructive actions |
+| Info | #3B82F6 | `bg-blue-500`, `text-blue-500` | Informational messages |
+
+## Typography
+
+- **Font Family:** Arial (all text - headings and body)
+- **Headings:** Arial, bold
+- **Body:** Arial, regular, 16px base
+- **Font Stack:** `font-sans` (Tailwind default uses system sans-serif, Arial is fallback)
+
+## Logo
+
+- **Current Format:** PNG
+- **Path:** `/static/images/vixxo-logo.png`
+- **Minimum height:** 32px (use `h-8` in Tailwind)
+- **Clear space:** 8px on all sides
+- **Fallback:** Text "Vixxo" in `text-vixxo-primary font-bold` (used if PNG fails to load)
+
+### Logo Implementation Pattern
+```html
+<a href="/" class="flex items-center">
+    <img src="{% static 'images/vixxo-logo.png' %}" alt="Vixxo" class="h-8"
+         onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+    <span class="text-xl font-bold text-vixxo-primary" style="display:none;">Vixxo</span>
+</a>
+```
+
+## Iconography
+
+- **Library:** Font Awesome 6 (Free)
+- **CDN:** `https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css`
+- **Style:** Solid (`fa-solid`)
+- **Implementation:** Use `<i>` tags with the appropriate classes.
+
+### Icon Guidelines
+- Use consistent sizing (e.g., `text-4xl` for large feature icons, `text-xl` for UI actions).
+- Avoid Pro-only icons (e.g., use `fa-shield-halved` instead of `fa-shield-check`).
+- Pair with brand colors (e.g., `text-vixxo-primary` or `text-vixxo-secondary`).
+- Icons in circles or squares should have centered alignment and proper padding.

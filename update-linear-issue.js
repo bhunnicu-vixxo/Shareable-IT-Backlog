@@ -207,6 +207,7 @@ async function findStateByName(teamId, stateName) {
   // Try common variations
   const variations = {
     'in progress': ['in progress', 'in-progress', 'in development', 'doing', 'active'],
+    'in review': ['in review', 'review', 'in-review', 'code review'],
     'done': ['done', 'completed', 'complete', 'finished'],
     'todo': ['todo', 'to do', 'backlog', 'planned'],
     'canceled': ['canceled', 'cancelled', 'cancelled']

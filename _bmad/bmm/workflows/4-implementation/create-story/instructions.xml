@@ -339,6 +339,22 @@
       <action>Save file, preserving ALL comments and structure including STATUS DEFINITIONS</action>
     </check>
 
+    <!-- Update Linear issue: set to Todo and add story file comment -->
+    <check if="{{linear_issue_id}} is non-empty">
+      <action>Update Linear issue {{linear_issue_id}} state to "Todo" (via Linear MCP mcp_linear_update_issue)</action>
+      <action>Add a comment to Linear issue {{linear_issue_id}} with Markdown body:
+
+**BMAD Story Created**
+
+- **Story:** {{story_key}} ({{story_id}})
+- **File:** `{{story_file}}`
+- **Status:** ready-for-dev
+
+Run `dev-story` for implementation.
+
+(via Linear MCP mcp_linear_create_comment)</action>
+    </check>
+
     <action>Report completion</action>
     <output>**🎯 ULTIMATE BMad Method STORY CONTEXT CREATED, {user_name}!**
 

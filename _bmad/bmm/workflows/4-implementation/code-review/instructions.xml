@@ -21,6 +21,13 @@
     <action>Set {{story_key}} = extracted key from filename (e.g., "1-2-user-authentication.md" → "1-2-user-authentication") or story
       metadata</action>
     <action>Extract {{linear_issue_id}} from the "Linear Issue ID:" field in the story file header</action>
+
+    <!-- LINEAR: Set status to In Review when code review is initiated -->
+    <check if="{{linear_issue_id}} is not empty">
+      <action>Update Linear issue {{linear_issue_id}} status to "In Review" using the Linear MCP tool (update_issue with state "In Review")</action>
+      <output>📋 Linear issue {{linear_issue_id}} set to In Review</output>
+    </check>
+
     <action>Parse sections: Story, Acceptance Criteria, Tasks/Subtasks, Dev Agent Record → File List, Change Log</action>
 
     <!-- Discover actual changes via git -->
