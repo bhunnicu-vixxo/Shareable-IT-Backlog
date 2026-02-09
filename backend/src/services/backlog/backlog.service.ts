@@ -58,8 +58,10 @@ export class BacklogService {
     )
 
     // 1. Fetch raw issues from Linear via the GraphQL client
+    //    Limit default to 20 to reduce lazy-loading overhead (each issue
+    //    resolves ~5 SDK relations → additional API calls).
     const result = await linearClient.getIssuesByProject(projectId, {
-      first: options?.first ?? 50,
+      first: options?.first ?? 20,
       after: options?.after,
     })
 

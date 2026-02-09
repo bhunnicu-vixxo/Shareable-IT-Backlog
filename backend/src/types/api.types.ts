@@ -1,0 +1,48 @@
+/**
+ * Shared API response types.
+ *
+ * Includes cursor-based pagination (matching Linear's model),
+ * standard error responses, and sync status shapes.
+ */
+
+import type {
+  BacklogItemDto,
+  CommentDto,
+} from './linear-entities.types.js'
+
+/** Cursor-based pagination info matching Linear's model. */
+export interface PaginationInfo {
+  hasNextPage: boolean
+  endCursor: string | null
+}
+
+/** Paginated list response wrapper. */
+export interface PaginatedResponse<T> {
+  items: T[]
+  pageInfo: PaginationInfo
+  totalCount: number
+}
+
+/** Backlog detail response shape. */
+export interface BacklogDetailResponse {
+  item: BacklogItemDto
+  comments: CommentDto[]
+}
+
+/** Standard API error response (matches error.middleware.ts). */
+export interface ApiErrorResponse {
+  error: {
+    message: string
+    code: string
+    details?: unknown
+  }
+}
+
+/** Sync status response shape. */
+export interface SyncStatusResponse {
+  /** ISO 8601 datetime or null if never synced */
+  lastSyncedAt: string | null
+  status: 'idle' | 'syncing' | 'success' | 'error'
+  itemCount: number | null
+  errorMessage: string | null
+}

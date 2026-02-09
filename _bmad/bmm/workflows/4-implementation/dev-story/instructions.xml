@@ -5,6 +5,7 @@
   <critical>Generate all documents in {document_output_language}</critical>
   <critical>Only modify the story file in these areas: Tasks/Subtasks checkboxes, Dev Agent Record (Debug Log, Completion Notes), File List,
     Change Log, and Status</critical>
+  <critical>NEVER modify the story's "Acceptance Criteria" section (or the "Story" section). If clarification is needed, capture it in Dev Notes / Dev Agent Record and in Linear comments—do not rewrite acceptance criteria.</critical>
   <critical>Execute ALL steps in exact order; do NOT skip steps</critical>
   <critical>Absolutely DO NOT stop because of "milestones", "significant progress", or "session boundaries". Continue in a single execution
     until the story is COMPLETE (all ACs satisfied and all tasks/subtasks checked) UNLESS a HALT condition is triggered or the USER gives
@@ -17,7 +18,7 @@
       <action>Use {{story_path}} directly</action>
       <action>Read COMPLETE story file</action>
       <action>Extract story_key from filename or metadata</action>
-      <goto anchor="task_check" />
+      <goto> anchor with id task_check</goto>
     </check>
 
     <!-- Sprint-based story discovery -->
@@ -120,7 +121,6 @@
     <anchor id="task_check" />
 
     <action>Parse sections: Story, Acceptance Criteria, Tasks/Subtasks, Dev Notes, Dev Agent Record, File List, Change Log, Status</action>
-    <action>Extract {{linear_issue_id}} from the "Linear Issue ID:" field in the story file header</action>
 
     <action>Load comprehensive context from story file's Dev Notes section</action>
     <action>Extract developer guidance from Dev Notes: architecture requirements, previous learnings, technical specifications</action>
@@ -188,14 +188,30 @@
     </check>
   </step>
 
-  <step n="4" goal="Mark story in-progress and update Linear" tag="sprint-status">
+  <step n="4" goal="Mark story in-progress" tag="sprint-status">
     <check if="{{sprint_status}} file exists">
       <action>Load the FULL file: {{sprint_status}}</action>
       <action>Read all development_status entries to find {{story_key}}</action>
-      <action>Get current status value for development_status[{{story_key}}]</action>
+
+      <!-- BACKWARD COMPATIBILITY: Handle old vs new sprint-status.yaml format -->
+      <action>Check format of development_status[{{story_key}}]:
+        - If STRING (old format): status = the string value, linear_id = "" (not available)
+        - If OBJECT (new format): status = .status field, linear_id = .linear_id field
+      </action>
+      <action>Get current status value (from string or .status field)</action>
+      <action>Extract linear_id from development_status[{{story_key}}].linear_id if format is object (otherwise set to "")</action>
 
       <check if="current status == 'ready-for-dev' OR review_continuation == true">
-        <action>Update the story in the sprint status report to = "in-progress"</action>
+        <!-- Convert old format to new format when updating -->
+        <action>If old string format, convert to object format when updating:
+          ```yaml
+          {{story_key}}:
+            status: in-progress
+            linear_id: ""
+            linear_url: ""
+          ```
+        </action>
+        <action>If new object format, update development_status[{{story_key}}].status = "in-progress"</action>
         <output>🚀 Starting work on story {{story_key}}
           Status updated: ready-for-dev → in-progress
         </output>
@@ -221,13 +237,83 @@
       <action>Set {{current_sprint_status}} = "no-sprint-tracking"</action>
     </check>
 
-    <!-- LINEAR INTEGRATION: Move issue to In Progress -->
-    <check if="{{linear_issue_id}} is not empty">
-      <action>Update Linear issue {{linear_issue_id}} status to "In Progress" using the Linear MCP tool (update_issue with state "In Progress")</action>
-      <output>📋 Linear issue {{linear_issue_id}} moved to **In Progress**</output>
+    <!-- Linear sync for in-progress status - ALWAYS attempt to sync -->
+    <critical>Linear issue MUST be self-assigned and moved to In Progress before implementation begins</critical>
+
+    <check if="{{linear_id}} exists and is not empty string">
+      <action>Use mcp_linear_update_issue to sync status:
+        - id: {{linear_id}}
+        - state: "In Progress"
+        - assignee: "me"
+      </action>
+      <output>🔗 Linear issue {{linear_id}} assigned to me and moved to In Progress</output>
     </check>
-    <check if="{{linear_issue_id}} is empty">
-      <output>ℹ️ No Linear Issue ID found in story file - skipping Linear status update</output>
+
+    <check if="{{linear_id}} does NOT exist or is empty string">
+      <action>Search Linear for the story issue using mcp_linear_list_issues:
+        - team: "Vixxo" (or configured team)
+        - query: "{{story_key}}" (e.g., "1-4-base-layout")
+        - limit: 5
+      </action>
+
+      <check if="matching issue found in Linear search results">
+        <action>Extract the Linear issue ID from the search result</action>
+        <action>Store as {{linear_id}}</action>
+        <action>Use mcp_linear_update_issue to sync status:
+          - id: {{linear_id}}
+          - state: "In Progress"
+          - assignee: "me"
+        </action>
+
+        <!-- Optionally update sprint-status.yaml with the discovered linear_id -->
+        <check if="{{sprint_status}} file exists">
+          <action>Update development_status[{{story_key}}] to include:
+            - linear_id: {{linear_id}}
+            - linear_url: extracted from issue URL
+          </action>
+          <output>🔗 Linear issue {{linear_id}} found, assigned to me, moved to In Progress, and linked in sprint-status.yaml</output>
+        </check>
+
+        <check if="{{sprint_status}} file does NOT exist">
+          <output>🔗 Linear issue {{linear_id}} found, assigned to me, and moved to In Progress</output>
+        </check>
+      </check>
+
+      <check if="no matching issue found in Linear">
+        <output>ℹ️ No Linear issue found for {{story_key}} - proceeding without Linear sync
+
+          To link this story to Linear later, add the linear_id to sprint-status.yaml or run sprint-planning workflow.
+        </output>
+      </check>
+    </check>
+
+    <critical>Before ANY implementation begins, you MUST work on a dedicated branch.</critical>
+
+    <!-- Detect GitHub username dynamically -->
+    <action>Detect GitHub username for branch naming:
+      1. Run `git config user.name` to get the configured git username
+      2. Store result as {{github_username}}
+      3. If empty or fails, fall back to {user_name} from config
+    </action>
+
+    <action>Create a new branch BEFORE Step 5 implementation using this format exactly:
+      - `{{github_username}}/issue-{{story_key}}`
+
+      Notes:
+      - Convert {{github_username}} to lowercase-kebab-case (spaces → hyphens, lowercase).
+      - Convert {{story_key}} to lowercase-kebab-case if needed.
+      - If already on that branch, continue; otherwise create/switch to it.
+
+      Example: If git username is "Brandon Franz" and story_key is "1-4-base-layout":
+      - Branch: `brandon-franz/issue-1-4-base-layout`
+    </action>
+    <action if="branch creation/switch fails">HALT - Do not implement outside the required `{{github_username}}/issue-{{story_key}}` branch</action>
+
+    <check if="{{linear_id}} exists and is not empty string">
+      <action>Use mcp_linear_create_comment to record the implementation branch and kickoff context (DO NOT edit acceptance criteria):
+        - issueId: {{linear_id}}
+        - body: include branch name (`{{github_username}}/issue-{{story_key}}`), story file path, and the first task being started
+      </action>
     </check>
   </step>
 
@@ -273,7 +359,38 @@
     <action>Determine how to run tests for this repo (infer test framework from project structure)</action>
     <action>Run all existing tests to ensure no regressions</action>
     <action>Run the new tests to verify implementation correctness</action>
-    <action>Run linting and code quality checks if configured in project</action>
+
+    <!-- Python Linting (CI Mirror) - Prevents web-ci failures -->
+    <check if="Python project detected (requirements.txt, pyproject.toml, or .py files modified)">
+      <critical>Run Python linting tools to prevent CI failures - these are NOT optional</critical>
+      <action>Check if in virtual environment; activate if available (source venv/bin/activate)</action>
+
+      <action>Run Black formatter check:
+        ```bash
+        black --check --diff .
+        ```
+        If Black fails: Run `black .` to auto-fix, then re-run check
+      </action>
+
+      <action>Run isort import sorter check:
+        ```bash
+        isort --check-only --diff . --skip venv --skip __pycache__
+        ```
+        If isort fails: Run `isort . --skip venv --skip __pycache__` to auto-fix, then re-run check
+      </action>
+
+      <action>Run Flake8 linting:
+        ```bash
+        flake8 .
+        ```
+        If Flake8 fails: Fix violations manually (cannot auto-fix), address each error
+      </action>
+
+      <action if="any linting tool fails after auto-fix attempts">HALT - Fix linting errors before continuing. These will fail CI.</action>
+      <output>✅ Python linting passed (Black, isort, Flake8)</output>
+    </check>
+
+    <action>Run any additional linting/code quality checks configured in project</action>
     <action>Validate implementation meets ALL story acceptance criteria; enforce quantitative thresholds explicitly</action>
     <action if="regression tests fail">STOP and fix before continuing - identify breaking changes immediately</action>
     <action if="new tests fail">STOP and fix before continuing - ensure implementation correctness</action>
@@ -345,6 +462,7 @@
       - Integration tests for component interactions added when required
       - End-to-end tests for critical flows added when story demands them
       - All tests pass (no regressions, new tests successful)
+      - **Python linting passes (Black, isort, Flake8)** - Run Step 7 linting if not already done
       - Code quality checks pass (linting, static analysis if configured)
       - File List includes every new/modified/deleted file (relative paths)
       - Dev Agent Record contains implementation notes
@@ -352,12 +470,28 @@
       - Only permitted story sections were modified
     </action>
 
+    <!-- Final linting gate before review -->
+    <check if="Python files were modified AND linting not yet verified in Step 7">
+      <action>Run final linting verification: `black --check . && isort --check-only . --skip venv && flake8 .`</action>
+      <action if="linting fails">HALT - Fix linting errors before marking for review. CI will fail otherwise.</action>
+    </check>
+
     <!-- Mark story ready for review - sprint status conditional -->
     <check if="{sprint_status} file exists AND {{current_sprint_status}} != 'no-sprint-tracking'">
       <action>Load the FULL file: {sprint_status}</action>
       <action>Find development_status key matching {{story_key}}</action>
-      <action>Verify current status is "in-progress" (expected previous state)</action>
-      <action>Update development_status[{{story_key}}] = "review"</action>
+
+      <!-- BACKWARD COMPATIBILITY: Handle old vs new format -->
+      <action>Check format of development_status[{{story_key}}]:
+        - If STRING (old format): verify value is "in-progress", then convert to object format:
+          ```yaml
+          {{story_key}}:
+            status: review
+            linear_id: ""
+            linear_url: ""
+          ```
+        - If OBJECT (new format): verify .status is "in-progress", then update .status = "review"
+      </action>
       <action>Save file, preserving ALL comments and structure including STATUS DEFINITIONS</action>
       <output>✅ Story status updated to "review" in sprint-status.yaml</output>
     </check>
@@ -373,19 +507,18 @@
       </output>
     </check>
 
-    <!-- LINEAR INTEGRATION: Update Linear that implementation is complete -->
-    <check if="{{linear_issue_id}} is not empty">
-      <action>Add a comment to Linear issue {{linear_issue_id}} using the Linear MCP tool (create_comment):
-        "Implementation complete for story {{story_key}}. All tasks and acceptance criteria satisfied. Story is now in code review."
-      </action>
-      <output>📋 Linear issue {{linear_issue_id}} updated - implementation complete, ready for review</output>
-    </check>
-
     <!-- Final validation gates -->
     <action if="any task is incomplete">HALT - Complete remaining tasks before marking ready for review</action>
     <action if="regression failures exist">HALT - Fix regression issues before completing</action>
     <action if="File List is incomplete">HALT - Update File List with all changed files</action>
     <action if="definition-of-done validation fails">HALT - Address DoD failures before completing</action>
+
+    <check if="{{linear_id}} exists and is not empty string">
+      <action>Use mcp_linear_create_comment to add implementation details (DO NOT edit acceptance criteria):
+        - issueId: {{linear_id}}
+        - body: summarize what changed, key decisions, tests run, and include the final File List + story file link/path
+      </action>
+    </check>
   </step>
 
   <step n="10" goal="Completion communication and user support">
@@ -415,17 +548,7 @@
       - Verify all acceptance criteria are met
       - Ensure deployment readiness if applicable
       - Run `code-review` workflow for peer review
-      - Optional: Run TEA `*automate` to expand guardrail tests
     </action>
-
-    <!-- LINEAR INTEGRATION: Update Linear when code is committed -->
-    <check if="{{linear_issue_id}} is not empty">
-      <action>Check if there are uncommitted changes via `git status --porcelain`</action>
-      <action>If user commits code (or code has already been committed), add a comment to Linear issue {{linear_issue_id}} using the Linear MCP tool (create_comment):
-        "Code committed for story {{story_key}}. Implementation changes are in the repository."
-      </action>
-      <output>📋 Linear issue {{linear_issue_id}} updated - code committed</output>
-    </check>
 
     <output>💡 **Tip:** For best results, run `code-review` using a **different** LLM than the one that implemented this story.</output>
     <check if="{sprint_status} file exists">
