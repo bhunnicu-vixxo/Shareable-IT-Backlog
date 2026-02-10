@@ -66,7 +66,7 @@ export function KeywordSearch({
       />
       {value && (
         <IconButton
-          aria-label="Clear search"
+          aria-label="Clear search input"
           size="xs"
           variant="ghost"
           position="absolute"

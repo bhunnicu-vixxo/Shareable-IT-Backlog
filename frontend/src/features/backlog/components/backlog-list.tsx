@@ -6,6 +6,7 @@ import { tokenizeQuery } from '../utils/highlight'
 import { BacklogItemCard } from './backlog-item-card'
 import { BusinessUnitFilter } from './business-unit-filter'
 import { KeywordSearch } from './keyword-search'
+import { EmptyStateWithGuidance } from './empty-state-with-guidance'
 import { SortControl } from './sort-control'
 import type { SortField, SortDirection } from './sort-control'
 import { ItemDetailModal } from './item-detail-modal'
@@ -276,58 +277,19 @@ export function BacklogList() {
 
       {/* Filtered items or empty filter state */}
       {displayedItems.length === 0 && hasActiveFilters ? (
-        <Flex
-          direction="column"
-          alignItems="center"
-          justifyContent="center"
-          p="12"
-          borderWidth="1px"
-          borderRadius="md"
-          borderColor="gray.200"
-          textAlign="center"
-        >
-          <Text fontWeight="bold" fontSize="lg" mb="2">
-            {debouncedQuery.trim()
-              ? `No items found matching "${debouncedQuery.trim()}"`
-              : selectedBusinessUnit && !showNewOnly
-                ? `No items found for ${selectedBusinessUnit}`
-                : showNewOnly && !selectedBusinessUnit
-                  ? 'No new items'
-                  : `No new items for ${selectedBusinessUnit}`}
-          </Text>
-          <Text color="gray.500" mb="4">
-            {debouncedQuery.trim()
-              ? 'Try different keywords or adjust your filters.'
-              : selectedBusinessUnit
-                ? 'Try selecting a different business unit or clear the filter.'
-                : 'All items have been reviewed. Remove the filter to see all items.'}
-          </Text>
-          <HStack gap="2">
-            {debouncedQuery.trim() && (
-              <Button
-                onClick={() => setKeywordQuery('')}
-                variant="outline"
-                size="sm"
-              >
-                Clear search
-              </Button>
-            )}
-            {selectedBusinessUnit && (
-              <Button
-                onClick={() => setSelectedBusinessUnit(null)}
-                variant="outline"
-                size="sm"
-              >
-                Clear filter
-              </Button>
-            )}
-            {showNewOnly && (
-              <Button onClick={() => setShowNewOnly(false)} variant="outline" size="sm">
-                Show all items
-              </Button>
-            )}
-          </HStack>
-        </Flex>
+        <EmptyStateWithGuidance
+          keyword={debouncedQuery}
+          businessUnit={selectedBusinessUnit}
+          showNewOnly={showNewOnly}
+          onClearKeyword={() => setKeywordQuery('')}
+          onClearBusinessUnit={() => setSelectedBusinessUnit(null)}
+          onClearNewOnly={() => setShowNewOnly(false)}
+          onClearAll={() => {
+            setKeywordQuery('')
+            setSelectedBusinessUnit(null)
+            setShowNewOnly(false)
+          }}
+        />
       ) : (
         <>
           <VStack gap="4" align="stretch">

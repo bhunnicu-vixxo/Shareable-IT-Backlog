@@ -467,7 +467,7 @@ describe('BacklogList', () => {
     expect(screen.getByText('Showing 1 new item for Operations')).toBeInTheDocument()
   })
 
-  it('shows empty filter state with "Clear filter" when BU filter returns no results', async () => {
+  it('shows empty filter state with "Clear business unit" when BU filter returns no results', async () => {
     const user = userEvent.setup()
     const response: BacklogListResponse = {
       items: [
@@ -507,14 +507,12 @@ describe('BacklogList', () => {
     await waitFor(() => {
       expect(screen.getByText('No new items for Finance')).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: 'Clear filter' })).toBeInTheDocument()
-    // The "Show all items" text appears as both the filter bar toggle (aria-label)
-    // and the empty state button — verify at least one exists
-    const showAllButtons = screen.getAllByRole('button', { name: 'Show all items' })
-    expect(showAllButtons.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByRole('button', { name: 'Clear business unit filter' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear all filters' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Turn off New only' })).toBeInTheDocument()
   })
 
-  it('"Clear filter" button resets business unit filter', async () => {
+  it('"Clear business unit" button resets business unit filter', async () => {
     const user = userEvent.setup()
     const response: BacklogListResponse = {
       items: [
@@ -555,14 +553,107 @@ describe('BacklogList', () => {
       expect(screen.getByText('No new items for Finance')).toBeInTheDocument()
     })
 
-    // Click "Clear filter" to remove business unit filter
-    fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }))
+    // Click "Clear business unit" to remove business unit filter
+    fireEvent.click(screen.getByRole('button', { name: 'Clear business unit filter' }))
 
     // Now showing new items across all BUs — only Ops item is new
     await waitFor(() => {
       expect(screen.getByText('Ops item')).toBeInTheDocument()
     })
     expect(screen.queryByText('Fin item')).not.toBeInTheDocument()
+  })
+
+  it('"Clear all filters" button resets all active filters at once', async () => {
+    const user = userEvent.setup()
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Ops item', teamName: 'Operations', isNew: true }),
+        createMockItem({ id: '2', title: 'Fin item', teamName: 'Finance', isNew: false }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Ops item')).toBeInTheDocument()
+    })
+
+    // Select Finance
+    const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
+    combobox.focus()
+    await user.keyboard('{ArrowDown}') // open
+
+    await waitFor(() => {
+      expect(combobox.getAttribute('aria-expanded')).toBe('true')
+    })
+
+    await user.keyboard('{ArrowDown}') // Finance
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => {
+      expect(screen.getByText('Fin item')).toBeInTheDocument()
+    })
+
+    // Toggle new only → empty state (Finance has no new items)
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('No new items for Finance')).toBeInTheDocument()
+    })
+
+    // Click "Clear all filters" to reset everything
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all filters' }))
+
+    // Both items should be visible again
+    await waitFor(() => {
+      expect(screen.getByText('Ops item')).toBeInTheDocument()
+      expect(screen.getByText('Fin item')).toBeInTheDocument()
+    })
+  })
+
+  it('renders EmptyStateWithGuidance with role="status" when filters yield zero results', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Only item', isNew: false }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 1,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Only item')).toBeInTheDocument()
+    })
+
+    // Search for something that doesn't exist
+    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
+    fireEvent.change(searchInput, { target: { value: 'nonexistent' } })
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBeInTheDocument()
+    })
+  })
+
+  it('no-data BacklogEmptyState still renders when items array is empty', async () => {
+    const response: BacklogListResponse = {
+      items: [],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 0,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('No backlog items found')).toBeInTheDocument()
+    })
+    // This is the no-data state, not the filter-empty state
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   // ─── Keyword Search Tests ───
@@ -747,9 +838,7 @@ describe('BacklogList', () => {
     await waitFor(() => {
       expect(screen.getByText('No items found matching "nonexistent"')).toBeInTheDocument()
     })
-    // Both the KeywordSearch clear icon and the empty-state button say "Clear search"
-    const clearButtons = screen.getAllByRole('button', { name: 'Clear search' })
-    expect(clearButtons.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByRole('button', { name: 'Clear search filter' })).toBeInTheDocument()
   })
 
   it('"Clear search" button in empty state resets keyword filter', async () => {
@@ -776,9 +865,8 @@ describe('BacklogList', () => {
       expect(screen.getByText(/No items found matching/)).toBeInTheDocument()
     })
 
-    // Click the "Clear search" button in the empty-state area (the last one in the DOM)
-    const clearButtons = screen.getAllByRole('button', { name: 'Clear search' })
-    fireEvent.click(clearButtons[clearButtons.length - 1])
+    // Click the "Clear search filter" button in the empty-state area
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search filter' }))
 
     await waitFor(() => {
       expect(screen.getByText('VPN configuration')).toBeInTheDocument()
