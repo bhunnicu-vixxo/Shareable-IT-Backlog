@@ -83,10 +83,19 @@ development_status:
   epic-3-retrospective: optional
 
   # Epic 4: Filtering & Search
-  epic-4: backlog
-  4-1-implement-business-unit-filter: backlog
-  4-2-implement-keyword-search: backlog
-  4-3-implement-sorting: backlog
+  epic-4: in-progress
+  4-1-implement-business-unit-filter:
+    status: done
+    linear_id: "VIX-345"
+    linear_url: "https://linear.app/vixxo/issue/VIX-345/implement-business-unit-filter"
+  4-2-implement-keyword-search:
+    status: done
+    linear_id: "VIX-346"
+    linear_url: "https://linear.app/vixxo/issue/VIX-346/implement-keyword-search"
+  4-3-implement-sorting:
+    status: done
+    linear_id: "VIX-347"
+    linear_url: "https://linear.app/vixxo/issue/VIX-347/implement-sorting"
   4-4-implement-empty-state-with-guidance: backlog
   epic-4-retrospective: optional
 

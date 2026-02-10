@@ -1,12 +1,15 @@
 import { Badge, Box, Flex, HStack, Text } from '@chakra-ui/react'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
+import { highlightText } from '../utils/highlight'
 import type { BacklogItem } from '../types/backlog.types'
 
 export interface BacklogItemCardProps {
   item: BacklogItem
   /** Optional click handler. When provided, card is clickable (cursor pointer, keyboard activatable). */
   onClick?: () => void
+  /** Search tokens to highlight in the title (and other visible text). Empty array = no highlights. */
+  highlightTokens?: string[]
 }
 
 /**
@@ -19,7 +22,7 @@ export interface BacklogItemCardProps {
  *
  * When onClick is provided, the card is clickable and keyboard-accessible (Enter/Space to activate).
  */
-export function BacklogItemCard({ item, onClick }: BacklogItemCardProps) {
+export function BacklogItemCard({ item, onClick, highlightTokens = [] }: BacklogItemCardProps) {
   const isClickable = !!onClick
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -39,6 +42,12 @@ export function BacklogItemCard({ item, onClick }: BacklogItemCardProps) {
       gap="4"
       alignItems="flex-start"
       _hover={{ bg: 'gray.50' }}
+      _focusVisible={{
+        outline: '2px solid',
+        outlineColor: 'brand.green',
+        outlineOffset: '2px',
+        borderColor: 'brand.green',
+      }}
       transition="background 0.15s"
       aria-label={`${item.title}, Priority ${item.priorityLabel}${item.isNew ? ', New item' : ''}`}
       role={isClickable ? 'button' : 'article'}
@@ -54,7 +63,9 @@ export function BacklogItemCard({ item, onClick }: BacklogItemCardProps) {
       <Box flex="1" minWidth="0">
         {/* Title */}
         <Text fontWeight="bold" fontSize="md" truncate>
-          {item.title}
+          {highlightTokens.length > 0
+            ? highlightText(item.title, highlightTokens)
+            : item.title}
         </Text>
 
         {/* Metadata row */}

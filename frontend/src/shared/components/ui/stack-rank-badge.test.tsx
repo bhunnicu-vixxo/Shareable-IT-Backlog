@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@/utils/test-utils'
-import { StackRankBadge, getBadgeDimensions } from './stack-rank-badge'
+import { StackRankBadge } from './stack-rank-badge'
+import { getBadgeDimensions } from './stack-rank-badge.utils'
 
 describe('StackRankBadge', () => {
   it('renders priority number 1 (Urgent)', () => {

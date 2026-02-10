@@ -19,7 +19,7 @@
       "name": "Debug Frontend (Chrome)",
       "type": "pwa-chrome",
       "request": "launch",
-      "url": "http://localhost:5173",
+      "url": "http://localhost:1576",
       "webRoot": "${workspaceFolder}/frontend/src",
       "preLaunchTask": "Start Frontend Dev Server"
     },
