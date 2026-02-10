@@ -122,4 +122,6 @@ export interface SyncStatus {
   status: 'idle' | 'syncing' | 'success' | 'error'
   itemCount: number | null
   errorMessage: string | null
+  /** Standardized error classification code (e.g. SYNC_API_UNAVAILABLE), or null when no error */
+  errorCode: string | null
 }

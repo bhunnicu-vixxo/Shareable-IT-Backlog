@@ -1,6 +1,7 @@
 import type { BacklogItemDto, CommentDto, IssueActivityDto } from '../../types/linear-entities.types.js'
 import type { PaginatedResponse } from '../../types/api.types.js'
 import { linearClient } from '../sync/linear-client.service.js'
+import { syncService } from '../sync/sync.service.js'
 import {
   toBacklogItemDto,
   toBacklogItemDtos,
@@ -25,7 +26,7 @@ export interface GetBacklogItemsOptions {
  *
  * Returns a new array — does NOT mutate the input.
  */
-function sortBacklogItems(items: BacklogItemDto[]): BacklogItemDto[] {
+export function sortBacklogItems(items: BacklogItemDto[]): BacklogItemDto[] {
   return [...items].sort((a, b) => {
     const aPriority = a.priority === 0 ? 5 : a.priority // Push "None" after "Low"
     const bPriority = b.priority === 0 ? 5 : b.priority
@@ -42,13 +43,25 @@ function sortBacklogItems(items: BacklogItemDto[]): BacklogItemDto[] {
  */
 export class BacklogService {
   /**
-   * Fetch backlog items from Linear, transform to DTOs, sort, and return
-   * as a `PaginatedResponse<BacklogItemDto>`.
+   * Fetch backlog items, preferring the sync cache when populated.
+   *
+   * Cache-first strategy:
+   * - If the sync cache is populated, apply in-memory pagination and return.
+   * - If the cache is empty, start a background sync to populate it, but
+   *   serve the request from live Linear data to avoid blocking the API.
+   * - If a `projectId` override is provided (different from configured project),
+   *   the cache is skipped and the service falls back to live Linear API fetch.
+   *
+   * The `after` cursor for cached data is the ID of the last item in the
+   * previous page. This matches the cursor-based pagination pattern the
+   * frontend already uses.
    */
   async getBacklogItems(
     options?: GetBacklogItemsOptions,
   ): Promise<PaginatedResponse<BacklogItemDto>> {
-    const projectId = options?.projectId ?? process.env.LINEAR_PROJECT_ID
+    const configuredProjectId = process.env.LINEAR_PROJECT_ID
+    const projectId = options?.projectId ?? configuredProjectId
+    const first = options?.first ?? 50
 
     if (!projectId) {
       throw new LinearConfigError(
@@ -57,16 +70,58 @@ export class BacklogService {
       )
     }
 
+    // Cache can only be used for the configured project ID.
+    const canUseCache = !options?.projectId || options.projectId === configuredProjectId
+
+    if (canUseCache) {
+      // Try cache first (populated by sync scheduler)
+      const cached = syncService.getCachedItems()
+
+      if (cached) {
+        const afterIndex = options?.after
+          ? cached.findIndex((item) => item.id === options.after) + 1
+          : 0
+        const startIndex = Math.max(0, afterIndex)
+        const page = cached.slice(startIndex, startIndex + first)
+        const hasNextPage = startIndex + first < cached.length
+        const endCursor = page.length > 0 ? page[page.length - 1].id : null
+
+        logger.debug(
+          { service: 'backlog', source: 'cache', itemCount: page.length },
+          'Serving backlog items from sync cache',
+        )
+
+        return {
+          items: page,
+          pageInfo: { hasNextPage, endCursor },
+          totalCount: cached.length,
+        }
+      }
+
+      // Cache miss: start a background sync so future requests can serve from a
+      // stable, globally-sorted cache, but do not block this request.
+      logger.info(
+        { service: 'backlog', operation: 'getBacklogItems' },
+        'Sync cache empty — starting background sync and serving live data',
+      )
+      syncService.runSync().catch((error) => {
+        logger.error(
+          { service: 'backlog', operation: 'getBacklogItems', error },
+          'Background sync failed while serving live data',
+        )
+      })
+    }
+
     logger.debug(
-      { service: 'backlog', operation: 'getBacklogItems', projectId },
-      'Fetching backlog items from Linear',
+      { service: 'backlog', source: 'live', projectId },
+      'Fetching backlog items live from Linear',
     )
 
-    // 1. Fetch raw issues from Linear via the GraphQL client
-    //    Limit default to 20 to reduce lazy-loading overhead (each issue
-    //    resolves ~5 SDK relations → additional API calls).
+    // 1. Fetch raw issues from Linear via the GraphQL client.
+    //    Note: When bypassing cache (projectId override), we retain cursor-based
+    //    pagination from Linear. Sorting is applied after transformation.
     const result = await linearClient.getIssuesByProject(projectId, {
-      first: options?.first ?? 20,
+      first,
       after: options?.after,
     })
 

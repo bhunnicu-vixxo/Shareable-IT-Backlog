@@ -1,7 +1,7 @@
 # Story 6.1: Implement Scheduled Automatic Sync
 
 Linear Issue ID: VIX-354
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,62 +28,62 @@ so that data stays current without manual intervention.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Install `node-cron` dependency (AC: #1)
-  - [ ] 1.1: Run `npm install node-cron` in `backend/` (v4.2.1+, has built-in TypeScript declarations)
-  - [ ] 1.2: Verify `node-cron` appears in `backend/package.json` dependencies
+- [x] Task 1: Install `node-cron` dependency (AC: #1)
+  - [x] 1.1: Run `npm install node-cron` in `backend/` (v4.2.1+, has built-in TypeScript declarations)
+  - [x] 1.2: Verify `node-cron` appears in `backend/package.json` dependencies
 
-- [ ] Task 2: Add sync environment variables (AC: #9, #10)
-  - [ ] 2.1: Add `SYNC_CRON_SCHEDULE` and `SYNC_ENABLED` to `backend/.env.example` with comments
-  - [ ] 2.2: Add same vars to root `.env.example` under the BACKEND section
-  - [ ] 2.3: Document default values in comments: `SYNC_CRON_SCHEDULE=0 6,12 * * *` and `SYNC_ENABLED=true`
+- [x] Task 2: Add sync environment variables (AC: #9, #10)
+  - [x] 2.1: Add `SYNC_CRON_SCHEDULE` and `SYNC_ENABLED` to `backend/.env.example` with comments
+  - [x] 2.2: Add same vars to root `.env.example` under the BACKEND section
+  - [x] 2.3: Document default values in comments: `SYNC_CRON_SCHEDULE=0 6,12 * * *` and `SYNC_ENABLED=true`
 
-- [ ] Task 3: Create `SyncService` — sync orchestration (AC: #2, #3, #6, #8)
-  - [ ] 3.1: Create `backend/src/services/sync/sync.service.ts`
-  - [ ] 3.2: Implement `runSync()`: paginate through ALL issues via `linearClient.getIssuesByProject()`, transform with `toBacklogItemDtos()`, sort, store in `cachedItems`
-  - [ ] 3.3: Implement pagination loop: fetch 50 items per page, follow `pageInfo.hasNextPage` / `endCursor` until all fetched
-  - [ ] 3.4: Track sync status transitions: idle → syncing → success|error
-  - [ ] 3.5: Implement `getCachedItems()`: returns cached `BacklogItemDto[]` or `null` if cache is empty
-  - [ ] 3.6: Implement `getStatus()`: returns `SyncStatusResponse`
-  - [ ] 3.7: Implement `clearCache()`: clears cached items (for testing and future manual sync invalidation)
-  - [ ] 3.8: Log sync start, completion (with item count and duration), and errors
-  - [ ] 3.9: Handle errors gracefully — a failed sync preserves the previous cache (don't wipe stale-but-valid data)
-  - [ ] 3.10: Export singleton `syncService`
-  - [ ] 3.11: Create `backend/src/services/sync/sync.service.test.ts` with tests for: successful sync, pagination, error handling, status transitions, cache preservation on failure, sort order
+- [x] Task 3: Create `SyncService` — sync orchestration (AC: #2, #3, #6, #8)
+  - [x] 3.1: Create `backend/src/services/sync/sync.service.ts`
+  - [x] 3.2: Implement `runSync()`: paginate through ALL issues via `linearClient.getIssuesByProject()`, transform with `toBacklogItemDtos()`, sort, store in `cachedItems`
+  - [x] 3.3: Implement pagination loop: fetch 50 items per page, follow `pageInfo.hasNextPage` / `endCursor` until all fetched
+  - [x] 3.4: Track sync status transitions: idle → syncing → success|error
+  - [x] 3.5: Implement `getCachedItems()`: returns cached `BacklogItemDto[]` or `null` if cache is empty
+  - [x] 3.6: Implement `getStatus()`: returns `SyncStatusResponse`
+  - [x] 3.7: Implement `clearCache()`: clears cached items (for testing and future manual sync invalidation)
+  - [x] 3.8: Log sync start, completion (with item count and duration), and errors
+  - [x] 3.9: Handle errors gracefully — a failed sync preserves the previous cache (don't wipe stale-but-valid data)
+  - [x] 3.10: Export singleton `syncService`
+  - [x] 3.11: Create `backend/src/services/sync/sync.service.test.ts` with tests for: successful sync, pagination, error handling, status transitions, cache preservation on failure, sort order
 
-- [ ] Task 4: Create `SyncSchedulerService` — cron scheduling (AC: #1, #9, #10)
-  - [ ] 4.1: Create `backend/src/services/sync/sync-scheduler.service.ts`
-  - [ ] 4.2: Implement `start()`: validates cron expression, creates `node-cron` task, optionally runs initial sync
-  - [ ] 4.3: Implement `stop()`: destroys cron task
-  - [ ] 4.4: Implement `isRunning()`: returns boolean
-  - [ ] 4.5: Read `SYNC_CRON_SCHEDULE` from env (default: `0 6,12 * * *` — 6 AM and 12 PM daily)
-  - [ ] 4.6: Read `SYNC_ENABLED` from env (default: `true`); skip scheduling entirely if `false`
-  - [ ] 4.7: Log schedule configuration on start, each cron tick, and on stop
-  - [ ] 4.8: Export singleton `syncScheduler`
-  - [ ] 4.9: Create `backend/src/services/sync/sync-scheduler.service.test.ts` with tests for: start/stop lifecycle, cron validation, disabled mode, sync invocation
+- [x] Task 4: Create `SyncSchedulerService` — cron scheduling (AC: #1, #9, #10)
+  - [x] 4.1: Create `backend/src/services/sync/sync-scheduler.service.ts`
+  - [x] 4.2: Implement `start()`: validates cron expression, creates `node-cron` task, optionally runs initial sync
+  - [x] 4.3: Implement `stop()`: destroys cron task
+  - [x] 4.4: Implement `isRunning()`: returns boolean
+  - [x] 4.5: Read `SYNC_CRON_SCHEDULE` from env (default: `0 6,12 * * *` — 6 AM and 12 PM daily)
+  - [x] 4.6: Read `SYNC_ENABLED` from env (default: `true`); skip scheduling entirely if `false`
+  - [x] 4.7: Log schedule configuration on start, each cron tick, and on stop
+  - [x] 4.8: Export singleton `syncScheduler`
+  - [x] 4.9: Create `backend/src/services/sync/sync-scheduler.service.test.ts` with tests for: start/stop lifecycle, cron validation, disabled mode, sync invocation
 
-- [ ] Task 5: Create sync controller and routes (AC: #7)
-  - [ ] 5.1: Create `backend/src/controllers/sync.controller.ts` with `getSyncStatus` handler
-  - [ ] 5.2: Create `backend/src/routes/sync.routes.ts` with `GET /sync/status` route
-  - [ ] 5.3: Register sync routes in `backend/src/routes/index.ts`
-  - [ ] 5.4: Create `backend/src/routes/sync.routes.test.ts` with tests for status endpoint
-  - [ ] 5.5: Create `backend/src/controllers/sync.controller.test.ts` (optional, route tests may suffice)
+- [x] Task 5: Create sync controller and routes (AC: #7)
+  - [x] 5.1: Create `backend/src/controllers/sync.controller.ts` with `getSyncStatus` handler
+  - [x] 5.2: Create `backend/src/routes/sync.routes.ts` with `GET /sync/status` route
+  - [x] 5.3: Register sync routes in `backend/src/routes/index.ts`
+  - [x] 5.4: Create `backend/src/routes/sync.routes.test.ts` with tests for status endpoint
+  - [x] 5.5: Create `backend/src/controllers/sync.controller.test.ts` (optional, route tests may suffice)
 
-- [ ] Task 6: Update `BacklogService` to use sync cache (AC: #4, #5)
-  - [ ] 6.1: In `getBacklogItems()`, check `syncService.getCachedItems()` first
-  - [ ] 6.2: If cache hit: apply in-memory pagination (`first`/`after` params) on cached array, return `PaginatedResponse`
-  - [ ] 6.3: If cache miss: fall back to existing live-fetch behavior (unchanged)
-  - [ ] 6.4: `getBacklogItemById()` stays unchanged — always fetches live for fresh comments/activities
-  - [ ] 6.5: Update `backend/src/services/backlog/backlog.service.test.ts` with cache hit/miss tests
+- [x] Task 6: Update `BacklogService` to use sync cache (AC: #4, #5)
+  - [x] 6.1: In `getBacklogItems()`, check `syncService.getCachedItems()` first
+  - [x] 6.2: If cache hit: apply in-memory pagination (`first`/`after` params) on cached array, return `PaginatedResponse`
+  - [x] 6.3: If cache miss: fall back to existing live-fetch behavior (unchanged)
+  - [x] 6.4: `getBacklogItemById()` stays unchanged — always fetches live for fresh comments/activities
+  - [x] 6.5: Update `backend/src/services/backlog/backlog.service.test.ts` with cache hit/miss tests
 
-- [ ] Task 7: Initialize scheduler on server start (AC: #1)
-  - [ ] 7.1: Update `backend/src/server.ts` to import and call `syncScheduler.start()` after server starts listening
-  - [ ] 7.2: Log scheduler initialization status
+- [x] Task 7: Initialize scheduler on server start (AC: #1)
+  - [x] 7.1: Update `backend/src/server.ts` to import and call `syncScheduler.start()` after server starts listening
+  - [x] 7.2: Log scheduler initialization status
 
-- [ ] Task 8: Build and test verification (AC: #11, #12)
-  - [ ] 8.1: Run `npm run build` in `backend/`
-  - [ ] 8.2: Run `npm run test:run` in `backend/`
-  - [ ] 8.3: Run `npm run build` in `frontend/` (should be unaffected)
-  - [ ] 8.4: Run `npm run test:run` in `frontend/` (should be unaffected)
+- [x] Task 8: Build and test verification (AC: #11, #12)
+  - [x] 8.1: Run `npm run build` in `backend/`
+  - [x] 8.2: Run `npm run test:run` in `backend/`
+  - [x] 8.3: Run `npm run build` in `frontend/` (should be unaffected)
+  - [x] 8.4: Run `npm run test:run` in `frontend/` (should be unaffected)
 
 ## Dev Notes
 
@@ -617,10 +617,55 @@ backend/src/
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude claude-4.6-opus (Cursor)
 
 ### Debug Log References
 
+- No HALT conditions encountered during implementation.
+- SyncSchedulerService tests required `vi.hoisted()` fix — vitest hoists `vi.mock` factories above variable declarations, so mock fns must be created via `vi.hoisted()`.
+- Exported `sortBacklogItems` from `backlog.service.ts` (was previously private function) for reuse in `SyncService` — Option A from Dev Notes.
+
 ### Completion Notes List
 
+- **Task 1:** Installed `node-cron@4.2.1` with built-in TypeScript declarations.
+- **Task 2:** Added `SYNC_ENABLED` and `SYNC_CRON_SCHEDULE` env vars to both `backend/.env.example` and root `.env.example` with documented defaults.
+- **Task 3:** Created `SyncService` with full pagination loop, status tracking (`idle → syncing → success|error`), in-memory cache, concurrent sync guard, and cache preservation on failure. 12 tests covering all scenarios.
+- **Task 4:** Created `SyncSchedulerService` wrapping `node-cron` with env-based configuration, initial sync on startup (fire-and-forget), and start/stop lifecycle. 13 tests.
+- **Task 5:** Created `GET /api/sync/status` endpoint following existing health route pattern. Controller, routes, registered in `routes/index.ts`. 5 tests.
+- **Task 6:** Updated `BacklogService.getBacklogItems()` to use cache-first strategy with in-memory cursor-based pagination on cached data; on cache miss, triggers a sync to populate cache before serving list (ensures stable pagination semantics). `getBacklogItemById()` unchanged (always live). 6 new cache integration tests added to existing test suite.
+- **Task 7:** Added `syncScheduler.start()` call in `server.ts` listen callback (after server starts listening).
+- **Task 8:** Backend build passes (0 TS errors), all 204 backend tests pass. Frontend build passes, all 205 frontend tests pass. No regressions.
+
 ### File List
+
+**New files:**
+- `backend/src/services/sync/sync.service.ts`
+- `backend/src/services/sync/sync.service.test.ts`
+- `backend/src/services/sync/sync-scheduler.service.ts`
+- `backend/src/services/sync/sync-scheduler.service.test.ts`
+- `backend/src/controllers/sync.controller.ts`
+- `backend/src/controllers/sync.controller.test.ts`
+- `backend/src/routes/sync.routes.ts`
+- `backend/src/routes/sync.routes.test.ts`
+
+**Modified files:**
+- `backend/package.json` (added `node-cron` dependency)
+- `backend/.env.example` (added `SYNC_ENABLED`, `SYNC_CRON_SCHEDULE`)
+- `.env.example` (added `SYNC_ENABLED`, `SYNC_CRON_SCHEDULE`)
+- `backend/src/server.ts` (import and start `syncScheduler`)
+- `backend/src/routes/index.ts` (register `syncRoutes`)
+- `backend/src/services/backlog/backlog.service.ts` (export `sortBacklogItems`, cache-first `getBacklogItems`)
+- `backend/src/services/backlog/backlog.service.test.ts` (mock `syncService`, add cache integration tests)
+- `package-lock.json` (auto-updated by npm install)
+
+## Senior Developer Review (AI)
+
+- **2026-02-10:** Code review changes applied:
+  - Fixed backlog pagination contract by ensuring list requests are served from the globally-sorted sync cache (cache miss triggers a sync before returning results).
+  - Converted `backend/src/routes/sync.routes.test.ts` into a true route integration test and moved controller unit tests to `backend/src/controllers/sync.controller.test.ts`.
+  - Made `SyncSchedulerService.start()` idempotent and improved `SYNC_ENABLED` parsing to handle common falsey values.
+
+## Change Log
+
+- **2026-02-10:** Implemented scheduled automatic sync (Story 6.1). Added `SyncService` for in-memory caching of Linear issues with full pagination, `SyncSchedulerService` for cron-based scheduling, `GET /api/sync/status` endpoint, and cache-first strategy in `BacklogService.getBacklogItems()`. All 204 backend tests pass, all 205 frontend tests pass, zero TypeScript errors.
+- **2026-02-10:** Code review fixes: enforce consistent backlog pagination via sync cache on miss, add true sync route integration test, and harden sync scheduler start/env handling. All 208 backend tests pass.

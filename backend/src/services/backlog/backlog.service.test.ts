@@ -4,6 +4,12 @@ import type { BacklogItemDto } from '../../types/linear-entities.types.js'
 import type { PaginatedResponse } from '../../types/api.types.js'
 import { LinearConfigError } from '../../utils/linear-errors.js'
 
+// Use vi.hoisted for sync service mock
+const { mockGetCachedItems, mockRunSync } = vi.hoisted(() => ({
+  mockGetCachedItems: vi.fn(),
+  mockRunSync: vi.fn(),
+}))
+
 // Mock the linear-client service
 vi.mock('../sync/linear-client.service.js', () => ({
   linearClient: {
@@ -11,6 +17,14 @@ vi.mock('../sync/linear-client.service.js', () => ({
     getIssueById: vi.fn(),
     getIssueComments: vi.fn(),
     getIssueHistory: vi.fn(),
+  },
+}))
+
+// Mock the sync service
+vi.mock('../sync/sync.service.js', () => ({
+  syncService: {
+    getCachedItems: mockGetCachedItems,
+    runSync: mockRunSync,
   },
 }))
 
@@ -76,23 +90,37 @@ describe('BacklogService', () => {
     vi.clearAllMocks()
     // Set up the env variable for project ID
     process.env.LINEAR_PROJECT_ID = 'test-project-id'
+    // Default: no cached items (live fetch path)
+    mockGetCachedItems.mockReturnValue(null)
+    mockRunSync.mockResolvedValue(undefined)
     service = new BacklogService()
   })
 
   describe('getBacklogItems', () => {
-    it('should call linearClient.getIssuesByProject with configured project ID', async () => {
+    it('should start background sync and serve live data when cache is empty', async () => {
+      const mockIssues = [{ id: 'issue-1' }, { id: 'issue-2' }] as never[]
+      const mockDtos = [
+        createMockBacklogItem({ id: 'issue-1' }),
+        createMockBacklogItem({ id: 'issue-2' }),
+      ]
+
+      mockGetCachedItems.mockReturnValue(null)
       mockGetIssuesByProject.mockResolvedValue({
-        data: [],
+        data: mockIssues,
         rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue([])
+      mockToBacklogItemDtos.mockResolvedValue(mockDtos)
 
-      await service.getBacklogItems()
+      const result = await service.getBacklogItems()
 
+      expect(mockRunSync).toHaveBeenCalledTimes(1)
       expect(mockGetIssuesByProject).toHaveBeenCalledWith('test-project-id', {
-        first: 20,
+        first: 50,
         after: undefined,
       })
+      expect(result.items).toHaveLength(2)
+      expect(result.totalCount).toBe(2)
     })
 
     it('should pass pagination options to linearClient', async () => {
@@ -102,9 +130,9 @@ describe('BacklogService', () => {
       })
       mockToBacklogItemDtos.mockResolvedValue([])
 
-      await service.getBacklogItems({ first: 25, after: 'cursor-abc' })
+      await service.getBacklogItems({ projectId: 'custom-project-id', first: 25, after: 'cursor-abc' })
 
-      expect(mockGetIssuesByProject).toHaveBeenCalledWith('test-project-id', {
+      expect(mockGetIssuesByProject).toHaveBeenCalledWith('custom-project-id', {
         first: 25,
         after: 'cursor-abc',
       })
@@ -121,7 +149,7 @@ describe('BacklogService', () => {
         createMockBacklogItem({ id: 'issue-2' }),
       ])
 
-      await service.getBacklogItems()
+      await service.getBacklogItems({ projectId: 'custom-project-id' })
 
       expect(mockToBacklogItemDtos).toHaveBeenCalledWith(mockIssues)
     })
@@ -138,7 +166,7 @@ describe('BacklogService', () => {
       mockGetIssuesByProject.mockResolvedValue({ data: [] as never[], rateLimit: null })
       mockToBacklogItemDtos.mockResolvedValue(items)
 
-      const result = await service.getBacklogItems()
+      const result = await service.getBacklogItems({ projectId: 'custom-project-id' })
 
       expect(result.items.map((i) => i.priority)).toEqual([1, 2, 3, 4, 0])
     })
@@ -153,7 +181,7 @@ describe('BacklogService', () => {
       mockGetIssuesByProject.mockResolvedValue({ data: [] as never[], rateLimit: null })
       mockToBacklogItemDtos.mockResolvedValue(items)
 
-      const result = await service.getBacklogItems()
+      const result = await service.getBacklogItems({ projectId: 'custom-project-id' })
 
       expect(result.items.map((i) => i.id)).toEqual(['2', '3', '1'])
     })
@@ -167,7 +195,7 @@ describe('BacklogService', () => {
       mockGetIssuesByProject.mockResolvedValue({ data: [] as never[], rateLimit: null })
       mockToBacklogItemDtos.mockResolvedValue(items)
 
-      const result: PaginatedResponse<BacklogItemDto> = await service.getBacklogItems()
+      const result: PaginatedResponse<BacklogItemDto> = await service.getBacklogItems({ projectId: 'custom-project-id' })
 
       expect(result).toEqual({
         items: expect.any(Array),
@@ -189,7 +217,7 @@ describe('BacklogService', () => {
       mockGetIssuesByProject.mockResolvedValue({ data: [] as never[], rateLimit: null })
       mockToBacklogItemDtos.mockResolvedValue(items)
 
-      await service.getBacklogItems()
+      await service.getBacklogItems({ projectId: 'custom-project-id' })
 
       // Original array should not be reordered
       expect(items[0].id).toBe('1')
@@ -219,7 +247,7 @@ describe('BacklogService', () => {
       await service.getBacklogItems({ projectId: 'custom-project-id' })
 
       expect(mockGetIssuesByProject).toHaveBeenCalledWith('custom-project-id', {
-        first: 20,
+        first: 50,
         after: undefined,
       })
     })
@@ -227,25 +255,103 @@ describe('BacklogService', () => {
     it('should propagate errors from linearClient', async () => {
       mockGetIssuesByProject.mockRejectedValue(new Error('Linear API unavailable'))
 
-      await expect(service.getBacklogItems()).rejects.toThrow('Linear API unavailable')
+      await expect(service.getBacklogItems({ projectId: 'custom-project-id' })).rejects.toThrow('Linear API unavailable')
     })
 
     it('should propagate errors from toBacklogItemDtos', async () => {
       mockGetIssuesByProject.mockResolvedValue({ data: [] as never[], rateLimit: null })
       mockToBacklogItemDtos.mockRejectedValue(new Error('Transform failed'))
 
-      await expect(service.getBacklogItems()).rejects.toThrow('Transform failed')
+      await expect(service.getBacklogItems({ projectId: 'custom-project-id' })).rejects.toThrow('Transform failed')
     })
 
     it('should handle empty results', async () => {
       mockGetIssuesByProject.mockResolvedValue({ data: [] as never[], rateLimit: null })
       mockToBacklogItemDtos.mockResolvedValue([])
 
-      const result = await service.getBacklogItems()
+      const result = await service.getBacklogItems({ projectId: 'custom-project-id' })
 
       expect(result.items).toEqual([])
       expect(result.totalCount).toBe(0)
       expect(result.pageInfo.hasNextPage).toBe(false)
+    })
+
+    describe('cache integration', () => {
+      const cachedItems: BacklogItemDto[] = [
+        createMockBacklogItem({ id: 'c-1', title: 'Cached Item 1' }),
+        createMockBacklogItem({ id: 'c-2', title: 'Cached Item 2' }),
+        createMockBacklogItem({ id: 'c-3', title: 'Cached Item 3' }),
+        createMockBacklogItem({ id: 'c-4', title: 'Cached Item 4' }),
+        createMockBacklogItem({ id: 'c-5', title: 'Cached Item 5' }),
+      ]
+
+      it('should return items from cache when available', async () => {
+        mockGetCachedItems.mockReturnValue(cachedItems)
+
+        const result = await service.getBacklogItems()
+
+        expect(result.items).toHaveLength(5)
+        expect(result.totalCount).toBe(5)
+        expect(result.items[0].id).toBe('c-1')
+        // Should NOT call linearClient when cache is available
+        expect(mockGetIssuesByProject).not.toHaveBeenCalled()
+      })
+
+      it('should apply pagination on cached data', async () => {
+        mockGetCachedItems.mockReturnValue(cachedItems)
+
+        const result = await service.getBacklogItems({ first: 2 })
+
+        expect(result.items).toHaveLength(2)
+        expect(result.items[0].id).toBe('c-1')
+        expect(result.items[1].id).toBe('c-2')
+        expect(result.pageInfo.hasNextPage).toBe(true)
+        expect(result.pageInfo.endCursor).toBe('c-2')
+        expect(result.totalCount).toBe(5)
+      })
+
+      it('should apply cursor-based pagination with after parameter', async () => {
+        mockGetCachedItems.mockReturnValue(cachedItems)
+
+        const result = await service.getBacklogItems({ first: 2, after: 'c-2' })
+
+        expect(result.items).toHaveLength(2)
+        expect(result.items[0].id).toBe('c-3')
+        expect(result.items[1].id).toBe('c-4')
+        expect(result.pageInfo.hasNextPage).toBe(true)
+        expect(result.pageInfo.endCursor).toBe('c-4')
+      })
+
+      it('should handle last page of cached data', async () => {
+        mockGetCachedItems.mockReturnValue(cachedItems)
+
+        const result = await service.getBacklogItems({ first: 2, after: 'c-4' })
+
+        expect(result.items).toHaveLength(1)
+        expect(result.items[0].id).toBe('c-5')
+        expect(result.pageInfo.hasNextPage).toBe(false)
+        expect(result.pageInfo.endCursor).toBe('c-5')
+      })
+
+      it('should handle invalid after cursor gracefully (start from beginning)', async () => {
+        mockGetCachedItems.mockReturnValue(cachedItems)
+
+        const result = await service.getBacklogItems({ first: 2, after: 'non-existent-id' })
+
+        // findIndex returns -1, -1 + 1 = 0, Math.max(0, 0) = 0 → starts from beginning
+        expect(result.items).toHaveLength(2)
+        expect(result.items[0].id).toBe('c-1')
+      })
+
+      it('should fall back to live fetch when cache is empty', async () => {
+        mockGetCachedItems.mockReturnValue(null)
+        mockGetIssuesByProject.mockResolvedValue({ data: [] as never[], rateLimit: null })
+        mockToBacklogItemDtos.mockResolvedValue([])
+
+        await service.getBacklogItems({ projectId: 'custom-project-id' })
+
+        expect(mockGetIssuesByProject).toHaveBeenCalled()
+      })
     })
   })
 
