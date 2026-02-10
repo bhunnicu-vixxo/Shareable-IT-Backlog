@@ -1,7 +1,7 @@
 # Story 5.3: Handle Deleted/Missing Items
 
 Linear Issue ID: VIX-352
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -24,39 +24,39 @@ so that I understand why I can't access it and can navigate back to the backlog 
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add error type differentiation to `useBacklogItemDetail` hook (AC: #4, #5)
-  - [ ] 1.1: Update `fetchBacklogItemDetail` in `frontend/src/features/backlog/hooks/use-backlog-item-detail.ts` to attach HTTP status code to the thrown Error (e.g., custom `ApiError` class with `status` field)
-  - [ ] 1.2: Create `ApiError` class in `frontend/src/utils/api-error.ts` with `message`, `status`, and `code` fields
-  - [ ] 1.3: Update the hook's error handling to parse the response status and throw `ApiError` instead of plain `Error`
-  - [ ] 1.4: Add unit tests for `useBacklogItemDetail` covering 404 vs 500 vs network error scenarios
-- [ ] Task 2: Create `ItemNotFoundState` component (AC: #1, #2, #3, #4)
-  - [ ] 2.1: Create `frontend/src/features/backlog/components/item-not-found-state.tsx`
-  - [ ] 2.2: Display a user-friendly message: "This item is no longer available. It may have been removed from the backlog."
-  - [ ] 2.3: Include a warning/info icon (Chakra UI `WarningIcon` or similar)
-  - [ ] 2.4: Include a prominent "Close" button that calls `onClose` to dismiss the modal
-  - [ ] 2.5: Use Chakra UI `Alert`, `AlertIcon`, `AlertTitle`, `AlertDescription`, `Button` components with theme tokens only
-  - [ ] 2.6: Accessible: proper ARIA roles, keyboard-navigable close button
-  - [ ] 2.7: Add unit tests for ItemNotFoundState (render, close callback, accessibility)
-- [ ] Task 3: Create `ItemErrorState` component for non-404 errors (AC: #5)
-  - [ ] 3.1: Create `frontend/src/features/backlog/components/item-error-state.tsx`
-  - [ ] 3.2: Display message: "Unable to load this item right now. Please try again."
-  - [ ] 3.3: Include an error icon and the error message (if available) in subdued text
-  - [ ] 3.4: Include a "Try Again" button that calls `onRetry` to trigger TanStack Query refetch
-  - [ ] 3.5: Include a "Close" button as secondary action
-  - [ ] 3.6: Use Chakra UI `Alert` with `status="error"`, `Button` components, theme tokens only
-  - [ ] 3.7: Accessible: proper ARIA roles, keyboard navigation
-  - [ ] 3.8: Add unit tests for ItemErrorState (render, retry callback, close callback)
-- [ ] Task 4: Update `ItemDetailModal` to use error state components (AC: #1, #2, #3, #4, #5, #6)
-  - [ ] 4.1: Import `ItemNotFoundState` and `ItemErrorState` into `item-detail-modal.tsx`
-  - [ ] 4.2: In the error branch of `ItemDetailContent`, check if `error` is an `ApiError` with `status === 404`
-  - [ ] 4.3: Render `<ItemNotFoundState onClose={onClose} />` for 404 errors
-  - [ ] 4.4: Render `<ItemErrorState error={error} onRetry={refetch} onClose={onClose} />` for all other errors
-  - [ ] 4.5: Pass `refetch` from `useBacklogItemDetail` to `ItemDetailContent` for retry support
-  - [ ] 4.6: Remove or simplify the existing inline error display code in `ItemDetailContent`
-  - [ ] 4.7: Update `ItemDetailModal` tests to verify 404 error renders `ItemNotFoundState`, other errors render `ItemErrorState`
-- [ ] Task 5: Build verification (AC: #7, #8)
-  - [ ] 5.1: Run `npm run build` in both `backend/` and `frontend/`
-  - [ ] 5.2: Run full test suite in both `backend/` and `frontend/`
+- [x] Task 1: Add error type differentiation to `useBacklogItemDetail` hook (AC: #4, #5)
+  - [x] 1.1: Update `fetchBacklogItemDetail` in `frontend/src/features/backlog/hooks/use-backlog-item-detail.ts` to attach HTTP status code to the thrown Error (e.g., custom `ApiError` class with `status` field)
+  - [x] 1.2: Create `ApiError` class in `frontend/src/utils/api-error.ts` with `message`, `status`, and `code` fields
+  - [x] 1.3: Update the hook's error handling to parse the response status and throw `ApiError` instead of plain `Error`
+  - [x] 1.4: Add unit tests for `useBacklogItemDetail` covering 404 vs 500 vs network error scenarios
+- [x] Task 2: Create `ItemNotFoundState` component (AC: #1, #2, #3, #4)
+  - [x] 2.1: Create `frontend/src/features/backlog/components/item-not-found-state.tsx`
+  - [x] 2.2: Display a user-friendly message: "This item is no longer available. It may have been removed from the backlog."
+  - [x] 2.3: Include a warning/info icon (Chakra UI `WarningIcon` or similar)
+  - [x] 2.4: Include a prominent "Close" button that calls `onClose` to dismiss the modal
+  - [x] 2.5: Use Chakra UI `Alert`, `AlertIcon`, `AlertTitle`, `AlertDescription`, `Button` components with theme tokens only
+  - [x] 2.6: Accessible: proper ARIA roles, keyboard-navigable close button
+  - [x] 2.7: Add unit tests for ItemNotFoundState (render, close callback, accessibility)
+- [x] Task 3: Create `ItemErrorState` component for non-404 errors (AC: #5)
+  - [x] 3.1: Create `frontend/src/features/backlog/components/item-error-state.tsx`
+  - [x] 3.2: Display message: "Unable to load this item right now. Please try again."
+  - [x] 3.3: Include an error icon and user-friendly guidance (do not display raw technical error text)
+  - [x] 3.4: Include a "Try Again" button that calls `onRetry` to trigger TanStack Query refetch
+  - [x] 3.5: Include a "Close" button as secondary action
+  - [x] 3.6: Use Chakra UI `Alert` with `status="error"`, `Button` components, theme tokens only
+  - [x] 3.7: Accessible: proper ARIA roles, keyboard navigation
+  - [x] 3.8: Add unit tests for ItemErrorState (render, retry callback, close callback)
+- [x] Task 4: Update `ItemDetailModal` to use error state components (AC: #1, #2, #3, #4, #5, #6)
+  - [x] 4.1: Import `ItemNotFoundState` and `ItemErrorState` into `item-detail-modal.tsx`
+  - [x] 4.2: In the modal error branch, check if `error` is an `ApiError` with `status === 404`
+  - [x] 4.3: Render `<ItemNotFoundState onClose={onClose} />` for 404 errors
+  - [x] 4.4: Render `<ItemErrorState onRetry={refetch} onClose={onClose} />` for all other errors
+  - [x] 4.5: Use `refetch` from `useBacklogItemDetail` as the "Try Again" handler for retry support
+  - [x] 4.6: Remove or simplify the existing inline error display code in `ItemDetailContent`
+  - [x] 4.7: Update `ItemDetailModal` tests to verify 404 error renders `ItemNotFoundState`, other errors render `ItemErrorState`
+- [x] Task 5: Build verification (AC: #7, #8)
+  - [x] 5.1: Run `npm run build` in both `backend/` and `frontend/`
+  - [x] 5.2: Run full test suite in both `backend/` and `frontend/`
 
 ## Dev Notes
 
@@ -208,7 +208,7 @@ export function useBacklogItemDetail(itemId: string | null) {
 }
 ```
 
-**CRITICAL:** The `refetch` function returned by `useQuery` is what the "Try Again" button should call. Pass it from the hook through to `ItemDetailContent` → `ItemErrorState`.
+**CRITICAL:** The `refetch` function returned by `useQuery` is what the "Try Again" button should call. Pass it from the hook through to `ItemErrorState`.
 
 ### CRITICAL: Handling Stale List Items (AC #6)
 
@@ -330,10 +330,60 @@ frontend/src/
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude claude-4.6-opus (Cursor Agent)
 
 ### Debug Log References
 
+- Chakra UI v3 Alert.Root does not add `role="alert"` attribute in jsdom; tests use `.chakra-alert__root` class selector instead
+- TanStack Query v5: hook-level `retry` function overrides QueryClient defaults; tests need `retryDelay: 0` in test wrapper to avoid timeout
+
 ### Completion Notes List
 
+- Created `ApiError` class (frontend/src/utils/api-error.ts) with `status`, `code`, `isNotFound`, `isServerError` — 7 unit tests
+- Updated `useBacklogItemDetail` hook to throw `ApiError` with HTTP status codes and smart retry (no retry on 404, up to 2 retries for other errors) — 7 unit tests covering 404, 500, non-JSON response, network failure, refetch
+- Created `ItemNotFoundState` component for 404 errors with Chakra Alert (warning), user-friendly message, Close button — 4 unit tests
+- Created `ItemErrorState` component for non-404 errors with Chakra Alert (error), "Try Again" + "Close" buttons, and user-friendly guidance (no raw technical error details displayed) — 6 unit tests
+- Updated `ItemDetailModal` to differentiate 404 vs other errors and render appropriate error state components — 23 tests (including 4 new error state tests)
+- Updated test-utils.tsx to add `retryDelay: 0` for stable test timing
+- All 173 frontend tests pass, backend test suite passes
+- `npm run build` passes with zero TypeScript errors in both frontend and backend
+
 ### File List
+
+**New files:**
+- `frontend/src/utils/api-error.ts` — ApiError class with status, code, isNotFound, isServerError
+- `frontend/src/utils/api-error.test.ts` — ApiError unit tests (7 tests)
+- `frontend/src/features/backlog/components/item-not-found-state.tsx` — 404 error display component
+- `frontend/src/features/backlog/components/item-not-found-state.test.tsx` — ItemNotFoundState tests (4 tests)
+- `frontend/src/features/backlog/components/item-error-state.tsx` — Non-404 error display component
+- `frontend/src/features/backlog/components/item-error-state.test.tsx` — ItemErrorState tests (6 tests)
+
+**Modified files:**
+- `frontend/src/features/backlog/hooks/use-backlog-item-detail.ts` — Throw ApiError with status code, smart retry
+- `frontend/src/features/backlog/hooks/use-backlog-item-detail.test.tsx` — Added 404/500/network error tests (7 total)
+- `frontend/src/features/backlog/components/item-detail-modal.tsx` — Uses ItemNotFoundState/ItemErrorState components
+- `frontend/src/features/backlog/components/item-detail-modal.test.tsx` — Added error state component tests (23 total)
+- `frontend/src/utils/test-utils.tsx` — Added retryDelay: 0 and stabilized QueryClient lifecycle for tests
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — Updated 5-3 status to done
+- `_bmad-output/implementation-artifacts/5-3-handle-deleted-missing-items.md` — Story file (this file)
+
+### Change Log
+
+- **2026-02-09**: Implemented Story 5.3 — Handle Deleted/Missing Items. Added `ApiError` class for HTTP status differentiation, `ItemNotFoundState` for 404 errors, `ItemErrorState` for transient errors with retry, and updated `ItemDetailModal` to route errors to the appropriate component. Frontend-only changes; backend unchanged.
+- **2026-02-10**: Senior Developer review fixes — removed display of raw technical error details for transient failures, added alert accessibility semantics, removed redundant modal close trigger in error states, and stabilized test QueryClient usage.
+
+## Senior Developer Review (AI)
+
+_Reviewer: Rhunnicutt on 2026-02-10_
+
+### Summary
+
+- Verified ACs #1–#8 against implementation and tests
+- Confirmed `frontend` + `backend` builds pass, and automated tests pass
+
+### Fixes Applied (from review findings)
+
+- Removed display of raw technical error details in transient error UI (`ItemErrorState`)
+- Added explicit accessibility semantics to alert components (`role` + `aria-live`)
+- Reduced redundant close controls in modal error states (kept prominent in-body Close actions)
+- Stabilized test `QueryClient` lifecycle to avoid cache resets during rerenders

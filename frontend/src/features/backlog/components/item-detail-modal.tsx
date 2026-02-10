@@ -10,12 +10,15 @@ import {
   VStack,
 } from '@chakra-ui/react'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
+import { ApiError } from '@/utils/api-error'
 import { SHOW_OPEN_IN_LINEAR } from '@/utils/constants'
 import { formatDateOnly } from '@/utils/formatters'
 import { useBacklogItemDetail } from '../hooks/use-backlog-item-detail'
 import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
 import { ActivityTimeline } from './activity-timeline'
 import { CommentThread } from './comment-thread'
+import { ItemErrorState } from './item-error-state'
+import { ItemNotFoundState } from './item-not-found-state'
 import { MarkdownContent } from './markdown-content'
 import type { BacklogItem, BacklogItemComment, IssueActivity } from '../types/backlog.types'
 
@@ -43,7 +46,10 @@ export function ItemDetailModal({
   onClose,
   triggerRef,
 }: ItemDetailModalProps) {
-  const { data, isLoading, isError, error } = useBacklogItemDetail(itemId)
+  const { data, isLoading, isError, error, refetch } = useBacklogItemDetail(itemId)
+
+  const isNotFoundError =
+    isError && error instanceof ApiError && error.isNotFound
 
   const handleOpenChange = (details: { open: boolean }) => {
     if (!details.open) onClose()
@@ -65,12 +71,14 @@ export function ItemDetailModal({
       <Dialog.Backdrop />
       <Dialog.Positioner>
         <Dialog.Content aria-label="Backlog item details">
-          <Dialog.CloseTrigger
-            position="absolute"
-            top="2"
-            right="2"
-            aria-label="Close"
-          />
+          {!isError && (
+            <Dialog.CloseTrigger
+              position="absolute"
+              top="2"
+              right="2"
+              aria-label="Close"
+            />
+          )}
           <Dialog.Header pt="6" pr="10" pb="2">
             {isLoading && (
               <Flex gap="4" alignItems="flex-start">
@@ -113,9 +121,9 @@ export function ItemDetailModal({
               </Flex>
             )}
             {!isLoading && isError && (
-              <Text fontSize="lg" fontWeight="bold" color="red.600">
-                {error?.message ?? 'Failed to load item'}
-              </Text>
+              <Dialog.Title fontSize="lg" fontWeight="bold" color="gray.700">
+                Item Unavailable
+              </Dialog.Title>
             )}
           </Dialog.Header>
 
@@ -135,10 +143,15 @@ export function ItemDetailModal({
               />
             )}
 
-            {!isLoading && isError && (
-              <Text color="gray.600">
-                The item may have been deleted or you may not have access. Try closing and selecting another item.
-              </Text>
+            {!isLoading && isError && isNotFoundError && (
+              <ItemNotFoundState onClose={onClose} />
+            )}
+
+            {!isLoading && isError && !isNotFoundError && (
+              <ItemErrorState
+                onRetry={() => refetch()}
+                onClose={onClose}
+              />
             )}
           </Dialog.Body>
 

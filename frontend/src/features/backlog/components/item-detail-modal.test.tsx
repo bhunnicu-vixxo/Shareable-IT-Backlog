@@ -54,9 +54,21 @@ function mockFetchDetail(response: BacklogDetailResponse) {
 function mockFetch404() {
   globalThis.fetch = vi.fn().mockResolvedValue({
     ok: false,
+    status: 404,
     json: () =>
       Promise.resolve({
         error: { message: 'Backlog item not found', code: 'NOT_FOUND' },
+      }),
+  })
+}
+
+function mockFetch500() {
+  globalThis.fetch = vi.fn().mockResolvedValue({
+    ok: false,
+    status: 500,
+    json: () =>
+      Promise.resolve({
+        error: { message: 'Internal server error', code: 'INTERNAL_ERROR' },
       }),
   })
 }
@@ -358,9 +370,9 @@ describe('ItemDetailModal', () => {
     expect(screen.getByText('No activity recorded yet')).toBeInTheDocument()
   })
 
-  // ──── Error state ─────────────────────────────────────────────────────────
+  // ──── Error state: 404 (deleted/missing) ─────────────────────────────────
 
-  it('renders error state when API returns 404', async () => {
+  it('renders ItemNotFoundState when API returns 404', async () => {
     mockFetch404()
 
     render(
@@ -368,13 +380,88 @@ describe('ItemDetailModal', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Backlog item not found')).toBeInTheDocument()
+      expect(
+        screen.getByText('This item is no longer available'),
+      ).toBeInTheDocument()
     })
     expect(
       screen.getByText(
-        'The item may have been deleted or you may not have access. Try closing and selecting another item.',
+        'It may have been removed from the backlog or deleted in Linear.',
       ),
     ).toBeInTheDocument()
+    // Should have a prominent Close button in the body
+    expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument()
+    // Should NOT have a Try Again button
+    expect(
+      screen.queryByRole('button', { name: 'Try Again' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('calls onClose when Close button in 404 state is clicked', async () => {
+    mockFetch404()
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="non-existent" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('This item is no longer available'),
+      ).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /close/i }))
+
+    expect(mockOnClose).toHaveBeenCalled()
+  })
+
+  // ──── Error state: non-404 (server/network errors) ──────────────────────
+
+  it('renders ItemErrorState when API returns 500', async () => {
+    mockFetch500()
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Unable to load this item'),
+      ).toBeInTheDocument()
+    })
+    expect(
+      screen.getByText('A temporary problem prevented loading. Please try again.'),
+    ).toBeInTheDocument()
+    // Technical error details should not be shown to end users.
+    expect(screen.queryByText(/internal server error/i)).not.toBeInTheDocument()
+    // Should have Try Again and Close buttons
+    expect(
+      screen.getByRole('button', { name: 'Try Again' }),
+    ).toBeInTheDocument()
+  })
+
+  it('calls refetch when Try Again button is clicked in 500 state', async () => {
+    mockFetch500()
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Unable to load this item'),
+      ).toBeInTheDocument()
+    })
+
+    // Click Try Again triggers refetch (which calls fetch again)
+    const callCountBefore = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }))
+
+    await waitFor(() => {
+      expect(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+      ).toBeGreaterThan(callCountBefore)
+    })
   })
 
   // ──── Close functionality ─────────────────────────────────────────────────
