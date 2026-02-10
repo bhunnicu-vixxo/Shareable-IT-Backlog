@@ -20,11 +20,11 @@ npm install
 
 # 3. Set up environment variables
 # PowerShell (Windows)
-Copy-Item .env.example frontend\.env
+Copy-Item frontend\.env.example frontend\.env
 Copy-Item backend\.env.example backend\.env
 #
 # Bash (macOS/Linux)
-# cp .env.example frontend/.env
+# cp frontend/.env.example frontend/.env
 # cp backend/.env.example backend/.env
 
 # 4. Run database migrations
@@ -34,7 +34,7 @@ npm run migrate:up -w backend
 npm run dev
 ```
 
-Frontend runs on **http://localhost:5173** and backend on **http://localhost:3000**.
+Frontend runs on **http://localhost:1576** and backend on **http://localhost:3000**.
 
 ## Available Scripts
 
@@ -65,7 +65,7 @@ Run from **frontend/** or **backend/** (or use `-w` flag from root):
 ```
 shareable-linear-backlog/
 ├── .vscode/              # VS Code debug configs, settings, extensions
-├── frontend/             # Vite + React + TypeScript (port 5173)
+├── frontend/             # Vite + React + TypeScript (port 1576)
 │   ├── src/
 │   │   ├── components/   # Shared UI components
 │   │   ├── features/     # Feature-based modules (backlog, admin, etc.)

@@ -1,0 +1,61 @@
+# Update Linear issue status when PR is merged (commit and push to main).
+# Requires LINEAR_API_KEY secret in repository settings.
+name: Linear Issue Sync
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main, develop]
+
+jobs:
+  update-linear-on-merge:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Extract Linear issue ID
+        id: linear
+        run: |
+          # Try PR title first (e.g., "feat: ... (Vix-341)" or "VIX-341")
+          TITLE="${{ github.event.pull_request.title }}"
+          LINEAR_ID=$(echo "$TITLE" | grep -oEi '(Vix|VIX)[-_]?[0-9]+' | head -1 | sed 's/[-_]/-/g' | tr '[:lower:]' '[:upper:]')
+          
+          if [ -z "$LINEAR_ID" ]; then
+            # Fallback: parse branch name for story key and look up in sprint-status.yaml
+            # Branch: rhunnicutt/issue-3-2-implement-priority-stack-rank-visualization
+            BRANCH="${{ github.head_ref }}"
+            STORY_KEY=$(echo "$BRANCH" | sed -n 's/.*issue-\([0-9]-[0-9]-[a-z-]*\)/\1/p' | head -1)
+            if [ -n "$STORY_KEY" ] && [ -f "_bmad-output/implementation-artifacts/sprint-status.yaml" ]; then
+              LINEAR_ID=$(grep -A 3 "$STORY_KEY:" _bmad-output/implementation-artifacts/sprint-status.yaml | grep 'linear_id:' | head -1 | sed 's/.*linear_id: *"\([^"]*\)".*/\1/')
+            fi
+          fi
+          
+          echo "linear_id=$LINEAR_ID" >> $GITHUB_OUTPUT
+          if [ -n "$LINEAR_ID" ]; then
+            echo "Found Linear issue: $LINEAR_ID"
+          else
+            echo "No Linear issue ID found in PR title or branch (branch: ${{ github.head_ref }})"
+          fi
+
+      - name: Update Linear issue to Done
+        if: steps.linear.outputs.linear_id != ''
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          if [ -z "$LINEAR_API_KEY" ]; then
+            echo "⚠️ LINEAR_API_KEY secret not configured. Skipping Linear update."
+            echo "Add LINEAR_API_KEY in Settings → Secrets and variables → Actions"
+            exit 0
+          fi
+          node update-linear-issue.js "${{ steps.linear.outputs.linear_id }}" --status "Done" --comment "PR merged to ${{ github.base_ref }}. Marking as Done."

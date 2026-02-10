@@ -1,6 +1,14 @@
+import { useState, useMemo, useRef } from 'react'
 import { Box, Button, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { useBacklogItems } from '../hooks/use-backlog-items'
+import { useDebouncedValue } from '../hooks/use-debounced-value'
+import { tokenizeQuery } from '../utils/highlight'
 import { BacklogItemCard } from './backlog-item-card'
+import { BusinessUnitFilter } from './business-unit-filter'
+import { KeywordSearch } from './keyword-search'
+import { SortControl } from './sort-control'
+import type { SortField, SortDirection } from './sort-control'
+import { ItemDetailModal } from './item-detail-modal'
 
 /**
  * Loading skeleton matching the BacklogItemCard layout.
@@ -100,6 +108,83 @@ function BacklogErrorState({
  */
 export function BacklogList() {
   const { data, isLoading, isError, error, refetch } = useBacklogItems()
+  const [showNewOnly, setShowNewOnly] = useState(false)
+  const [selectedBusinessUnit, setSelectedBusinessUnit] = useState<string | null>(null)
+  const [keywordQuery, setKeywordQuery] = useState('')
+  const [sortBy, setSortBy] = useState<SortField>('priority')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const lastClickedCardRef = useRef<HTMLDivElement | null>(null)
+
+  // Debounce the keyword query so filtering doesn't run on every keystroke
+  const debouncedQuery = useDebouncedValue(keywordQuery, 300)
+  const searchTokens = useMemo(() => {
+    const tokens = tokenizeQuery(debouncedQuery)
+      .map((t) => t.toLowerCase())
+      .filter(Boolean)
+    return Array.from(new Set(tokens))
+  }, [debouncedQuery])
+
+  const items = useMemo(() => data?.items ?? [], [data?.items])
+
+  // Client-side chained filters + sort — O(n log n), instant re-render, no API call
+  // Chain: business unit → "New only" → keyword search → sort
+  const displayedItems = useMemo(() => {
+    let filtered = items
+    if (selectedBusinessUnit) {
+      filtered = filtered.filter((item) => item.teamName === selectedBusinessUnit)
+    }
+    if (showNewOnly) {
+      filtered = filtered.filter((item) => item.isNew)
+    }
+    if (searchTokens.length > 0) {
+      filtered = filtered.filter((item) => {
+        const searchable = [
+          item.title,
+          item.description ?? '',
+          item.teamName,
+          item.status,
+          item.identifier,
+          ...item.labels.map((l) => l.name),
+        ]
+          .join(' ')
+          .toLowerCase()
+        return searchTokens.every((token) => searchable.includes(token))
+      })
+    }
+
+    // Sort after filtering (immutable — spread before sort)
+    const sorted = [...filtered].sort((a, b) => {
+      // Special-case priority so "None" (0) always stays last, even when descending.
+      if (sortBy === 'priority') {
+        const aIsNone = a.priority === 0
+        const bIsNone = b.priority === 0
+        if (aIsNone !== bIsNone) {
+          return aIsNone ? 1 : -1
+        }
+        const base = a.priority - b.priority
+        return sortDirection === 'asc' ? base : -base
+      }
+
+      let cmp = 0
+      switch (sortBy) {
+        case 'dateCreated':
+          cmp = a.createdAt.localeCompare(b.createdAt)
+          break
+        case 'dateUpdated':
+          cmp = a.updatedAt.localeCompare(b.updatedAt)
+          break
+        case 'status':
+          cmp = a.status.localeCompare(b.status)
+          break
+      }
+
+      return sortDirection === 'asc' ? cmp : -cmp
+    })
+
+    return sorted
+  }, [items, selectedBusinessUnit, showNewOnly, searchTokens, sortBy, sortDirection])
 
   if (isLoading) {
     return (
@@ -119,23 +204,159 @@ export function BacklogList() {
     )
   }
 
-  const items = data?.items ?? []
-  const totalCount = data?.totalCount ?? 0
-
   if (items.length === 0) {
     return <BacklogEmptyState onRetry={() => void refetch()} />
   }
 
+  // Used to decide whether to render the "New only" toggle at all.
+  // We keep this based on the full dataset so users can still discover
+  // "no new items for <BU>" scenarios when combined with BU filtering.
+  const newItemCount = items.filter((item) => item.isNew).length
+
+  // Used for display only. When a business unit is selected, show a BU-scoped
+  // count to avoid implying that the new-item count applies to the current BU
+  // when it doesn't.
+  const scopedNewItemCount = (selectedBusinessUnit
+    ? items.filter((item) => item.teamName === selectedBusinessUnit)
+    : items
+  ).filter((item) => item.isNew).length
+
+  /** Build a descriptive results count reflecting active filters. */
+  const getResultCountText = () => {
+    const count = displayedItems.length
+    const parts: string[] = []
+    if (showNewOnly) parts.push('new')
+    const itemWord = count === 1 ? 'item' : 'items'
+    const filterParts = parts.length > 0 ? `${parts.join(' ')} ` : ''
+    const matchPart = debouncedQuery.trim() ? ` matching "${debouncedQuery.trim()}"` : ''
+    const buPart = selectedBusinessUnit ? ` for ${selectedBusinessUnit}` : ''
+    return `Showing ${count} ${filterParts}${itemWord}${matchPart}${buPart}`
+  }
+
+  /** Whether any filter is active (used for empty-state detection). */
+  const hasActiveFilters = showNewOnly || !!selectedBusinessUnit || debouncedQuery.trim().length > 0
+
   return (
     <Box>
-      <Text fontSize="sm" color="gray.500" mb="4">
-        Showing {totalCount} {totalCount === 1 ? 'item' : 'items'}
-      </Text>
-      <VStack gap="4" align="stretch">
-        {items.map((item) => (
-          <BacklogItemCard key={item.id} item={item} />
-        ))}
-      </VStack>
+      {/* Filter bar: business unit dropdown, search input, "New only" toggle, results count */}
+      <Flex alignItems="center" mb="4" flexWrap="wrap" gap="3">
+        <BusinessUnitFilter
+          items={items}
+          value={selectedBusinessUnit}
+          onChange={setSelectedBusinessUnit}
+        />
+        <KeywordSearch
+          value={keywordQuery}
+          onChange={setKeywordQuery}
+          onClear={() => setKeywordQuery('')}
+        />
+        {newItemCount > 0 && (
+          <Button
+            size="sm"
+            variant={showNewOnly ? 'solid' : 'outline'}
+            onClick={() => setShowNewOnly(!showNewOnly)}
+            aria-pressed={showNewOnly}
+            aria-label={showNewOnly ? 'Show all items' : 'Show only new items'}
+          >
+            {showNewOnly
+              ? 'Show all'
+              : `New only (${selectedBusinessUnit ? scopedNewItemCount : newItemCount})`}
+          </Button>
+        )}
+        <SortControl
+          sortBy={sortBy}
+          sortDirection={sortDirection}
+          onSortByChange={setSortBy}
+          onSortDirectionChange={setSortDirection}
+        />
+        <Text fontSize="sm" color="gray.500" ml="auto">
+          {getResultCountText()}
+        </Text>
+      </Flex>
+
+      {/* Filtered items or empty filter state */}
+      {displayedItems.length === 0 && hasActiveFilters ? (
+        <Flex
+          direction="column"
+          alignItems="center"
+          justifyContent="center"
+          p="12"
+          borderWidth="1px"
+          borderRadius="md"
+          borderColor="gray.200"
+          textAlign="center"
+        >
+          <Text fontWeight="bold" fontSize="lg" mb="2">
+            {debouncedQuery.trim()
+              ? `No items found matching "${debouncedQuery.trim()}"`
+              : selectedBusinessUnit && !showNewOnly
+                ? `No items found for ${selectedBusinessUnit}`
+                : showNewOnly && !selectedBusinessUnit
+                  ? 'No new items'
+                  : `No new items for ${selectedBusinessUnit}`}
+          </Text>
+          <Text color="gray.500" mb="4">
+            {debouncedQuery.trim()
+              ? 'Try different keywords or adjust your filters.'
+              : selectedBusinessUnit
+                ? 'Try selecting a different business unit or clear the filter.'
+                : 'All items have been reviewed. Remove the filter to see all items.'}
+          </Text>
+          <HStack gap="2">
+            {debouncedQuery.trim() && (
+              <Button
+                onClick={() => setKeywordQuery('')}
+                variant="outline"
+                size="sm"
+              >
+                Clear search
+              </Button>
+            )}
+            {selectedBusinessUnit && (
+              <Button
+                onClick={() => setSelectedBusinessUnit(null)}
+                variant="outline"
+                size="sm"
+              >
+                Clear filter
+              </Button>
+            )}
+            {showNewOnly && (
+              <Button onClick={() => setShowNewOnly(false)} variant="outline" size="sm">
+                Show all items
+              </Button>
+            )}
+          </HStack>
+        </Flex>
+      ) : (
+        <>
+          <VStack gap="4" align="stretch">
+            {displayedItems.map((item) => (
+              <Box
+                key={item.id}
+                ref={(el: HTMLDivElement | null) => {
+                  cardRefs.current[item.id] = el
+                }}
+              >
+                <BacklogItemCard
+                  item={item}
+                  highlightTokens={searchTokens}
+                  onClick={() => {
+                    lastClickedCardRef.current = cardRefs.current[item.id] ?? null
+                    setSelectedItemId(item.id)
+                  }}
+                />
+              </Box>
+            ))}
+          </VStack>
+          <ItemDetailModal
+            isOpen={!!selectedItemId}
+            itemId={selectedItemId}
+            onClose={() => setSelectedItemId(null)}
+            triggerRef={lastClickedCardRef}
+          />
+        </>
+      )}
     </Box>
   )
 }

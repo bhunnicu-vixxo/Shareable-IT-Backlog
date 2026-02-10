@@ -50,6 +50,7 @@ export const backlogItemDtoSchema = z.object({
   dueDate: z.iso.date().nullable(),
   sortOrder: z.number(),
   url: z.url(),
+  isNew: z.boolean(),
 })
 
 export type BacklogItemDtoValidated = z.infer<typeof backlogItemDtoSchema>

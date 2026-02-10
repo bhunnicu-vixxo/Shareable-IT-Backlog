@@ -159,6 +159,7 @@ describe('toBacklogItemDto', () => {
       dueDate: null,
       sortOrder: 1.5,
       url: 'https://linear.app/vixxo/issue/VIX-1',
+      isNew: expect.any(Boolean),
     })
   })
 
@@ -188,6 +189,36 @@ describe('toBacklogItemDto', () => {
 
     expect(dto.assigneeId).toBeNull()
     expect(dto.assigneeName).toBeNull()
+  })
+
+  it('formats assignee display name when name is an email', async () => {
+    const issue = createMockIssue({
+      get assignee() {
+        return Promise.resolve({
+          id: 'user-1',
+          name: 'robert.hunnicutt@vixxo.com',
+          email: 'robert.hunnicutt@vixxo.com',
+        })
+      },
+    })
+    const dto = await toBacklogItemDto(issue)
+
+    expect(dto.assigneeName).toBe('Robert Hunnicutt')
+  })
+
+  it('uses assignee name as-is when it is not an email', async () => {
+    const issue = createMockIssue({
+      get assignee() {
+        return Promise.resolve({
+          id: 'user-1',
+          name: 'Jane Dev',
+          email: 'jane@vixxo.com',
+        })
+      },
+    })
+    const dto = await toBacklogItemDto(issue)
+
+    expect(dto.assigneeName).toBe('Jane Dev')
   })
 
   it('handles null project gracefully', async () => {
@@ -411,6 +442,42 @@ describe('toCommentDtos', () => {
   })
 })
 
+describe('isNew computation', () => {
+  it('flags item created 1 day ago as new (within default 7-day threshold)', async () => {
+    const oneDayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
+    const issue = createMockIssue({ createdAt: oneDayAgo })
+    const dto = await toBacklogItemDto(issue)
+    expect(dto.isNew).toBe(true)
+  })
+
+  it('flags item created 6 days ago as new', async () => {
+    const sixDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000)
+    const issue = createMockIssue({ createdAt: sixDaysAgo })
+    const dto = await toBacklogItemDto(issue)
+    expect(dto.isNew).toBe(true)
+  })
+
+  it('does not flag item created 8 days ago as new', async () => {
+    const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+    const issue = createMockIssue({ createdAt: eightDaysAgo })
+    const dto = await toBacklogItemDto(issue)
+    expect(dto.isNew).toBe(false)
+  })
+
+  it('does not flag item created 30 days ago as new', async () => {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const issue = createMockIssue({ createdAt: thirtyDaysAgo })
+    const dto = await toBacklogItemDto(issue)
+    expect(dto.isNew).toBe(false)
+  })
+
+  it('flags item created just now as new', async () => {
+    const issue = createMockIssue({ createdAt: new Date() })
+    const dto = await toBacklogItemDto(issue)
+    expect(dto.isNew).toBe(true)
+  })
+})
+
 describe('Zod schema validation', () => {
   it('validates a valid BacklogItemDto without errors', async () => {
     const issue = createMockIssue()
@@ -461,6 +528,7 @@ describe('Zod schema validation', () => {
       dueDate: null,
       sortOrder: 1.5,
       url: 'https://linear.app/vixxo/issue/VIX-1',
+      isNew: false,
     }
 
     const result = backlogItemDtoSchema.safeParse(invalidData)

@@ -19,7 +19,7 @@ app.use(helmet())
 // CORS — allow Vixxo network origins (configurable via env)
 app.use(
   cors({
-    origin: allowedOrigins.length > 0 ? allowedOrigins : ['http://localhost:5173'],
+    origin: allowedOrigins.length > 0 ? allowedOrigins : ['http://localhost:1576'],
     credentials: true,
   }),
 )

@@ -46,6 +46,21 @@ const PRIORITY_LABELS: Record<number, PriorityLabel> = {
   4: 'Low',
 }
 
+/** Number of days within which an item is considered "new". */
+const raw = parseInt(process.env.NEW_ITEM_DAYS_THRESHOLD ?? '7', 10)
+const NEW_ITEM_DAYS = Number.isFinite(raw) && raw >= 0 ? raw : 7
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+/**
+ * Determine whether an item is "new" based on its creation date.
+ * Items created within the last N days (configurable via NEW_ITEM_DAYS_THRESHOLD
+ * env var, default 7) are considered new.
+ * Boundary: items created exactly N days ago are not new (strict < comparison).
+ */
+function isItemNew(createdAt: Date): boolean {
+  return (Date.now() - createdAt.getTime()) < NEW_ITEM_DAYS * MS_PER_DAY
+}
+
 const VALID_WORKFLOW_STATE_TYPES: WorkflowStateType[] = [
   'backlog',
   'unstarted',
@@ -63,6 +78,26 @@ function normalizeWorkflowStateType(value: unknown): WorkflowStateType {
     return value as WorkflowStateType
   }
   return 'backlog'
+}
+
+/**
+ * Derive a short display name for assignee. Prefers name when it doesn't look
+ * like an email. When name is an email (e.g. robert.hunnicutt@vixxo.com),
+ * formats the local part as "Robert Hunnicutt" to avoid wrapping and improve readability.
+ */
+function formatAssigneeDisplayName(name: string | null, email: string | null): string | null {
+  const raw = name ?? email
+  if (!raw) return null
+  // If it doesn't look like an email, use as-is (proper name from Linear)
+  if (!raw.includes('@')) return raw
+  // Format email: "robert.hunnicutt@vixxo.com" → "Robert Hunnicutt"
+  const localPart = raw.split('@')[0] ?? ''
+  const withSpaces = localPart.replace(/[._]/g, ' ')
+  const titleCase = withSpaces
+    .split(' ')
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+    .join(' ')
+  return titleCase || raw
 }
 
 /**
@@ -97,7 +132,10 @@ export async function toBacklogItemDto(issue: Issue): Promise<BacklogItemDto> {
     status: state?.name ?? 'Unknown',
     statusType: normalizeWorkflowStateType(state?.type),
     assigneeId: assignee?.id ?? null,
-    assigneeName: assignee?.name ?? null,
+    assigneeName: formatAssigneeDisplayName(
+      assignee?.name ?? null,
+      assignee?.email ?? null,
+    ),
     projectId: project?.id ?? null,
     projectName: project?.name ?? null,
     teamId: team?.id ?? '',
@@ -109,6 +147,7 @@ export async function toBacklogItemDto(issue: Issue): Promise<BacklogItemDto> {
     dueDate: issue.dueDate ?? null,
     sortOrder: issue.sortOrder,
     url: issue.url,
+    isNew: isItemNew(issue.createdAt),
   }
 }
 

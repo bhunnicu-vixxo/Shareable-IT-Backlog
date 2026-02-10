@@ -59,6 +59,8 @@ export interface BacklogItemDto {
   sortOrder: number
   /** Deep-link URL to the issue in Linear */
   url: string
+  /** Whether the item is considered "new" (created within configurable threshold) */
+  isNew: boolean
 }
 
 /** Flattened, API-safe representation of a Linear Comment. */

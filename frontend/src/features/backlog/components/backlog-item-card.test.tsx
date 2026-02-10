@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@/utils/test-utils'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@/utils/test-utils'
 import { BacklogItemCard } from './backlog-item-card'
 import type { BacklogItem } from '../types/backlog.types'
 
@@ -23,6 +23,7 @@ function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
     dueDate: null,
     sortOrder: 1.0,
     url: 'https://linear.app/vixxo/issue/VIX-42',
+    isNew: false,
     ...overrides,
   }
 }
@@ -77,5 +78,70 @@ describe('BacklogItemCard', () => {
       name: 'Implement login page, Priority High',
     })
     expect(card).toBeInTheDocument()
+  })
+
+  it('renders "New" badge when item isNew is true', () => {
+    render(<BacklogItemCard item={createMockItem({ isNew: true })} />)
+    expect(screen.getByText('New')).toBeInTheDocument()
+  })
+
+  it('does not render "New" badge when item isNew is false', () => {
+    render(<BacklogItemCard item={createMockItem({ isNew: false })} />)
+    expect(screen.queryByText('New')).not.toBeInTheDocument()
+  })
+
+  it('includes "New item" in aria-label when isNew is true', () => {
+    render(<BacklogItemCard item={createMockItem({ isNew: true })} />)
+    const card = screen.getByRole('article', {
+      name: 'Implement login page, Priority High, New item',
+    })
+    expect(card).toBeInTheDocument()
+  })
+
+  it('"New" badge has accessible aria-label', () => {
+    render(<BacklogItemCard item={createMockItem({ isNew: true })} />)
+    expect(screen.getByLabelText('New item')).toBeInTheDocument()
+  })
+
+  it('renders as button and calls onClick when provided', () => {
+    const onClick = vi.fn()
+    render(<BacklogItemCard item={createMockItem()} onClick={onClick} />)
+
+    const card = screen.getByRole('button', {
+      name: 'Implement login page, Priority High',
+    })
+    expect(card).toBeInTheDocument()
+
+    fireEvent.click(card)
+    expect(onClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('activates on Enter key when onClick is provided', () => {
+    const onClick = vi.fn()
+    render(<BacklogItemCard item={createMockItem()} onClick={onClick} />)
+
+    const card = screen.getByRole('button', {
+      name: 'Implement login page, Priority High',
+    })
+    fireEvent.keyDown(card, { key: 'Enter' })
+    expect(onClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('activates on Space key when onClick is provided', () => {
+    const onClick = vi.fn()
+    render(<BacklogItemCard item={createMockItem()} onClick={onClick} />)
+
+    const card = screen.getByRole('button', {
+      name: 'Implement login page, Priority High',
+    })
+    fireEvent.keyDown(card, { key: ' ' })
+    expect(onClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders as article when onClick is not provided', () => {
+    render(<BacklogItemCard item={createMockItem()} />)
+    expect(
+      screen.getByRole('article', { name: 'Implement login page, Priority High' }),
+    ).toBeInTheDocument()
   })
 })

@@ -1,9 +1,15 @@
 import { Badge, Box, Flex, HStack, Text } from '@chakra-ui/react'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
+import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
+import { highlightText } from '../utils/highlight'
 import type { BacklogItem } from '../types/backlog.types'
 
 export interface BacklogItemCardProps {
   item: BacklogItem
+  /** Optional click handler. When provided, card is clickable (cursor pointer, keyboard activatable). */
+  onClick?: () => void
+  /** Search tokens to highlight in the title (and other visible text). Empty array = no highlights. */
+  highlightTokens?: string[]
 }
 
 /**
@@ -13,8 +19,20 @@ export interface BacklogItemCardProps {
  *  [Priority Badge]  Title
  *                    Status | Team | Identifier
  *                    Labels: [Label1] [Label2]
+ *
+ * When onClick is provided, the card is clickable and keyboard-accessible (Enter/Space to activate).
  */
-export function BacklogItemCard({ item }: BacklogItemCardProps) {
+export function BacklogItemCard({ item, onClick, highlightTokens = [] }: BacklogItemCardProps) {
+  const isClickable = !!onClick
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isClickable) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onClick?.()
+    }
+  }
+
   return (
     <Flex
       p="4"
@@ -24,9 +42,19 @@ export function BacklogItemCard({ item }: BacklogItemCardProps) {
       gap="4"
       alignItems="flex-start"
       _hover={{ bg: 'gray.50' }}
+      _focusVisible={{
+        outline: '2px solid',
+        outlineColor: 'brand.green',
+        outlineOffset: '2px',
+        borderColor: 'brand.green',
+      }}
       transition="background 0.15s"
-      aria-label={`${item.title}, Priority ${item.priorityLabel}`}
-      role="article"
+      aria-label={`${item.title}, Priority ${item.priorityLabel}${item.isNew ? ', New item' : ''}`}
+      role={isClickable ? 'button' : 'article'}
+      tabIndex={isClickable ? 0 : undefined}
+      cursor={isClickable ? 'pointer' : undefined}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
     >
       {/* Left: Priority badge */}
       <StackRankBadge priority={item.priority} priorityLabel={item.priorityLabel} />
@@ -35,12 +63,15 @@ export function BacklogItemCard({ item }: BacklogItemCardProps) {
       <Box flex="1" minWidth="0">
         {/* Title */}
         <Text fontWeight="bold" fontSize="md" truncate>
-          {item.title}
+          {highlightTokens.length > 0
+            ? highlightText(item.title, highlightTokens)
+            : item.title}
         </Text>
 
         {/* Metadata row */}
         <HStack gap="2" mt="1" flexWrap="wrap">
           <StatusBadge status={item.status} statusType={item.statusType} />
+          {item.isNew && <NewItemBadge />}
           <Text fontSize="sm" color="gray.500">
             {item.teamName}
           </Text>
@@ -72,6 +103,28 @@ export function BacklogItemCard({ item }: BacklogItemCardProps) {
   )
 }
 
+/**
+ * "New" badge for items recently added to the backlog.
+ * Uses Vixxo Yellow (brand.yellow) as background with dark text for WCAG AA contrast.
+ * Includes text label so colour is not the sole indicator (accessibility).
+ */
+function NewItemBadge() {
+  return (
+    <Badge
+      fontSize="xs"
+      bg="brand.yellow"
+      color="brand.gray"
+      px="2"
+      py="0.5"
+      borderRadius="sm"
+      fontWeight="semibold"
+      aria-label="New item"
+    >
+      New
+    </Badge>
+  )
+}
+
 /** Status badge component with color coding based on workflow state type. */
 function StatusBadge({
   status,
@@ -80,14 +133,7 @@ function StatusBadge({
   status: string
   statusType: string
 }) {
-  const colorMap: Record<string, { bg: string; color: string }> = {
-    started: { bg: 'brand.teal', color: 'white' },
-    completed: { bg: 'brand.green', color: 'white' },
-    cancelled: { bg: 'gray.400', color: 'white' },
-    backlog: { bg: 'gray.500', color: 'white' },
-    unstarted: { bg: 'brand.blue', color: 'white' },
-  }
-  const colors = colorMap[statusType] ?? { bg: 'gray.500', color: 'white' }
+  const colors = STATUS_COLORS[statusType] ?? DEFAULT_STATUS_COLORS
 
   return (
     <Badge

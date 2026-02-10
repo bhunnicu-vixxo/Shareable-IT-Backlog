@@ -37,6 +37,8 @@ export interface BacklogItem {
   sortOrder: number
   /** Deep-link URL to the issue in Linear */
   url: string
+  /** Whether the item is considered "new" (recently created, needs prioritization) */
+  isNew: boolean
 }
 
 export interface Label {
