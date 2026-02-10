@@ -120,16 +120,22 @@ development_status:
 
   # Epic 6: Data Synchronization
   epic-6: in-progress
-  6-1-implement-scheduled-automatic-sync: ready-for-dev
+  6-1-implement-scheduled-automatic-sync:
+    status: done
+    linear_id: "VIX-354"
+    linear_url: "https://linear.app/vixxo/issue/VIX-354/implement-scheduled-automatic-sync"
   6-2-implement-manual-sync-trigger:
-    status: ready-for-dev
+    status: done
     linear_id: "VIX-355"
     linear_url: "https://linear.app/vixxo/issue/VIX-355/implement-manual-sync-trigger"
   6-3-display-sync-status-to-users:
-    status: ready-for-dev
+    status: done
     linear_id: "VIX-356"
     linear_url: "https://linear.app/vixxo/issue/VIX-356/display-sync-status-to-users"
-  6-4-implement-sync-error-handling-and-messages: backlog
+  6-4-implement-sync-error-handling-and-messages:
+    status: in-progress
+    linear_id: "VIX-357"
+    linear_url: "https://linear.app/vixxo/issue/VIX-357/implement-sync-error-handling-and-messages"
   6-5-handle-linear-api-unavailability: backlog
   6-6-handle-partial-sync-failures: backlog
   epic-6-retrospective: optional

@@ -1,14 +1,13 @@
-import { Box, Heading, Text } from '@chakra-ui/react'
+import { Box, Heading, VStack } from '@chakra-ui/react'
+import { SyncControl } from './sync-control'
 
 export function AdminPage() {
   return (
-    <Box p="4">
-      <Heading as="h1" size="xl" color="brand.gray">
-        Admin
-      </Heading>
-      <Text mt="2" color="brand.gray">
-        Administration settings coming soon.
-      </Text>
+    <Box maxW="960px" mx="auto" p={6}>
+      <VStack gap={8} align="stretch">
+        <Heading size="xl">Administration</Heading>
+        <SyncControl />
+      </VStack>
     </Box>
   )
 }
