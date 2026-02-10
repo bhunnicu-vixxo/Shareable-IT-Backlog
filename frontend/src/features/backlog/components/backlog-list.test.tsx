@@ -284,6 +284,7 @@ describe('BacklogList', () => {
         description: 'Item description here',
       }),
       comments: [] as BacklogItemComment[],
+      activities: [],
     }
 
     globalThis.fetch = vi.fn().mockImplementation((url: string | URL) => {

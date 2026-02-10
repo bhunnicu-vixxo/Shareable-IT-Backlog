@@ -10,6 +10,7 @@ vi.mock('../sync/linear-client.service.js', () => ({
     getIssuesByProject: vi.fn(),
     getIssueById: vi.fn(),
     getIssueComments: vi.fn(),
+    getIssueHistory: vi.fn(),
   },
 }))
 
@@ -18,6 +19,7 @@ vi.mock('../sync/linear-transformers.js', () => ({
   toBacklogItemDtos: vi.fn(),
   toBacklogItemDto: vi.fn(),
   toCommentDtos: vi.fn(),
+  toIssueActivityDtos: vi.fn(),
 }))
 
 // Import after mocking
@@ -26,15 +28,18 @@ import {
   toBacklogItemDtos,
   toBacklogItemDto,
   toCommentDtos,
+  toIssueActivityDtos,
 } from '../sync/linear-transformers.js'
 import { BacklogService } from './backlog.service.js'
 
 const mockGetIssuesByProject = vi.mocked(linearClient.getIssuesByProject)
 const mockGetIssueById = vi.mocked(linearClient.getIssueById)
 const mockGetIssueComments = vi.mocked(linearClient.getIssueComments)
+const mockGetIssueHistory = vi.mocked(linearClient.getIssueHistory)
 const mockToBacklogItemDtos = vi.mocked(toBacklogItemDtos)
 const mockToBacklogItemDto = vi.mocked(toBacklogItemDto)
 const mockToCommentDtos = vi.mocked(toCommentDtos)
+const mockToIssueActivityDtos = vi.mocked(toIssueActivityDtos)
 
 function createMockBacklogItem(overrides: Partial<BacklogItemDto> = {}): BacklogItemDto {
   return {
@@ -245,14 +250,19 @@ describe('BacklogService', () => {
   })
 
   describe('getBacklogItemById', () => {
-    it('should return item and comments when issue exists', async () => {
+    it('should return item, comments, and activities when issue exists', async () => {
       const mockIssue = { id: 'issue-123' } as never
       const mockComments = [{ id: 'comment-1' }] as never[]
+      const mockHistory = [{ id: 'history-1' }] as never[]
       mockGetIssueById.mockResolvedValue({ data: mockIssue, rateLimit: null })
       mockGetIssueComments.mockResolvedValue({ data: mockComments, rateLimit: null })
+      mockGetIssueHistory.mockResolvedValue({ data: mockHistory, rateLimit: null })
       mockToBacklogItemDto.mockResolvedValue(createMockBacklogItem({ id: 'issue-123' }))
       mockToCommentDtos.mockResolvedValue([
-        { id: 'comment-1', body: 'A comment', createdAt: '2026-02-05T10:00:00.000Z', updatedAt: '2026-02-05T10:00:00.000Z', userId: null, userName: 'User' },
+        { id: 'comment-1', body: 'A comment', createdAt: '2026-02-05T10:00:00.000Z', updatedAt: '2026-02-05T10:00:00.000Z', userId: null, userName: 'User', userAvatarUrl: null, parentId: null },
+      ])
+      mockToIssueActivityDtos.mockResolvedValue([
+        { id: 'history-1', createdAt: '2026-02-05T10:00:00.000Z', actorName: 'Jane', type: 'state_change', description: 'Status changed from Backlog to In Progress' },
       ])
 
       const result = await service.getBacklogItemById('issue-123')
@@ -260,28 +270,72 @@ describe('BacklogService', () => {
       expect(result).not.toBeNull()
       expect(result?.item.id).toBe('issue-123')
       expect(result?.comments).toHaveLength(1)
+      expect(result?.activities).toHaveLength(1)
+      expect(result?.activities[0]!.type).toBe('state_change')
       expect(mockGetIssueById).toHaveBeenCalledWith('issue-123')
       expect(mockGetIssueComments).toHaveBeenCalledWith('issue-123')
+      expect(mockGetIssueHistory).toHaveBeenCalledWith('issue-123')
     })
 
     it('should return null when issue does not exist', async () => {
       mockGetIssueById.mockResolvedValue({ data: null, rateLimit: null })
+      mockGetIssueComments.mockResolvedValue({ data: [], rateLimit: null })
+      mockGetIssueHistory.mockResolvedValue({ data: [], rateLimit: null })
 
       const result = await service.getBacklogItemById('non-existent-id')
 
       expect(result).toBeNull()
-      expect(mockGetIssueComments).not.toHaveBeenCalled()
+    })
+
+    it('should return null when issue fetch rejects', async () => {
+      mockGetIssueById.mockRejectedValue(new Error('Issue fetch failed'))
+      mockGetIssueComments.mockResolvedValue({ data: [], rateLimit: null })
+      mockGetIssueHistory.mockResolvedValue({ data: [], rateLimit: null })
+
+      await expect(service.getBacklogItemById('bad-id')).rejects.toThrow('Issue fetch failed')
     })
 
     it('should return empty comments array when issue has no comments', async () => {
       const mockIssue = { id: 'issue-456' } as never
       mockGetIssueById.mockResolvedValue({ data: mockIssue, rateLimit: null })
       mockGetIssueComments.mockResolvedValue({ data: [], rateLimit: null })
+      mockGetIssueHistory.mockResolvedValue({ data: [], rateLimit: null })
       mockToBacklogItemDto.mockResolvedValue(createMockBacklogItem({ id: 'issue-456' }))
       mockToCommentDtos.mockResolvedValue([])
+      mockToIssueActivityDtos.mockResolvedValue([])
 
       const result = await service.getBacklogItemById('issue-456')
 
+      expect(result?.comments).toEqual([])
+      expect(result?.activities).toEqual([])
+    })
+
+    it('should degrade gracefully when history fetch fails', async () => {
+      const mockIssue = { id: 'issue-789' } as never
+      mockGetIssueById.mockResolvedValue({ data: mockIssue, rateLimit: null })
+      mockGetIssueComments.mockResolvedValue({ data: [], rateLimit: null })
+      mockGetIssueHistory.mockRejectedValue(new Error('History API error'))
+      mockToBacklogItemDto.mockResolvedValue(createMockBacklogItem({ id: 'issue-789' }))
+      mockToCommentDtos.mockResolvedValue([])
+
+      const result = await service.getBacklogItemById('issue-789')
+
+      expect(result).not.toBeNull()
+      expect(result?.item.id).toBe('issue-789')
+      expect(result?.activities).toEqual([])
+    })
+
+    it('should degrade gracefully when comments fetch fails', async () => {
+      const mockIssue = { id: 'issue-789' } as never
+      mockGetIssueById.mockResolvedValue({ data: mockIssue, rateLimit: null })
+      mockGetIssueComments.mockRejectedValue(new Error('Comments API error'))
+      mockGetIssueHistory.mockResolvedValue({ data: [], rateLimit: null })
+      mockToBacklogItemDto.mockResolvedValue(createMockBacklogItem({ id: 'issue-789' }))
+      mockToIssueActivityDtos.mockResolvedValue([])
+
+      const result = await service.getBacklogItemById('issue-789')
+
+      expect(result).not.toBeNull()
       expect(result?.comments).toEqual([])
     })
   })

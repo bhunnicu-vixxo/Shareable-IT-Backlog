@@ -64,9 +64,34 @@ export const commentDtoSchema = z.object({
   updatedAt: z.iso.datetime(),
   userId: z.string().nullable(),
   userName: z.string().nullable(),
+  userAvatarUrl: z.string().url().nullable(),
+  parentId: z.string().nullable(),
 })
 
 export type CommentDtoValidated = z.infer<typeof commentDtoSchema>
+
+// ─── IssueActivity ──────────────────────────────────────────────────────────
+
+const issueActivityTypeSchema = z.enum([
+  'state_change',
+  'assignment',
+  'priority_change',
+  'label_added',
+  'label_removed',
+  'created',
+  'archived',
+  'other',
+])
+
+export const issueActivityDtoSchema = z.object({
+  id: z.string(),
+  createdAt: z.iso.datetime(),
+  actorName: z.string(),
+  type: issueActivityTypeSchema,
+  description: z.string(),
+})
+
+export type IssueActivityDtoValidated = z.infer<typeof issueActivityDtoSchema>
 
 // ─── Project ────────────────────────────────────────────────────────────────
 

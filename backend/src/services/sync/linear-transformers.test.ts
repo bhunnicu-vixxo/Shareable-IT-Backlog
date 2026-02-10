@@ -9,15 +9,18 @@ import {
   toWorkflowStateDto,
   toBacklogItemDtos,
   toCommentDtos,
+  toIssueActivityDto,
+  toIssueActivityDtos,
 } from './linear-transformers.js'
 
 import {
   backlogItemDtoSchema,
   commentDtoSchema,
   workflowStateDtoSchema,
+  issueActivityDtoSchema,
 } from '../../types/linear-entities.schemas.js'
 
-import type { Issue, Comment, Project, Team, User, WorkflowState } from '@linear/sdk'
+import type { Issue, IssueHistory, Comment, Project, Team, User, WorkflowState } from '@linear/sdk'
 
 // ─── Mock helpers ───────────────────────────────────────────────────────────
 
@@ -78,7 +81,11 @@ function createMockComment(overrides: Record<string, unknown> = {}): Comment {
         id: 'user-1',
         name: 'Jane Dev',
         email: 'jane@vixxo.com',
+        avatarUrl: 'https://avatars.example.com/jane.png',
       })
+    },
+    get parent() {
+      return Promise.resolve(undefined)
     },
     ...overrides,
   }
@@ -128,6 +135,46 @@ function createMockWorkflowState(
     description: 'Work has begun',
     ...overrides,
   } as unknown as WorkflowState
+}
+
+/**
+ * Create a mock SDK IssueHistory entry that mimics lazy-loading getters.
+ */
+function createMockHistoryEntry(overrides: Record<string, unknown> = {}): IssueHistory {
+  const base = {
+    id: 'history-1',
+    createdAt: new Date('2026-02-05T10:00:00.000Z'),
+    updatedAt: new Date('2026-02-05T10:00:00.000Z'),
+    actorId: 'user-1',
+    fromStateId: null,
+    toStateId: null,
+    fromAssigneeId: null,
+    toAssigneeId: null,
+    fromPriority: undefined,
+    toPriority: undefined,
+    addedLabelIds: null,
+    removedLabelIds: null,
+    addedLabels: null,
+    removedLabels: null,
+    archived: undefined,
+    get actor() {
+      return Promise.resolve({ id: 'user-1', name: 'Jane Dev', email: 'jane@vixxo.com' })
+    },
+    get fromState() {
+      return undefined
+    },
+    get toState() {
+      return undefined
+    },
+    get fromAssignee() {
+      return undefined
+    },
+    get toAssignee() {
+      return undefined
+    },
+    ...overrides,
+  }
+  return base as unknown as IssueHistory
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -308,6 +355,8 @@ describe('toCommentDto', () => {
       updatedAt: '2026-02-01T11:00:00.000Z',
       userId: 'user-1',
       userName: 'Jane Dev',
+      userAvatarUrl: 'https://avatars.example.com/jane.png',
+      parentId: null,
     })
   })
 
@@ -321,6 +370,85 @@ describe('toCommentDto', () => {
 
     expect(dto.userId).toBeNull()
     expect(dto.userName).toBeNull()
+    expect(dto.userAvatarUrl).toBeNull()
+  })
+
+  it('handles user relation rejection gracefully (deleted user)', async () => {
+    const comment = createMockComment({
+      get user() {
+        return Promise.reject(new Error('User deleted'))
+      },
+    })
+    const dto = await toCommentDto(comment)
+
+    expect(dto.userId).toBeNull()
+    expect(dto.userName).toBeNull()
+    expect(dto.userAvatarUrl).toBeNull()
+  })
+
+  it('resolves parentId from parent comment relation', async () => {
+    const comment = createMockComment({
+      get parent() {
+        return Promise.resolve({ id: 'parent-comment-1' })
+      },
+    })
+    const dto = await toCommentDto(comment)
+
+    expect(dto.parentId).toBe('parent-comment-1')
+  })
+
+  it('sets parentId to null for top-level comments', async () => {
+    const comment = createMockComment({
+      get parent() {
+        return Promise.resolve(undefined)
+      },
+    })
+    const dto = await toCommentDto(comment)
+
+    expect(dto.parentId).toBeNull()
+  })
+
+  it('handles parent resolution rejection gracefully (deleted parent)', async () => {
+    const comment = createMockComment({
+      get parent() {
+        return Promise.reject(new Error('Parent comment deleted'))
+      },
+    })
+    const dto = await toCommentDto(comment)
+
+    expect(dto.parentId).toBeNull()
+  })
+
+  it('extracts userAvatarUrl from resolved user', async () => {
+    const comment = createMockComment({
+      get user() {
+        return Promise.resolve({
+          id: 'user-2',
+          name: 'Bob Smith',
+          email: 'bob@vixxo.com',
+          avatarUrl: 'https://avatars.example.com/bob.png',
+        })
+      },
+    })
+    const dto = await toCommentDto(comment)
+
+    expect(dto.userAvatarUrl).toBe('https://avatars.example.com/bob.png')
+  })
+
+  it('sets userAvatarUrl to null when user has no avatar', async () => {
+    const comment = createMockComment({
+      get user() {
+        return Promise.resolve({
+          id: 'user-3',
+          name: 'No Avatar User',
+          email: 'noavatar@vixxo.com',
+          avatarUrl: undefined,
+        })
+      },
+    })
+    const dto = await toCommentDto(comment)
+
+    expect(dto.userAvatarUrl).toBeNull()
   })
 })
 
@@ -431,14 +559,33 @@ describe('toBacklogItemDtos', () => {
 describe('toCommentDtos', () => {
   it('batch transforms multiple comments', async () => {
     const comments = [
-      createMockComment({ id: 'comment-1' }),
-      createMockComment({ id: 'comment-2', body: 'Second comment' }),
+      createMockComment({ id: 'comment-1', createdAt: new Date('2026-02-01T10:00:00.000Z') }),
+      createMockComment({ id: 'comment-2', body: 'Second comment', createdAt: new Date('2026-02-01T11:00:00.000Z') }),
     ]
     const dtos = await toCommentDtos(comments)
 
     expect(dtos).toHaveLength(2)
     expect(dtos[0]!.id).toBe('comment-1')
     expect(dtos[1]!.id).toBe('comment-2')
+  })
+
+  it('sorts comments by createdAt ascending (oldest first)', async () => {
+    const comments = [
+      createMockComment({ id: 'comment-newest', createdAt: new Date('2026-02-03T10:00:00.000Z') }),
+      createMockComment({ id: 'comment-oldest', createdAt: new Date('2026-02-01T10:00:00.000Z') }),
+      createMockComment({ id: 'comment-middle', createdAt: new Date('2026-02-02T10:00:00.000Z') }),
+    ]
+    const dtos = await toCommentDtos(comments)
+
+    expect(dtos).toHaveLength(3)
+    expect(dtos[0]!.id).toBe('comment-oldest')
+    expect(dtos[1]!.id).toBe('comment-middle')
+    expect(dtos[2]!.id).toBe('comment-newest')
+  })
+
+  it('returns empty array for empty input', async () => {
+    const dtos = await toCommentDtos([])
+    expect(dtos).toEqual([])
   })
 })
 
@@ -478,6 +625,218 @@ describe('isNew computation', () => {
   })
 })
 
+describe('toIssueActivityDto', () => {
+  it('keeps issue creation entries and labels them as created', async () => {
+    const entry = createMockHistoryEntry({
+      action: 'create',
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.type).toBe('created')
+    expect(dto!.description).toBe('Issue created')
+  })
+
+  it('transforms state change into human-readable description', async () => {
+    const entry = createMockHistoryEntry({
+      get fromState() {
+        return Promise.resolve({ name: 'Backlog', type: 'backlog' })
+      },
+      get toState() {
+        return Promise.resolve({ name: 'In Progress', type: 'started' })
+      },
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.type).toBe('state_change')
+    expect(dto!.description).toBe('Status changed from Backlog to In Progress')
+    expect(dto!.actorName).toBe('Jane Dev')
+    expect(dto!.createdAt).toBe('2026-02-05T10:00:00.000Z')
+  })
+
+  it('transforms assignment change (assigned to)', async () => {
+    const entry = createMockHistoryEntry({
+      get toAssignee() {
+        return Promise.resolve({ id: 'user-2', name: 'Bob Smith' })
+      },
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.type).toBe('assignment')
+    expect(dto!.description).toBe('Assigned to Bob Smith')
+  })
+
+  it('transforms unassignment change', async () => {
+    const entry = createMockHistoryEntry({
+      get fromAssignee() {
+        return Promise.resolve({ id: 'user-1', name: 'Jane Dev' })
+      },
+      get toAssignee() {
+        return undefined
+      },
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.type).toBe('assignment')
+    expect(dto!.description).toBe('Unassigned from Jane Dev')
+  })
+
+  it('transforms priority change', async () => {
+    const entry = createMockHistoryEntry({
+      fromPriority: 3,
+      toPriority: 2,
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.type).toBe('priority_change')
+    expect(dto!.description).toBe('Priority changed from Normal to High')
+  })
+
+  it('transforms label added with resolved label names', async () => {
+    const entry = createMockHistoryEntry({
+      addedLabelIds: ['lbl-1'],
+      addedLabels: [{ id: 'lbl-1', name: 'Frontend', color: '#395389' }],
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.type).toBe('label_added')
+    expect(dto!.description).toBe('Label added: Frontend')
+  })
+
+  it('transforms label removed with resolved label names', async () => {
+    const entry = createMockHistoryEntry({
+      removedLabelIds: ['lbl-2'],
+      removedLabels: [{ id: 'lbl-2', name: 'Bug', color: '#eb5757' }],
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.type).toBe('label_removed')
+    expect(dto!.description).toBe('Label removed: Bug')
+  })
+
+  it('transforms archival event', async () => {
+    const entry = createMockHistoryEntry({
+      archived: true,
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.type).toBe('archived')
+    expect(dto!.description).toBe('Item archived')
+  })
+
+  it('transforms unarchival event', async () => {
+    const entry = createMockHistoryEntry({
+      archived: false,
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.type).toBe('archived')
+    expect(dto!.description).toBe('Item unarchived')
+  })
+
+  it('filters out irrelevant entries (no meaningful changes)', async () => {
+    // Entry with no state, assignee, priority, label, or archive changes
+    const entry = createMockHistoryEntry()
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).toBeNull()
+  })
+
+  it('handles null actor gracefully (system changes)', async () => {
+    const entry = createMockHistoryEntry({
+      get actor() {
+        return Promise.resolve(null)
+      },
+      get fromState() {
+        return Promise.resolve({ name: 'Backlog', type: 'backlog' })
+      },
+      get toState() {
+        return Promise.resolve({ name: 'Triage', type: 'unstarted' })
+      },
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.actorName).toBe('System')
+  })
+
+  it('handles actor relation rejection gracefully', async () => {
+    const entry = createMockHistoryEntry({
+      get actor() {
+        return Promise.reject(new Error('User deleted'))
+      },
+      get fromState() {
+        return Promise.resolve({ name: 'Backlog', type: 'backlog' })
+      },
+      get toState() {
+        return Promise.resolve({ name: 'In Progress', type: 'started' })
+      },
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    expect(dto).not.toBeNull()
+    expect(dto!.actorName).toBe('System')
+  })
+})
+
+describe('toIssueActivityDtos', () => {
+  it('batch transforms and filters entries', async () => {
+    const entries = [
+      createMockHistoryEntry({
+        id: 'h-1',
+        createdAt: new Date('2026-02-05T10:00:00.000Z'),
+        get fromState() {
+          return Promise.resolve({ name: 'Backlog', type: 'backlog' })
+        },
+        get toState() {
+          return Promise.resolve({ name: 'In Progress', type: 'started' })
+        },
+      }),
+      // This one should be filtered out (no meaningful changes)
+      createMockHistoryEntry({
+        id: 'h-2',
+        createdAt: new Date('2026-02-04T10:00:00.000Z'),
+      }),
+      createMockHistoryEntry({
+        id: 'h-3',
+        createdAt: new Date('2026-02-06T10:00:00.000Z'),
+        fromPriority: 4,
+        toPriority: 1,
+      }),
+    ]
+
+    const dtos = await toIssueActivityDtos(entries)
+
+    // Only 2 relevant entries (h-2 is filtered out)
+    expect(dtos).toHaveLength(2)
+    // Sorted reverse-chronological (newest first)
+    expect(dtos[0]!.id).toBe('h-3')
+    expect(dtos[1]!.id).toBe('h-1')
+  })
+
+  it('returns empty array for empty input', async () => {
+    const dtos = await toIssueActivityDtos([])
+    expect(dtos).toEqual([])
+  })
+
+  it('returns empty array when all entries are irrelevant', async () => {
+    const entries = [
+      createMockHistoryEntry({ id: 'h-1' }),
+      createMockHistoryEntry({ id: 'h-2' }),
+    ]
+    const dtos = await toIssueActivityDtos(entries)
+    expect(dtos).toEqual([])
+  })
+})
+
 describe('Zod schema validation', () => {
   it('validates a valid BacklogItemDto without errors', async () => {
     const issue = createMockIssue()
@@ -493,6 +852,22 @@ describe('Zod schema validation', () => {
 
     const result = commentDtoSchema.safeParse(dto)
     expect(result.success).toBe(true)
+  })
+
+  it('rejects CommentDto when userAvatarUrl is not a valid URL', () => {
+    const invalidData = {
+      id: 'comment-1',
+      body: 'Body',
+      createdAt: '2026-02-01T10:00:00.000Z',
+      updatedAt: '2026-02-01T11:00:00.000Z',
+      userId: null,
+      userName: null,
+      userAvatarUrl: 'not-a-url',
+      parentId: null,
+    }
+
+    const result = commentDtoSchema.safeParse(invalidData)
+    expect(result.success).toBe(false)
   })
 
   it('rejects invalid BacklogItemDto data (missing required fields)', () => {
@@ -542,6 +917,31 @@ describe('Zod schema validation', () => {
     }
 
     const result = commentDtoSchema.safeParse(invalidData)
+    expect(result.success).toBe(false)
+  })
+
+  it('validates a valid IssueActivityDto without errors', async () => {
+    const entry = createMockHistoryEntry({
+      get fromState() {
+        return Promise.resolve({ name: 'Backlog', type: 'backlog' })
+      },
+      get toState() {
+        return Promise.resolve({ name: 'In Progress', type: 'started' })
+      },
+    })
+    const dto = await toIssueActivityDto(entry)
+
+    const result = issueActivityDtoSchema.safeParse(dto)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects IssueActivityDto with missing required fields', () => {
+    const invalidData = {
+      id: 'history-1',
+      // Missing createdAt, actorName, type, description
+    }
+
+    const result = issueActivityDtoSchema.safeParse(invalidData)
     expect(result.success).toBe(false)
   })
 

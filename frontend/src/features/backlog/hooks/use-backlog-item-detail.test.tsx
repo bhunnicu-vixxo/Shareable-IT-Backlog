@@ -62,6 +62,7 @@ describe('useBacklogItemDetail', () => {
         isNew: false,
       },
       comments: [],
+      activities: [],
     }
 
     globalThis.fetch = vi.fn().mockResolvedValue({

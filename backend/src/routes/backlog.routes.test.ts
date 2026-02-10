@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Request, Response, NextFunction } from 'express'
 
-import type { BacklogItemDto } from '../types/linear-entities.types.js'
+import type { BacklogItemDto, IssueActivityDto } from '../types/linear-entities.types.js'
 import type { PaginatedResponse } from '../types/api.types.js'
 
 // Mock the backlog service
@@ -254,9 +254,20 @@ describe('BacklogController.getBacklogItemById', () => {
         updatedAt: '2026-02-05T10:00:00.000Z',
         userId: null,
         userName: 'User',
+        userAvatarUrl: null,
+        parentId: null,
       },
     ]
-    mockGetBacklogItemById.mockResolvedValue({ item: mockItem, comments: mockComments })
+    const mockActivities: IssueActivityDto[] = [
+      {
+        id: 'activity-1',
+        createdAt: '2026-02-05T10:00:00.000Z',
+        actorName: 'Jane Dev',
+        type: 'state_change',
+        description: 'Status changed from Backlog to In Progress',
+      },
+    ]
+    mockGetBacklogItemById.mockResolvedValue({ item: mockItem, comments: mockComments, activities: mockActivities })
 
     const req = createMockRequest({ params: { id: validUuid } })
     const res = createMockResponse()
@@ -264,7 +275,7 @@ describe('BacklogController.getBacklogItemById', () => {
     await getBacklogItemById(req, res as unknown as Response, mockNext)
 
     expect(res.statusCode).toBe(200)
-    expect(res.body).toEqual({ item: mockItem, comments: mockComments })
+    expect(res.body).toEqual({ item: mockItem, comments: mockComments, activities: mockActivities })
     expect(mockGetBacklogItemById).toHaveBeenCalledWith(validUuid)
   })
 

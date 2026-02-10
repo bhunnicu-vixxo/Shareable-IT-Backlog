@@ -8,6 +8,7 @@
 import type {
   BacklogItemDto,
   CommentDto,
+  IssueActivityDto,
 } from './linear-entities.types.js'
 
 /** Cursor-based pagination info matching Linear's model. */
@@ -27,6 +28,7 @@ export interface PaginatedResponse<T> {
 export interface BacklogDetailResponse {
   item: BacklogItemDto
   comments: CommentDto[]
+  activities: IssueActivityDto[]
 }
 
 /** Standard API error response (matches error.middleware.ts). */
