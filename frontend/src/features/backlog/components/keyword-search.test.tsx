@@ -43,20 +43,20 @@ describe('KeywordSearch', () => {
   it('shows clear button when value is non-empty', () => {
     render(<KeywordSearch value="vpn" onChange={vi.fn()} onClear={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear search input' })).toBeInTheDocument()
   })
 
   it('does not show clear button when value is empty', () => {
     render(<KeywordSearch value="" onChange={vi.fn()} onClear={vi.fn()} />)
 
-    expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Clear search input' })).not.toBeInTheDocument()
   })
 
   it('calls onClear when clear button is clicked', () => {
     const onClear = vi.fn()
     render(<KeywordSearch value="vpn" onChange={vi.fn()} onClear={onClear} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search input' }))
     expect(onClear).toHaveBeenCalledTimes(1)
   })
 
