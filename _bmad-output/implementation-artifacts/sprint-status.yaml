@@ -109,14 +109,23 @@ development_status:
     status: done
     linear_id: "VIX-351"
     linear_url: "https://linear.app/vixxo/issue/VIX-351/display-comments-from-linear"
-  5-3-handle-deleted-missing-items: backlog
+  5-3-handle-deleted-missing-items:
+    status: done
+    linear_id: "d65d6a5f-a9d8-4f78-a3cc-fd108df5a0b8"
+    linear_url: "https://linear.app/vixxo/issue/VIX-352/handle-deletedmissing-items"
   epic-5-retrospective: optional
 
   # Epic 6: Data Synchronization
   epic-6: in-progress
   6-1-implement-scheduled-automatic-sync: ready-for-dev
-  6-2-implement-manual-sync-trigger: backlog
-  6-3-display-sync-status-to-users: backlog
+  6-2-implement-manual-sync-trigger:
+    status: ready-for-dev
+    linear_id: "VIX-355"
+    linear_url: "https://linear.app/vixxo/issue/VIX-355/implement-manual-sync-trigger"
+  6-3-display-sync-status-to-users:
+    status: ready-for-dev
+    linear_id: "VIX-356"
+    linear_url: "https://linear.app/vixxo/issue/VIX-356/display-sync-status-to-users"
   6-4-implement-sync-error-handling-and-messages: backlog
   6-5-handle-linear-api-unavailability: backlog
   6-6-handle-partial-sync-failures: backlog

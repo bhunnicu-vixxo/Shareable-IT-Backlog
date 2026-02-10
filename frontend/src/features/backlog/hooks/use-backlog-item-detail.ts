@@ -1,21 +1,28 @@
 import { useQuery } from '@tanstack/react-query'
 import { API_URL } from '@/utils/constants'
+import { ApiError } from '@/utils/api-error'
 import type { BacklogDetailResponse } from '../types/backlog.types'
 
 /**
  * Fetch a single backlog item by ID with its comments.
  *
- * Throws with a specific error message extracted from the API error response,
- * or falls back to a generic message if parsing fails.
+ * Throws an ApiError with HTTP status code and error code from the backend's
+ * standard error format, enabling callers to differentiate 404 (deleted/missing)
+ * from transient server errors.
  */
 async function fetchBacklogItemDetail(id: string): Promise<BacklogDetailResponse> {
   const res = await fetch(`${API_URL}/backlog-items/${encodeURIComponent(id)}`)
   if (!res.ok) {
-    const errorBody = await res.json().catch(() => null)
-    const message =
-      (errorBody as { error?: { message?: string } })?.error?.message ??
-      'Failed to load item details. Please try again.'
-    throw new Error(message)
+    let message = 'Failed to load item details. Please try again.'
+    let code = 'UNKNOWN_ERROR'
+    try {
+      const errorBody = await res.json()
+      message = errorBody?.error?.message ?? message
+      code = errorBody?.error?.code ?? code
+    } catch {
+      // Response body not parseable — use defaults
+    }
+    throw new ApiError(message, res.status, code)
   }
   return res.json() as Promise<BacklogDetailResponse>
 }
@@ -26,11 +33,19 @@ async function fetchBacklogItemDetail(id: string): Promise<BacklogDetailResponse
  * - Skips fetch when id is null
  * - Uses queryKey: ['backlog-item', id]
  * - Provides isLoading, error, data, and refetch
+ * - Does NOT retry 404 errors (item genuinely deleted)
+ * - Retries other errors up to 2 times
  */
 export function useBacklogItemDetail(id: string | null) {
-  return useQuery({
+  return useQuery<BacklogDetailResponse, ApiError | Error>({
     queryKey: ['backlog-item', id],
     queryFn: () => fetchBacklogItemDetail(id!),
     enabled: !!id,
+    retry: (failureCount, error) => {
+      // Don't retry 404s — item is genuinely gone
+      if (error instanceof ApiError && error.isNotFound) return false
+      // Retry other errors up to 2 times
+      return failureCount < 2
+    },
   })
 }

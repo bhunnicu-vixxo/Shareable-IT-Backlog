@@ -3,6 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useBacklogItemDetail } from './use-backlog-item-detail'
+import { ApiError } from '@/utils/api-error'
 import type { BacklogDetailResponse } from '../types/backlog.types'
 
 function createWrapper() {
@@ -10,6 +11,7 @@ function createWrapper() {
     defaultOptions: {
       queries: {
         retry: false,
+        retryDelay: 0,
       },
     },
   })
@@ -84,9 +86,12 @@ describe('useBacklogItemDetail', () => {
     )
   })
 
-  it('throws error message from API when fetch fails', async () => {
+  // ──── Error type differentiation ─────────────────────────────────────────
+
+  it('throws ApiError with status 404 when API returns 404', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
+      status: 404,
       json: () =>
         Promise.resolve({
           error: { message: 'Backlog item not found', code: 'NOT_FOUND' },
@@ -101,7 +106,97 @@ describe('useBacklogItemDetail', () => {
       expect(result.current.isError).toBe(true)
     })
 
-    expect(result.current.error).toBeInstanceOf(Error)
-    expect((result.current.error as Error).message).toBe('Backlog item not found')
+    expect(result.current.error).toBeInstanceOf(ApiError)
+    const apiError = result.current.error as ApiError
+    expect(apiError.message).toBe('Backlog item not found')
+    expect(apiError.status).toBe(404)
+    expect(apiError.code).toBe('NOT_FOUND')
+    expect(apiError.isNotFound).toBe(true)
+  })
+
+  it('throws ApiError with status 500 when API returns server error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () =>
+        Promise.resolve({
+          error: { message: 'Internal server error', code: 'INTERNAL_ERROR' },
+        }),
+    })
+
+    const { result } = renderHook(() => useBacklogItemDetail('issue-1'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true)
+    })
+
+    expect(result.current.error).toBeInstanceOf(ApiError)
+    const apiError = result.current.error as ApiError
+    expect(apiError.message).toBe('Internal server error')
+    expect(apiError.status).toBe(500)
+    expect(apiError.isNotFound).toBe(false)
+    expect(apiError.isServerError).toBe(true)
+  })
+
+  it('throws ApiError with defaults when response body is not JSON', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: () => Promise.reject(new SyntaxError('Unexpected token')),
+    })
+
+    const { result } = renderHook(() => useBacklogItemDetail('issue-1'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true)
+    })
+
+    expect(result.current.error).toBeInstanceOf(ApiError)
+    const apiError = result.current.error as ApiError
+    expect(apiError.message).toBe('Failed to load item details. Please try again.')
+    expect(apiError.status).toBe(502)
+    expect(apiError.code).toBe('UNKNOWN_ERROR')
+  })
+
+  it('throws plain Error on network failure (no response)', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const { result } = renderHook(() => useBacklogItemDetail('issue-1'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true)
+    })
+
+    // Network errors throw TypeError, not ApiError
+    expect(result.current.error).toBeInstanceOf(TypeError)
+    expect((result.current.error as Error).message).toBe('Failed to fetch')
+  })
+
+  it('provides refetch function for retry support', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () =>
+        Promise.resolve({
+          error: { message: 'Server error', code: 'INTERNAL_ERROR' },
+        }),
+    })
+
+    const { result } = renderHook(() => useBacklogItemDetail('issue-1'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true)
+    })
+
+    // refetch should be available as a function
+    expect(typeof result.current.refetch).toBe('function')
   })
 })
