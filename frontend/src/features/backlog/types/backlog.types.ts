@@ -7,6 +7,15 @@
  */
 
 /** Backlog item as returned by GET /api/backlog-items. */
+export type PriorityLabel = 'None' | 'Urgent' | 'High' | 'Normal' | 'Low'
+
+export type WorkflowStateType =
+  | 'backlog'
+  | 'unstarted'
+  | 'started'
+  | 'completed'
+  | 'cancelled'
+
 export interface BacklogItem {
   id: string
   /** Linear identifier, e.g. "VIX-338" */
@@ -16,11 +25,11 @@ export interface BacklogItem {
   /** 0 = None, 1 = Urgent, 2 = High, 3 = Normal, 4 = Low */
   priority: number
   /** Human-readable priority label */
-  priorityLabel: string
+  priorityLabel: PriorityLabel
   /** Workflow state name, e.g. "In Progress" */
   status: string
   /** Lifecycle classification: "backlog" | "unstarted" | "started" | "completed" | "cancelled" */
-  statusType: string
+  statusType: WorkflowStateType
   assigneeName: string | null
   projectName: string | null
   teamName: string
@@ -57,6 +66,34 @@ export interface BacklogItemComment {
   /** ISO 8601 datetime */
   updatedAt: string
   userName: string | null
+  /** URL of the comment author's avatar, or null if unavailable */
+  userAvatarUrl: string | null
+  /** ID of the parent comment for threaded replies, or null for top-level comments */
+  parentId: string | null
+}
+
+/** Type of activity change tracked in issue history. */
+export type IssueActivityType =
+  | 'state_change'
+  | 'assignment'
+  | 'priority_change'
+  | 'label_added'
+  | 'label_removed'
+  | 'created'
+  | 'archived'
+  | 'other'
+
+/** Activity history entry for a backlog item. */
+export interface IssueActivity {
+  id: string
+  /** ISO 8601 datetime */
+  createdAt: string
+  /** Name of the user who made the change, or "System" for automated changes */
+  actorName: string
+  /** Categorisation of the change */
+  type: IssueActivityType
+  /** Human-readable description (e.g. "Status changed from Backlog to In Progress") */
+  description: string
 }
 
 /** Cursor-based pagination info matching Linear's model. */
@@ -76,6 +113,7 @@ export interface BacklogListResponse {
 export interface BacklogDetailResponse {
   item: BacklogItem
   comments: BacklogItemComment[]
+  activities: IssueActivity[]
 }
 
 /** Sync status as returned by the API. */

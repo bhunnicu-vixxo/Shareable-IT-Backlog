@@ -38,6 +38,8 @@ function createMockComment(overrides: Partial<BacklogItemComment> = {}): Backlog
     createdAt: '2026-02-05T14:00:00.000Z',
     updatedAt: '2026-02-05T14:00:00.000Z',
     userName: 'Commenter',
+    userAvatarUrl: null,
+    parentId: null,
     ...overrides,
   }
 }
@@ -84,6 +86,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -103,6 +106,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -123,6 +127,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -140,6 +145,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem({ description: 'Some **bold** text' }),
       comments: [],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -158,6 +164,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem({ description: null }),
       comments: [],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -180,6 +187,7 @@ describe('ItemDetailModal', () => {
         createMockComment({ id: 'c1', userName: 'Alice', body: 'First comment' }),
         createMockComment({ id: 'c2', userName: 'Bob', body: 'Second comment' }),
       ],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -200,6 +208,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -217,6 +226,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [createMockComment({ userName: null, body: 'Anonymous comment' })],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -228,6 +238,124 @@ describe('ItemDetailModal', () => {
       expect(screen.getByText('Unknown')).toBeInTheDocument()
     })
     expect(screen.getByText('Anonymous comment')).toBeInTheDocument()
+  })
+
+  it('renders threaded comments with replies nested under parent', async () => {
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [
+        createMockComment({ id: 'c1', userName: 'Alice', body: 'Top-level comment' }),
+        createMockComment({ id: 'c2', userName: 'Bob', body: 'Reply to Alice', parentId: 'c1' }),
+      ],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Comments (2)')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Top-level comment')).toBeInTheDocument()
+    expect(screen.getByText('Reply to Alice')).toBeInTheDocument()
+  })
+
+  it('renders avatar initials for comments', async () => {
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [
+        createMockComment({ id: 'c1', userName: 'Jane Dev', body: 'Hello', userAvatarUrl: null }),
+      ],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('JD')).toBeInTheDocument()
+    })
+  })
+
+  it('renders collapse toggle for long reply threads', async () => {
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [
+        createMockComment({ id: 'c1', userName: 'Alice', body: 'Parent' }),
+        createMockComment({ id: 'r1', body: 'Reply 1', parentId: 'c1' }),
+        createMockComment({ id: 'r2', body: 'Reply 2', parentId: 'c1' }),
+        createMockComment({ id: 'r3', body: 'Reply 3', parentId: 'c1' }),
+        createMockComment({ id: 'r4', body: 'Reply 4', parentId: 'c1' }),
+      ],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Show 2 more replies')).toBeInTheDocument()
+    })
+  })
+
+  // ──── Activity section ───────────────────────────────────────────────────
+
+  it('renders activity section with entries', async () => {
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [
+        {
+          id: 'act-1',
+          createdAt: '2026-02-05T10:00:00.000Z',
+          actorName: 'Jane Dev',
+          type: 'state_change',
+          description: 'Status changed from Backlog to In Progress',
+        },
+        {
+          id: 'act-2',
+          createdAt: '2026-02-04T10:00:00.000Z',
+          actorName: 'Bob',
+          type: 'assignment',
+          description: 'Assigned to Jane Dev',
+        },
+      ],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Activity (2)')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Status changed from Backlog to In Progress')).toBeInTheDocument()
+    expect(screen.getByText('Assigned to Jane Dev')).toBeInTheDocument()
+  })
+
+  it('shows empty activity state when no activities', async () => {
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Activity (0)')).toBeInTheDocument()
+    })
+    expect(screen.getByText('No activity recorded yet')).toBeInTheDocument()
   })
 
   // ──── Error state ─────────────────────────────────────────────────────────
@@ -255,6 +383,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -272,6 +401,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -311,6 +441,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem({ assigneeName: null }),
       comments: [],
+      activities: [],
     }
     mockFetchDetail(detail)
 
@@ -330,6 +461,7 @@ describe('ItemDetailModal', () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem({ dueDate: null }),
       comments: [],
+      activities: [],
     }
     mockFetchDetail(detail)
 

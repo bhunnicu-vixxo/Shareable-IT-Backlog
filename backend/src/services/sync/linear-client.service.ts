@@ -4,6 +4,7 @@ import {
   parseLinearError,
   type Comment,
   type Issue,
+  type IssueHistory,
 } from '@linear/sdk'
 
 import { getLinearConfig } from '../../config/linear.config.js'
@@ -468,6 +469,25 @@ export class LinearClientService {
       const issue = await client.issue(issueId)
       const comments = await issue.comments()
       return comments.nodes
+    })
+  }
+
+  /**
+   * Fetch activity history for a given issue.
+   *
+   * Returns the raw `IssueHistory` nodes from the Linear SDK.
+   * These contain lazy-loading getters for related entities (actor, fromState,
+   * toState, etc.) that must be resolved by the caller/transformer.
+   */
+  async getIssueHistory(
+    issueId: string,
+  ): Promise<LinearQueryResult<IssueHistory[]>> {
+    const client = this.getClient()
+
+    return this.executeWithRateTracking('getIssueHistory', async () => {
+      const issue = await client.issue(issueId)
+      const history = await issue.history()
+      return history.nodes
     })
   }
 

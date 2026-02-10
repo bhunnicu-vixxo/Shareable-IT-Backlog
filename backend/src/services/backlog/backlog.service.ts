@@ -1,10 +1,11 @@
-import type { BacklogItemDto, CommentDto } from '../../types/linear-entities.types.js'
+import type { BacklogItemDto, CommentDto, IssueActivityDto } from '../../types/linear-entities.types.js'
 import type { PaginatedResponse } from '../../types/api.types.js'
 import { linearClient } from '../sync/linear-client.service.js'
 import {
   toBacklogItemDto,
   toBacklogItemDtos,
   toCommentDtos,
+  toIssueActivityDtos,
 } from '../sync/linear-transformers.js'
 import { LinearConfigError } from '../../utils/linear-errors.js'
 import { logger } from '../../utils/logger.js'
@@ -92,28 +93,73 @@ export class BacklogService {
   }
 
   /**
-   * Fetch a single backlog item by ID with its comments.
+   * Fetch a single backlog item by ID with its comments and activity history.
    *
    * Returns null when the issue does not exist (Linear returns null for non-existent issues).
+   * Comments and history degrade gracefully — if either fetch fails, the detail
+   * view still works with empty arrays rather than an error.
    */
   async getBacklogItemById(
     issueId: string,
-  ): Promise<{ item: BacklogItemDto; comments: CommentDto[] } | null> {
-    const issueResult = await linearClient.getIssueById(issueId)
-    if (!issueResult.data) return null
-
-    const [item, commentsResult] = await Promise.all([
-      toBacklogItemDto(issueResult.data),
+  ): Promise<{ item: BacklogItemDto; comments: CommentDto[]; activities: IssueActivityDto[] } | null> {
+    // Fetch issue, comments, and history in parallel using Promise.allSettled
+    // so that failures in comments or history don't break the detail view
+    const [issueResult, commentsResult, historyResult] = await Promise.allSettled([
+      linearClient.getIssueById(issueId),
       linearClient.getIssueComments(issueId),
+      linearClient.getIssueHistory(issueId),
     ])
-    const comments = await toCommentDtos(commentsResult.data ?? [])
+
+    // Issue is required:
+    // - If Linear returns `null` (not found) → return null (404)
+    // - If the fetch fails (network/auth/etc.) → throw so controller returns 5xx (not a fake 404)
+    if (issueResult.status === 'rejected') {
+      logger.error(
+        { service: 'backlog', operation: 'getBacklogItemById', issueId, error: issueResult.reason },
+        'Failed to fetch issue',
+      )
+      throw issueResult.reason
+    }
+    if (!issueResult.value.data) return null
+
+    const item = await toBacklogItemDto(issueResult.value.data)
+
+    // Comments degrade gracefully
+    const comments = commentsResult.status === 'fulfilled'
+      ? await toCommentDtos(commentsResult.value.data ?? [])
+      : []
+
+    if (commentsResult.status === 'rejected') {
+      logger.warn(
+        { service: 'backlog', operation: 'getBacklogItemById', issueId, error: commentsResult.reason },
+        'Failed to fetch issue comments',
+      )
+    }
+
+    // Activities degrade gracefully
+    const activities = historyResult.status === 'fulfilled'
+      ? await toIssueActivityDtos(historyResult.value.data ?? [])
+      : []
+
+    if (historyResult.status === 'rejected') {
+      logger.warn(
+        { service: 'backlog', operation: 'getBacklogItemById', issueId, error: historyResult.reason },
+        'Failed to fetch issue history',
+      )
+    }
 
     logger.debug(
-      { service: 'backlog', operation: 'getBacklogItemById', issueId, commentCount: comments.length },
+      {
+        service: 'backlog',
+        operation: 'getBacklogItemById',
+        issueId,
+        commentCount: comments.length,
+        activityCount: activities.length,
+      },
       'Backlog item detail fetched',
     )
 
-    return { item, comments }
+    return { item, comments, activities }
   }
 }
 

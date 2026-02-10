@@ -9,14 +9,15 @@ import {
   Text,
   VStack,
 } from '@chakra-ui/react'
-import ReactMarkdown from 'react-markdown'
-import remarkBreaks from 'remark-breaks'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import { SHOW_OPEN_IN_LINEAR } from '@/utils/constants'
-import { formatDateTime, formatDateOnly } from '@/utils/formatters'
+import { formatDateOnly } from '@/utils/formatters'
 import { useBacklogItemDetail } from '../hooks/use-backlog-item-detail'
 import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
-import type { BacklogItem, BacklogItemComment } from '../types/backlog.types'
+import { ActivityTimeline } from './activity-timeline'
+import { CommentThread } from './comment-thread'
+import { MarkdownContent } from './markdown-content'
+import type { BacklogItem, BacklogItemComment, IssueActivity } from '../types/backlog.types'
 
 export interface ItemDetailModalProps {
   /** Whether the modal is open. */
@@ -27,56 +28,6 @@ export interface ItemDetailModalProps {
   onClose: () => void
   /** Optional ref for the element that triggered the modal (for focus return). */
   triggerRef?: React.RefObject<HTMLElement | null>
-}
-
-function MarkdownContent({ content }: { content: string }) {
-  return (
-    <Box fontSize="sm" color="gray.700">
-      <ReactMarkdown
-        remarkPlugins={[remarkBreaks]}
-        components={{
-          p: ({ children }) => <Text as="p" mb="2" whiteSpace="pre-wrap">{children}</Text>,
-          strong: ({ children }) => <Text as="strong" fontWeight="600">{children}</Text>,
-          a: ({ href, children }) => (
-            <Link
-              href={href ?? '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-              color="brand.green"
-              textDecoration="underline"
-              _hover={{ textDecoration: 'none' }}
-            >
-              {children}
-            </Link>
-          ),
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </Box>
-  )
-}
-
-function CommentBlock({ comment }: { comment: BacklogItemComment }) {
-  return (
-    <Box
-      p="3"
-      borderWidth="1px"
-      borderRadius="md"
-      borderColor="gray.200"
-      bg="gray.50"
-    >
-      <Flex justifyContent="space-between" alignItems="center" mb="2">
-        <Text fontSize="sm" fontWeight="semibold" color="gray.700">
-          {comment.userName ?? 'Unknown'}
-        </Text>
-        <Text fontSize="xs" color="gray.500">
-          {formatDateTime(comment.createdAt)}
-        </Text>
-      </Flex>
-      <MarkdownContent content={comment.body} />
-    </Box>
-  )
 }
 
 /**
@@ -176,7 +127,13 @@ export function ItemDetailModal({
               </Stack>
             )}
 
-            {!isLoading && data && <ItemDetailContent item={data.item} comments={data.comments} />}
+            {!isLoading && data && (
+              <ItemDetailContent
+                item={data.item}
+                comments={data.comments}
+                activities={data.activities}
+              />
+            )}
 
             {!isLoading && isError && (
               <Text color="gray.600">
@@ -208,9 +165,11 @@ export function ItemDetailModal({
 function ItemDetailContent({
   item,
   comments,
+  activities,
 }: {
   item: BacklogItem
   comments: BacklogItemComment[]
+  activities: IssueActivity[]
 }) {
   return (
     <VStack align="stretch" gap="4">
@@ -261,22 +220,15 @@ function ItemDetailContent({
         </Box>
       )}
 
+      {/* Activity */}
+      <ActivityTimeline activities={activities} />
+
       {/* Comments */}
       <Box>
         <Text fontSize="sm" fontWeight="semibold" color="gray.600" mb="2">
           Comments ({comments.length})
         </Text>
-        {comments.length === 0 ? (
-          <Text fontSize="sm" color="gray.500">
-            No comments yet.
-          </Text>
-        ) : (
-          <VStack align="stretch" gap="2">
-            {comments.map((comment) => (
-              <CommentBlock key={comment.id} comment={comment} />
-            ))}
-          </VStack>
-        )}
+        <CommentThread comments={comments} />
       </Box>
     </VStack>
   )

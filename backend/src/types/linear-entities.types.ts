@@ -74,6 +74,10 @@ export interface CommentDto {
   updatedAt: string
   userId: string | null
   userName: string | null
+  /** URL of the comment author's avatar, or null if unavailable */
+  userAvatarUrl: string | null
+  /** ID of the parent comment for threaded replies, or null for top-level comments */
+  parentId: string | null
 }
 
 /** Flattened, API-safe representation of a Linear Project. */
@@ -100,6 +104,30 @@ export interface UserDto {
   email: string | null
   avatarUrl: string | null
   active: boolean
+}
+
+/** Type of activity change tracked in issue history. */
+export type IssueActivityType =
+  | 'state_change'
+  | 'assignment'
+  | 'priority_change'
+  | 'label_added'
+  | 'label_removed'
+  | 'created'
+  | 'archived'
+  | 'other'
+
+/** Flattened, API-safe representation of a Linear Issue history entry. */
+export interface IssueActivityDto {
+  id: string
+  /** ISO 8601 datetime */
+  createdAt: string
+  /** Name of the user who made the change, or "System" for automated changes */
+  actorName: string
+  /** Categorisation of the change */
+  type: IssueActivityType
+  /** Human-readable description (e.g. "Status changed from Backlog to In Progress") */
+  description: string
 }
 
 /** Flattened, API-safe representation of a Linear WorkflowState. */

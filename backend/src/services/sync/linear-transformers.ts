@@ -9,6 +9,7 @@
 import type {
   Comment,
   Issue,
+  IssueHistory,
   Project,
   Team,
   User,
@@ -18,6 +19,8 @@ import type {
 import type {
   BacklogItemDto,
   CommentDto,
+  IssueActivityDto,
+  IssueActivityType,
   LabelDto,
   PriorityLabel,
   ProjectDto,
@@ -154,10 +157,16 @@ export async function toBacklogItemDto(issue: Issue): Promise<BacklogItemDto> {
 /**
  * Convert a single SDK Comment to a CommentDto.
  *
- * Resolves the lazy `comment.user` relation for user info.
+ * Resolves the lazy `comment.user` and `comment.parent` relations in parallel.
+ * Parent resolution supports threaded comment display (parentId).
+ * Avatar URL is extracted from the user relation.
  */
 export async function toCommentDto(comment: Comment): Promise<CommentDto> {
-  const user = await comment.user
+  // Resolve user and parent in parallel — catch for deleted parent/user
+  const [user, parent] = await Promise.all([
+    Promise.resolve(comment.user).catch(() => undefined),
+    Promise.resolve(comment.parent).catch(() => undefined),
+  ])
 
   return {
     id: comment.id,
@@ -166,6 +175,8 @@ export async function toCommentDto(comment: Comment): Promise<CommentDto> {
     updatedAt: comment.updatedAt.toISOString(),
     userId: user?.id ?? null,
     userName: user?.name ?? null,
+    userAvatarUrl: user?.avatarUrl ?? null,
+    parentId: parent?.id ?? null,
   }
 }
 
@@ -224,6 +235,238 @@ export function toWorkflowStateDto(state: WorkflowState): WorkflowStateDto {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/*  Issue history → IssueActivityDto transformers                      */
+/* ------------------------------------------------------------------ */
+
+/** Resolved lazy-loading relations for an IssueHistory entry. */
+interface ResolvedHistoryRelations {
+  actor: User | null | undefined
+  fromState: WorkflowState | null | undefined
+  toState: WorkflowState | null | undefined
+  fromAssignee: User | null | undefined
+  toAssignee: User | null | undefined
+  addedLabels: Array<{ name: string }> | null | undefined
+  removedLabels: Array<{ name: string }> | null | undefined
+}
+
+function isCreatedHistoryEntry(entry: IssueHistory): boolean {
+  const e = entry as unknown as Record<string, unknown>
+  const action = e.action
+  const type = e.type
+  const created = e.created
+  return (
+    created === true ||
+    action === 'create' ||
+    action === 'created' ||
+    type === 'create' ||
+    type === 'created'
+  )
+}
+
+function normalizeLabelList(value: unknown): Array<{ name: string }> {
+  if (!value) return []
+  // Some SDK shapes may expose `nodes` (connection)
+  if (typeof value === 'object' && value !== null && 'nodes' in value) {
+    const nodes = (value as { nodes?: unknown }).nodes
+    if (Array.isArray(nodes)) {
+      return nodes.filter((n): n is { name: string } => !!n && typeof (n as { name?: unknown }).name === 'string')
+    }
+  }
+  // Or it may already be an array of label-like objects
+  if (Array.isArray(value)) {
+    return value.filter((n): n is { name: string } => !!n && typeof (n as { name?: unknown }).name === 'string')
+  }
+  return []
+}
+
+/**
+ * Determine whether a history entry represents a change relevant to
+ * business users.  Internal / noisy changes (sort order, subscriber
+ * changes, metadata-only) are filtered out.
+ */
+function isRelevantActivity(
+  entry: IssueHistory,
+  resolved: ResolvedHistoryRelations,
+): boolean {
+  // Issue creation
+  if (isCreatedHistoryEntry(entry)) return true
+  // State changes
+  if (resolved.fromState || resolved.toState) return true
+  // Assignment changes
+  if (resolved.fromAssignee || resolved.toAssignee) return true
+  // Priority changes
+  if (entry.fromPriority !== undefined && entry.fromPriority !== null) return true
+  if (entry.toPriority !== undefined && entry.toPriority !== null) return true
+  // Label changes
+  if (entry.addedLabelIds?.length) return true
+  if (entry.removedLabelIds?.length) return true
+  if (resolved.addedLabels?.length) return true
+  if (resolved.removedLabels?.length) return true
+  // Archival
+  if (entry.archived !== undefined && entry.archived !== null) return true
+  // Everything else is internal noise
+  return false
+}
+
+/**
+ * Classify the type of activity change for categorisation and display.
+ */
+function classifyActivityType(
+  entry: IssueHistory,
+  resolved: ResolvedHistoryRelations,
+): IssueActivityType {
+  if (isCreatedHistoryEntry(entry)) return 'created'
+  if (resolved.fromState || resolved.toState) return 'state_change'
+  if (resolved.fromAssignee || resolved.toAssignee) return 'assignment'
+  if (
+    (entry.fromPriority !== undefined && entry.fromPriority !== null) ||
+    (entry.toPriority !== undefined && entry.toPriority !== null)
+  ) return 'priority_change'
+  if (entry.addedLabelIds?.length || resolved.addedLabels?.length) return 'label_added'
+  if (entry.removedLabelIds?.length || resolved.removedLabels?.length) return 'label_removed'
+  if (entry.archived !== undefined && entry.archived !== null) return 'archived'
+  return 'other'
+}
+
+/**
+ * Build a human-readable description of a history change.
+ *
+ * Uses resolved relation names instead of raw IDs to provide
+ * business-friendly language.
+ */
+function buildActivityDescription(
+  entry: IssueHistory,
+  resolved: ResolvedHistoryRelations,
+): string {
+  const actorName = resolved.actor?.name ?? 'System'
+
+  // Creation
+  if (isCreatedHistoryEntry(entry)) return 'Issue created'
+
+  // State changes
+  if (resolved.fromState || resolved.toState) {
+    const from = resolved.fromState?.name ?? 'Unknown'
+    const to = resolved.toState?.name ?? 'Unknown'
+    return `Status changed from ${from} to ${to}`
+  }
+
+  // Assignment changes
+  if (resolved.toAssignee) {
+    return `Assigned to ${resolved.toAssignee.name}`
+  }
+  if (resolved.fromAssignee && !resolved.toAssignee) {
+    return `Unassigned from ${resolved.fromAssignee.name}`
+  }
+
+  // Priority changes
+  if (
+    (entry.fromPriority !== undefined && entry.fromPriority !== null) ||
+    (entry.toPriority !== undefined && entry.toPriority !== null)
+  ) {
+    const from = getPriorityLabel(entry.fromPriority ?? 0)
+    const to = getPriorityLabel(entry.toPriority ?? 0)
+    return `Priority changed from ${from} to ${to}`
+  }
+
+  // Label changes
+  if (resolved.addedLabels?.length) {
+    const names = resolved.addedLabels.map((l) => l.name).join(', ')
+    return `Label added: ${names}`
+  }
+  if (resolved.removedLabels?.length) {
+    const names = resolved.removedLabels.map((l) => l.name).join(', ')
+    return `Label removed: ${names}`
+  }
+  if (entry.addedLabelIds?.length) return 'Label added'
+  if (entry.removedLabelIds?.length) return 'Label removed'
+
+  // Archival
+  if (entry.archived === true) return 'Item archived'
+  if (entry.archived === false) return 'Item unarchived'
+
+  // Fallback
+  return `Updated by ${actorName}`
+}
+
+/**
+ * Convert a single SDK IssueHistory entry to an IssueActivityDto.
+ *
+ * Resolves all lazy-loading SDK relations in parallel, then builds
+ * a human-readable description of the change.
+ */
+export async function toIssueActivityDto(
+  entry: IssueHistory,
+): Promise<IssueActivityDto | null> {
+  // Resolve lazy relations in parallel — catch errors to avoid breaking
+  // on deleted users or states
+  const [
+    actor,
+    fromState,
+    toState,
+    fromAssignee,
+    toAssignee,
+    addedLabelsRaw,
+    removedLabelsRaw,
+  ] = await Promise.all([
+    Promise.resolve(entry.actor as unknown).catch(() => null),
+    Promise.resolve(entry.fromState as unknown).catch(() => null),
+    Promise.resolve(entry.toState as unknown).catch(() => null),
+    Promise.resolve(entry.fromAssignee as unknown).catch(() => null),
+    Promise.resolve(entry.toAssignee as unknown).catch(() => null),
+    Promise.resolve((entry as unknown as { addedLabels?: unknown }).addedLabels).catch(() => null),
+    Promise.resolve((entry as unknown as { removedLabels?: unknown }).removedLabels).catch(() => null),
+  ])
+
+  const resolved: ResolvedHistoryRelations = {
+    actor: actor as User | null,
+    fromState: fromState as WorkflowState | null,
+    toState: toState as WorkflowState | null,
+    fromAssignee: fromAssignee as User | null,
+    toAssignee: toAssignee as User | null,
+    addedLabels: normalizeLabelList(addedLabelsRaw),
+    removedLabels: normalizeLabelList(removedLabelsRaw),
+  }
+
+  // Filter out noisy / irrelevant entries
+  if (!isRelevantActivity(entry, resolved)) return null
+
+  const actorName = resolved.actor?.name ?? 'System'
+  const type = classifyActivityType(entry, resolved)
+  const description = buildActivityDescription(entry, resolved)
+
+  return {
+    id: entry.id,
+    createdAt: entry.createdAt.toISOString(),
+    actorName,
+    type,
+    description,
+  }
+}
+
+/**
+ * Batch-convert multiple SDK IssueHistory entries to IssueActivityDtos.
+ *
+ * Filters out irrelevant entries (returns only meaningful activity).
+ * Results are sorted in reverse-chronological order (newest first).
+ */
+export async function toIssueActivityDtos(
+  entries: IssueHistory[],
+  concurrency = 10,
+): Promise<IssueActivityDto[]> {
+  const results: IssueActivityDto[] = []
+  for (let i = 0; i < entries.length; i += concurrency) {
+    const batch = entries.slice(i, i + concurrency)
+    const batchResults = await Promise.all(batch.map(toIssueActivityDto))
+    results.push(...batchResults.filter((dto): dto is IssueActivityDto => dto !== null))
+  }
+
+  // Sort by createdAt descending (newest first)
+  results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+  return results
+}
+
 /**
  * Batch-convert multiple SDK Issues to BacklogItemDtos.
  *
@@ -249,7 +492,23 @@ export async function toBacklogItemDtos(
 
 /**
  * Batch-convert multiple SDK Comments to CommentDtos.
+ *
+ * Results are sorted by createdAt ascending (oldest first) for natural
+ * conversation reading order.
  */
-export async function toCommentDtos(comments: Comment[]): Promise<CommentDto[]> {
-  return Promise.all(comments.map(toCommentDto))
+export async function toCommentDtos(
+  comments: Comment[],
+  concurrency = 10,
+): Promise<CommentDto[]> {
+  const dtos: CommentDto[] = []
+  for (let i = 0; i < comments.length; i += concurrency) {
+    const batch = comments.slice(i, i + concurrency)
+    const batchResults = await Promise.all(batch.map(toCommentDto))
+    dtos.push(...batchResults)
+  }
+
+  // Sort ascending by createdAt (oldest first) for natural reading order
+  dtos.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
+  return dtos
 }

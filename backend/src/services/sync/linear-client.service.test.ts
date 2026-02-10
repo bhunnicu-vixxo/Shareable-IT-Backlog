@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { parseLinearError } from '@linear/sdk'
-import type { Issue, Comment } from '@linear/sdk'
+import type { Issue, Comment, IssueHistory } from '@linear/sdk'
 
 /* ------------------------------------------------------------------ */
 /*  Mocks — must be declared before the module under test is imported  */
@@ -21,11 +21,17 @@ const mockCommentNodes: Partial<Comment>[] = [
   { id: 'comment-1', body: 'A comment' } as Partial<Comment>,
 ]
 
+const mockHistoryNodes: Partial<IssueHistory>[] = [
+  { id: 'history-1', createdAt: new Date('2026-02-01T10:00:00Z') } as Partial<IssueHistory>,
+  { id: 'history-2', createdAt: new Date('2026-02-02T10:00:00Z') } as Partial<IssueHistory>,
+]
+
 const mockIssues = vi.fn().mockResolvedValue({ nodes: mockIssueNodes })
 const mockIssue = vi.fn().mockResolvedValue({
   id: 'issue-1',
   title: 'First issue',
   comments: vi.fn().mockResolvedValue({ nodes: mockCommentNodes }),
+  history: vi.fn().mockResolvedValue({ nodes: mockHistoryNodes }),
 })
 const mockRawRequest = vi.fn().mockResolvedValue({
   headers: new Headers({
@@ -132,6 +138,7 @@ describe('LinearClientService', () => {
       id: 'issue-1',
       title: 'First issue',
       comments: vi.fn().mockResolvedValue({ nodes: mockCommentNodes }),
+      history: vi.fn().mockResolvedValue({ nodes: mockHistoryNodes }),
     })
   })
 
@@ -211,6 +218,29 @@ describe('LinearClientService', () => {
 
       const result = await service.getIssueById('non-existent')
       expect(result.data).toBeNull()
+    })
+  })
+
+  /* ---------------------------------------------------------------- */
+  /*  getIssueHistory                                                   */
+  /* ---------------------------------------------------------------- */
+  describe('getIssueHistory', () => {
+    it('returns history nodes for an existing issue', async () => {
+      const result = await service.getIssueHistory('issue-1')
+      expect(result.data).toEqual(mockHistoryNodes)
+      expect(mockIssue).toHaveBeenCalledWith('issue-1')
+    })
+
+    it('returns empty array when issue has no history', async () => {
+      mockIssue.mockResolvedValueOnce({
+        id: 'issue-1',
+        title: 'First issue',
+        comments: vi.fn().mockResolvedValue({ nodes: mockCommentNodes }),
+        history: vi.fn().mockResolvedValue({ nodes: [] }),
+      })
+
+      const result = await service.getIssueHistory('issue-1')
+      expect(result.data).toEqual([])
     })
   })
 
