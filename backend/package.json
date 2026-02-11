@@ -18,11 +18,13 @@
   },
   "dependencies": {
     "@linear/sdk": "^73.0.0",
+    "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "helmet": "^8.1.0",
+    "ip-cidr": "^4.0.2",
     "node-cron": "^4.2.1",
     "pg": "^8.18.0",
     "pino": "^10.3.0",
@@ -33,6 +35,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
+    "@types/connect-pg-simple": "^7.0.3",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.25",
     "@types/express-session": "^1.18.0",

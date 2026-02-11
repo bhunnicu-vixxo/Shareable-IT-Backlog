@@ -6,6 +6,7 @@ import type { SyncStatus } from '@/features/backlog/types/backlog.types'
 // Mock the hooks
 const mockUseSyncStatus = vi.fn()
 const mockUseSyncTrigger = vi.fn()
+const mockUseSyncHistory = vi.fn()
 
 vi.mock('../hooks/use-sync-status', () => ({
   useSyncStatus: (...args: unknown[]) => mockUseSyncStatus(...args),
@@ -13,6 +14,10 @@ vi.mock('../hooks/use-sync-status', () => ({
 
 vi.mock('../hooks/use-sync-trigger', () => ({
   useSyncTrigger: () => mockUseSyncTrigger(),
+}))
+
+vi.mock('../hooks/use-sync-history', () => ({
+  useSyncHistory: () => mockUseSyncHistory(),
 }))
 
 // Mock formatRelativeTime to get predictable output
@@ -30,6 +35,8 @@ const defaultSyncStatus: SyncStatus = {
   itemCount: 42,
   errorMessage: null,
   errorCode: null,
+  itemsSynced: null,
+  itemsFailed: null,
 }
 
 describe('SyncControl', () => {
@@ -47,6 +54,12 @@ describe('SyncControl', () => {
       triggerSync: mockTriggerSync,
       isTriggering: false,
       triggerError: null,
+    })
+    mockUseSyncHistory.mockReturnValue({
+      history: [],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
     })
   })
 
@@ -122,6 +135,8 @@ describe('SyncControl', () => {
         itemCount: null,
         errorMessage: 'Network error',
         errorCode: 'SYNC_UNKNOWN_ERROR',
+        itemsSynced: null,
+        itemsFailed: null,
       },
       isLoading: false,
       error: null,
@@ -146,6 +161,8 @@ describe('SyncControl', () => {
         itemCount: null,
         errorMessage: 'Linear API authentication failed',
         errorCode: 'SYNC_AUTH_FAILED',
+        itemsSynced: null,
+        itemsFailed: null,
       },
       isLoading: false,
       error: null,
@@ -164,6 +181,8 @@ describe('SyncControl', () => {
         itemCount: null,
         errorMessage: 'Connection refused',
         errorCode: 'SYNC_API_UNAVAILABLE',
+        itemsSynced: null,
+        itemsFailed: null,
       },
       isLoading: false,
       error: null,
@@ -188,6 +207,77 @@ describe('SyncControl', () => {
     expect(matches.length).toBeGreaterThanOrEqual(1)
   })
 
+  it('shows partial success alert after sync transitions to partial', async () => {
+    const partialStatus = {
+      ...defaultSyncStatus,
+      status: 'partial' as const,
+      itemsSynced: 45,
+      itemsFailed: 3,
+      errorCode: 'SYNC_PARTIAL_SUCCESS',
+      errorMessage: '3 item(s) failed to sync',
+    }
+
+    mockUseSyncStatus.mockReturnValueOnce({
+      syncStatus: { ...defaultSyncStatus, status: 'syncing' },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    const { rerender } = render(<SyncControl />)
+    expect(screen.queryByText(/Synced with warnings/i)).not.toBeInTheDocument()
+
+    // Switch to persistent partial status for subsequent renders
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: partialStatus,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    rerender(<SyncControl />)
+    expect(await screen.findByText(/Synced with warnings/i)).toBeInTheDocument()
+  })
+
+  it('shows items synced/failed counts in partial alert', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: {
+        ...defaultSyncStatus,
+        status: 'partial',
+        itemsSynced: 45,
+        itemsFailed: 3,
+        errorCode: 'SYNC_PARTIAL_SUCCESS',
+        errorMessage: '3 item(s) failed to sync',
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    render(<SyncControl />)
+    expect(screen.getByText(/45 synced/)).toBeInTheDocument()
+    expect(screen.getByText(/3 failed/)).toBeInTheDocument()
+  })
+
+  it('shows error code in partial alert description', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: {
+        ...defaultSyncStatus,
+        status: 'partial',
+        itemsSynced: 45,
+        itemsFailed: 3,
+        errorCode: 'SYNC_PARTIAL_SUCCESS',
+        errorMessage: '3 item(s) failed to sync',
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    render(<SyncControl />)
+    expect(screen.getByText(/SYNC_PARTIAL_SUCCESS/)).toBeInTheDocument()
+  })
+
   it('handles null lastSyncedAt (never synced)', () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: {
@@ -195,6 +285,9 @@ describe('SyncControl', () => {
         status: 'idle',
         itemCount: null,
         errorMessage: null,
+        errorCode: null,
+        itemsSynced: null,
+        itemsFailed: null,
       },
       isLoading: false,
       error: null,
@@ -216,5 +309,173 @@ describe('SyncControl', () => {
     render(<SyncControl />)
     // Should still render the button
     expect(screen.getByRole('button', { name: /sync now/i })).toBeInTheDocument()
+  })
+
+  // --- Sync History Tests ---
+  describe('Sync History', () => {
+    const mockHistoryEntries = [
+      {
+        id: 1,
+        status: 'success' as const,
+        triggerType: 'scheduled' as const,
+        triggeredBy: null,
+        startedAt: '2026-02-10T06:00:00.000Z',
+        completedAt: '2026-02-10T06:00:02.000Z',
+        durationMs: 2000,
+        itemsSynced: 100,
+        itemsFailed: 0,
+        errorMessage: null,
+        errorDetails: null,
+        createdAt: '2026-02-10T06:00:00.000Z',
+      },
+      {
+        id: 2,
+        status: 'error' as const,
+        triggerType: 'manual' as const,
+        triggeredBy: 5,
+        startedAt: '2026-02-10T12:00:00.000Z',
+        completedAt: '2026-02-10T12:00:01.000Z',
+        durationMs: 1000,
+        itemsSynced: 0,
+        itemsFailed: 0,
+        errorMessage: 'Connection refused',
+        errorDetails: { errorCode: 'SYNC_API_UNAVAILABLE' },
+        createdAt: '2026-02-10T12:00:00.000Z',
+      },
+      {
+        id: 3,
+        status: 'partial' as const,
+        triggerType: 'scheduled' as const,
+        triggeredBy: null,
+        startedAt: '2026-02-10T18:00:00.000Z',
+        completedAt: '2026-02-10T18:00:03.000Z',
+        durationMs: 3000,
+        itemsSynced: 80,
+        itemsFailed: 5,
+        errorMessage: 'Some items failed',
+        errorDetails: null,
+        createdAt: '2026-02-10T18:00:00.000Z',
+      },
+    ]
+
+    it('renders sync history heading', () => {
+      render(<SyncControl />)
+      expect(screen.getByText('Sync History')).toBeInTheDocument()
+    })
+
+    it('renders "No sync history yet" when empty', () => {
+      render(<SyncControl />)
+      expect(screen.getByText('No sync history yet')).toBeInTheDocument()
+    })
+
+    it('renders history rows with correct data', () => {
+      mockUseSyncHistory.mockReturnValue({
+        history: mockHistoryEntries,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<SyncControl />)
+
+      // Check status badges are rendered
+      expect(screen.getByText('success')).toBeInTheDocument()
+      expect(screen.getByText('error')).toBeInTheDocument()
+      expect(screen.getByText('partial')).toBeInTheDocument()
+    })
+
+    it('renders status badges with correct color coding', () => {
+      mockUseSyncHistory.mockReturnValue({
+        history: [mockHistoryEntries[0]], // success entry
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<SyncControl />)
+
+      const successBadge = screen.getByText('success')
+      expect(successBadge).toBeInTheDocument()
+    })
+
+    it('shows error details for failed rows', () => {
+      mockUseSyncHistory.mockReturnValue({
+        history: [mockHistoryEntries[1]], // error entry
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<SyncControl />)
+
+      expect(screen.getByText(/Connection refused/)).toBeInTheDocument()
+      expect(screen.getByText(/SYNC_API_UNAVAILABLE/)).toBeInTheDocument()
+    })
+
+    it('shows error details for partial rows', () => {
+      mockUseSyncHistory.mockReturnValue({
+        history: [mockHistoryEntries[2]], // partial entry
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<SyncControl />)
+
+      expect(screen.getByText(/Some items failed/)).toBeInTheDocument()
+    })
+
+    it('does not show error column content for success rows', () => {
+      mockUseSyncHistory.mockReturnValue({
+        history: [mockHistoryEntries[0]], // success entry
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<SyncControl />)
+
+      expect(screen.queryByText('Connection refused')).not.toBeInTheDocument()
+    })
+
+    it('shows loading state for history', () => {
+      mockUseSyncHistory.mockReturnValue({
+        history: [],
+        isLoading: true,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<SyncControl />)
+
+      expect(screen.getByText('Loading history...')).toBeInTheDocument()
+    })
+
+    it('shows error state for history', () => {
+      mockUseSyncHistory.mockReturnValue({
+        history: [],
+        isLoading: false,
+        error: new Error('Failed to fetch'),
+        refetch: vi.fn(),
+      })
+
+      render(<SyncControl />)
+
+      expect(screen.getByText(/Failed to load sync history/)).toBeInTheDocument()
+    })
+
+    it('renders items with failed count when applicable', () => {
+      mockUseSyncHistory.mockReturnValue({
+        history: [mockHistoryEntries[2]], // partial entry: 80 synced, 5 failed
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<SyncControl />)
+
+      expect(screen.getByText(/80/)).toBeInTheDocument()
+      expect(screen.getByText(/5 failed/)).toBeInTheDocument()
+    })
   })
 })

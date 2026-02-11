@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { API_URL } from '@/utils/constants'
+import { apiFetchJson } from '@/utils/api-fetch'
 import type { BacklogListResponse } from '../types/backlog.types'
 
 /**
@@ -9,15 +10,9 @@ import type { BacklogListResponse } from '../types/backlog.types'
  * or falls back to a generic message if parsing fails.
  */
 async function fetchBacklogItems(): Promise<BacklogListResponse> {
-  const res = await fetch(`${API_URL}/backlog-items`)
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => null)
-    const message =
-      (errorBody as { error?: { message?: string } })?.error?.message ??
-      'Failed to load backlog items. Please try again.'
-    throw new Error(message)
-  }
-  return res.json() as Promise<BacklogListResponse>
+  return apiFetchJson<BacklogListResponse>(`${API_URL}/backlog-items`, undefined, {
+    fallbackMessage: 'Failed to load backlog items. Please try again.',
+  })
 }
 
 /**

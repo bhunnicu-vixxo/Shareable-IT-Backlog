@@ -19,6 +19,8 @@ const mockSuccessStatus: SyncStatus = {
   itemCount: 42,
   errorMessage: null,
   errorCode: null,
+  itemsSynced: null,
+  itemsFailed: null,
 }
 
 describe('useSyncStatus (backlog)', () => {

@@ -44,6 +44,20 @@ describe('getUserFriendlyErrorMessage', () => {
     expect(result.guidance).toContain('retry automatically')
   })
 
+  it('should return correct message for SYNC_PARTIAL_SUCCESS', () => {
+    const result = getUserFriendlyErrorMessage('SYNC_PARTIAL_SUCCESS')
+    expect(result.title).toBe('Synced with warnings')
+    expect(result.description).toContain('some could not be updated')
+    expect(result.guidance).toContain('retry on the next sync')
+  })
+
+  it('should return correct message for SYNC_TRANSFORM_FAILED', () => {
+    const result = getUserFriendlyErrorMessage('SYNC_TRANSFORM_FAILED')
+    expect(result.title).toBe('Sync issue')
+    expect(result.description).toContain('process')
+    expect(result.guidance).toContain('administrator')
+  })
+
   it('should return default message for null error code', () => {
     const result = getUserFriendlyErrorMessage(null)
     expect(result.title).toBe('Sync issue')

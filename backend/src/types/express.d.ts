@@ -5,6 +5,10 @@ declare module 'express-serve-static-core' {
     session: Session & {
       userId?: string
       isAdmin?: boolean
+      isApproved?: boolean
+      isDisabled?: boolean
+      /** Epoch ms when approval status was last verified from DB */
+      approvalCheckedAt?: number
     }
   }
 }

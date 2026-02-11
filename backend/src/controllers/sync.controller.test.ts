@@ -81,6 +81,8 @@ describe('SyncController.getSyncStatus', () => {
       itemCount: 42,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValue(mockStatus)
 
@@ -101,6 +103,8 @@ describe('SyncController.getSyncStatus', () => {
       itemCount: null,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValue(idleStatus)
 
@@ -119,6 +123,8 @@ describe('SyncController.getSyncStatus', () => {
       itemCount: null,
       errorMessage: 'Network error',
       errorCode: 'SYNC_UNKNOWN_ERROR',
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValue(errorStatus)
 
@@ -139,6 +145,8 @@ describe('SyncController.getSyncStatus', () => {
       itemCount: null,
       errorMessage: 'Network error',
       errorCode: 'SYNC_UNKNOWN_ERROR',
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValue(errorStatus)
 
@@ -162,6 +170,8 @@ describe('SyncController.getSyncStatus', () => {
       itemCount: null,
       errorMessage: 'Network error',
       errorCode: 'SYNC_UNKNOWN_ERROR',
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValue(errorStatus)
 
@@ -182,6 +192,8 @@ describe('SyncController.getSyncStatus', () => {
       itemCount: 10,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValue(mockStatus)
 
@@ -195,7 +207,7 @@ describe('SyncController.getSyncStatus', () => {
     expect(body).toHaveProperty('status')
     expect(body).toHaveProperty('itemCount')
     expect(body).toHaveProperty('errorMessage')
-    expect(['idle', 'syncing', 'success', 'error']).toContain(body.status)
+    expect(['idle', 'syncing', 'success', 'error', 'partial']).toContain(body.status)
   })
 
   it('should call next with error when getStatus throws', async () => {
@@ -240,6 +252,8 @@ describe('SyncController.triggerSync', () => {
       itemCount: null,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     const syncingStatus: SyncStatusResponse = {
       lastSyncedAt: null,
@@ -247,6 +261,8 @@ describe('SyncController.triggerSync', () => {
       itemCount: null,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     // First call checks current status (idle), second call returns syncing after runSync starts
     mockGetStatus.mockReturnValueOnce(idleStatus).mockReturnValueOnce(syncingStatus)
@@ -271,6 +287,8 @@ describe('SyncController.triggerSync', () => {
       itemCount: null,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValue(idleStatus)
 
@@ -296,6 +314,8 @@ describe('SyncController.triggerSync', () => {
       itemCount: null,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     const syncingStatus: SyncStatusResponse = {
       lastSyncedAt: null,
@@ -303,6 +323,8 @@ describe('SyncController.triggerSync', () => {
       itemCount: null,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValueOnce(idleStatus).mockReturnValueOnce(syncingStatus)
 
@@ -325,6 +347,8 @@ describe('SyncController.triggerSync', () => {
       itemCount: null,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValue(syncingStatus)
 
@@ -346,6 +370,8 @@ describe('SyncController.triggerSync', () => {
       itemCount: 42,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     const syncingStatus: SyncStatusResponse = {
       lastSyncedAt: '2026-02-10T06:00:00.000Z',
@@ -353,6 +379,8 @@ describe('SyncController.triggerSync', () => {
       itemCount: 42,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValueOnce(idleStatus).mockReturnValueOnce(syncingStatus)
 
@@ -366,7 +394,7 @@ describe('SyncController.triggerSync', () => {
     expect(body).toHaveProperty('status')
     expect(body).toHaveProperty('itemCount')
     expect(body).toHaveProperty('errorMessage')
-    expect(['idle', 'syncing', 'success', 'error']).toContain(body.status)
+    expect(['idle', 'syncing', 'success', 'error', 'partial']).toContain(body.status)
   })
 
   it('should fire-and-forget runSync (not await it)', async () => {
@@ -376,6 +404,8 @@ describe('SyncController.triggerSync', () => {
       itemCount: null,
       errorMessage: null,
       errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
     }
     mockGetStatus.mockReturnValue(idleStatus)
 

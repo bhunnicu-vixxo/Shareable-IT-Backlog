@@ -22,6 +22,7 @@ function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
     completedAt: null,
     dueDate: null,
     sortOrder: 1.0,
+    prioritySortOrder: 1.0,
     url: 'https://linear.app/vixxo/issue/VIX-42',
     isNew: false,
     ...overrides,

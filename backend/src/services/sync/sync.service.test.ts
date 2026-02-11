@@ -11,7 +11,7 @@ vi.mock('./linear-client.service.js', () => ({
 
 // Mock the linear-transformers module
 vi.mock('./linear-transformers.js', () => ({
-  toBacklogItemDtos: vi.fn(),
+  toBacklogItemDtosResilient: vi.fn(),
 }))
 
 // Mock the backlog service sort function
@@ -21,14 +21,22 @@ vi.mock('../backlog/backlog.service.js', () => ({
   backlogService: {},
 }))
 
+// Mock the sync-history service
+const mockCreateSyncHistoryEntry = vi.fn()
+const mockCompleteSyncHistoryEntry = vi.fn()
+vi.mock('./sync-history.service.js', () => ({
+  createSyncHistoryEntry: (...args: unknown[]) => mockCreateSyncHistoryEntry(...args),
+  completeSyncHistoryEntry: (...args: unknown[]) => mockCompleteSyncHistoryEntry(...args),
+}))
+
 // Import after mocking
 import { linearClient } from './linear-client.service.js'
-import { toBacklogItemDtos } from './linear-transformers.js'
+import { toBacklogItemDtosResilient } from './linear-transformers.js'
 import { sortBacklogItems } from '../backlog/backlog.service.js'
 import { SyncService } from './sync.service.js'
 
 const mockGetIssuesByProject = vi.mocked(linearClient.getIssuesByProject)
-const mockToBacklogItemDtos = vi.mocked(toBacklogItemDtos)
+const mockToBacklogItemDtosResilient = vi.mocked(toBacklogItemDtosResilient)
 const mockSortBacklogItems = vi.mocked(sortBacklogItems)
 
 function createMockBacklogItem(overrides: Partial<BacklogItemDto> = {}): BacklogItemDto {
@@ -53,6 +61,7 @@ function createMockBacklogItem(overrides: Partial<BacklogItemDto> = {}): Backlog
     completedAt: null,
     dueDate: null,
     sortOrder: 1.0,
+    prioritySortOrder: 1.0,
     url: 'https://linear.app/vixxo/issue/VIX-1',
     isNew: false,
     ...overrides,
@@ -71,6 +80,10 @@ describe('SyncService', () => {
 
     // Default: sortBacklogItems returns items as-is
     mockSortBacklogItems.mockImplementation((items) => [...items])
+
+    // Default: sync history operations succeed
+    mockCreateSyncHistoryEntry.mockResolvedValue(1)
+    mockCompleteSyncHistoryEntry.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -94,7 +107,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue(mockDtos)
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
 
       await service.runSync()
 
@@ -102,7 +115,7 @@ describe('SyncService', () => {
         first: 50,
         after: undefined,
       })
-      expect(mockToBacklogItemDtos).toHaveBeenCalledWith(mockIssues)
+      expect(mockToBacklogItemDtosResilient).toHaveBeenCalledWith(mockIssues)
       expect(mockSortBacklogItems).toHaveBeenCalledWith(mockDtos)
 
       const cached = service.getCachedItems()
@@ -132,10 +145,13 @@ describe('SyncService', () => {
           pageInfo: { hasNextPage: false, endCursor: null },
         })
 
-      mockToBacklogItemDtos.mockResolvedValue([
-        createMockBacklogItem({ id: 'i-1' }),
-        createMockBacklogItem({ id: 'i-2' }),
-      ])
+      mockToBacklogItemDtosResilient.mockResolvedValue({
+        items: [
+          createMockBacklogItem({ id: 'i-1' }),
+          createMockBacklogItem({ id: 'i-2' }),
+        ],
+        failures: [],
+      })
 
       await service.runSync()
 
@@ -150,7 +166,7 @@ describe('SyncService', () => {
       })
 
       // Both pages' issues should be passed to transformer
-      expect(mockToBacklogItemDtos).toHaveBeenCalledWith([...page1Issues, ...page2Issues])
+      expect(mockToBacklogItemDtosResilient).toHaveBeenCalledWith([...page1Issues, ...page2Issues])
     })
 
     it('should preserve previous cache on failure', async () => {
@@ -161,7 +177,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue(mockDtos)
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
 
       await service.runSync()
       expect(service.getCachedItems()).toHaveLength(1)
@@ -197,7 +213,7 @@ describe('SyncService', () => {
           pageInfo: { hasNextPage: false, endCursor: null },
         }
       })
-      mockToBacklogItemDtos.mockResolvedValue([])
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: [], failures: [] })
 
       // Start first sync (won't complete until we resolve)
       const firstSync = service.runSync()
@@ -253,7 +269,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue([createMockBacklogItem()])
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: [createMockBacklogItem()], failures: [] })
       await service.runSync()
 
       const status = service.getStatus()
@@ -278,7 +294,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue(mockDtos)
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
 
       await service.runSync()
 
@@ -305,7 +321,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue([createMockBacklogItem()])
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: [createMockBacklogItem()], failures: [] })
 
       await service.runSync()
 
@@ -335,6 +351,178 @@ describe('SyncService', () => {
     })
   })
 
+  describe('partial sync handling', () => {
+    it('should set partial status when some items fail and some succeed', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }, { id: 'i-2' }, { id: 'i-3' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+
+      const successItems = [
+        createMockBacklogItem({ id: 'i-1' }),
+        createMockBacklogItem({ id: 'i-3' }),
+      ]
+      mockToBacklogItemDtosResilient.mockResolvedValue({
+        items: successItems,
+        failures: [
+          { issueId: 'i-2', identifier: 'VIX-2', error: 'Transform failed' },
+        ],
+      })
+
+      await service.runSync()
+
+      const status = service.getStatus()
+      expect(status.status).toBe('partial')
+      expect(status.itemsSynced).toBe(2)
+      expect(status.itemsFailed).toBe(1)
+      expect(status.errorCode).toBe('SYNC_PARTIAL_SUCCESS')
+      expect(status.errorMessage).toBe('1 item(s) failed to sync')
+      expect(status.lastSyncedAt).toBeTruthy()
+      expect(status.itemCount).toBe(2)
+    })
+
+    it('should set error status when ALL items fail', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }, { id: 'i-2' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+
+      mockToBacklogItemDtosResilient.mockResolvedValue({
+        items: [],
+        failures: [
+          { issueId: 'i-1', identifier: 'VIX-1', error: 'Fail 1' },
+          { issueId: 'i-2', identifier: 'VIX-2', error: 'Fail 2' },
+        ],
+      })
+
+      await service.runSync()
+
+      const status = service.getStatus()
+      expect(status.status).toBe('error')
+      expect(status.itemsSynced).toBe(0)
+      expect(status.itemsFailed).toBe(2)
+      expect(status.errorCode).toBe('SYNC_TRANSFORM_FAILED')
+    })
+
+    it('should replace cache with successful items on partial failure', async () => {
+      // First: successful sync to populate cache
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }, { id: 'i-2' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({
+        items: [createMockBacklogItem({ id: 'i-1' }), createMockBacklogItem({ id: 'i-2' })],
+        failures: [],
+      })
+      await service.runSync()
+      expect(service.getCachedItems()).toHaveLength(2)
+
+      // Second: partial sync — only i-1 succeeds
+      mockToBacklogItemDtosResilient.mockResolvedValue({
+        items: [createMockBacklogItem({ id: 'i-1' })],
+        failures: [{ issueId: 'i-2', identifier: 'VIX-2', error: 'Transform failed' }],
+      })
+      await service.runSync()
+
+      // Cache should be replaced with partial results (not preserved old)
+      const cached = service.getCachedItems()
+      expect(cached).toHaveLength(1)
+      expect(cached![0].id).toBe('i-1')
+    })
+
+    it('should preserve previous cache when all items fail', async () => {
+      // First: successful sync to populate cache
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({
+        items: [createMockBacklogItem({ id: 'i-1' })],
+        failures: [],
+      })
+      await service.runSync()
+      expect(service.getCachedItems()).toHaveLength(1)
+
+      // Second: all items fail
+      mockToBacklogItemDtosResilient.mockResolvedValue({
+        items: [],
+        failures: [{ issueId: 'i-1', identifier: 'VIX-1', error: 'Fail' }],
+      })
+      await service.runSync()
+
+      // Cache preserved from previous sync
+      expect(service.getCachedItems()).toHaveLength(1)
+      expect(service.getCachedItems()![0].id).toBe('i-1')
+    })
+
+    it('should return itemsSynced and itemsFailed in getStatus after partial sync', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }, { id: 'i-2' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({
+        items: [createMockBacklogItem({ id: 'i-1' })],
+        failures: [{ issueId: 'i-2', identifier: 'VIX-2', error: 'Fail' }],
+      })
+
+      await service.runSync()
+
+      const status = service.getStatus()
+      expect(status.itemsSynced).toBe(1)
+      expect(status.itemsFailed).toBe(1)
+    })
+
+    it('should return itemsSynced and itemsFailed as null/0 on full success', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({
+        items: [createMockBacklogItem({ id: 'i-1' })],
+        failures: [],
+      })
+
+      await service.runSync()
+
+      const status = service.getStatus()
+      expect(status.status).toBe('success')
+      expect(status.itemsSynced).toBe(1)
+      expect(status.itemsFailed).toBe(0)
+    })
+
+    it('should return itemsSynced and itemsFailed as null initially', () => {
+      const status = service.getStatus()
+      expect(status.itemsSynced).toBeNull()
+      expect(status.itemsFailed).toBeNull()
+    })
+
+    it('should track transform failures via getLastTransformFailures', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }, { id: 'i-2' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({
+        items: [createMockBacklogItem({ id: 'i-1' })],
+        failures: [{ issueId: 'i-2', identifier: 'VIX-2', error: 'Bad data' }],
+      })
+
+      await service.runSync()
+
+      const failures = service.getLastTransformFailures()
+      expect(failures).toHaveLength(1)
+      expect(failures[0].issueId).toBe('i-2')
+      expect(failures[0].identifier).toBe('VIX-2')
+      expect(failures[0].error).toBe('Bad data')
+    })
+  })
+
   describe('clearCache', () => {
     it('should clear the cached items', async () => {
       mockGetIssuesByProject.mockResolvedValue({
@@ -342,13 +530,159 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue([createMockBacklogItem()])
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: [createMockBacklogItem()], failures: [] })
 
       await service.runSync()
       expect(service.getCachedItems()).not.toBeNull()
 
       service.clearCache()
       expect(service.getCachedItems()).toBeNull()
+    })
+  })
+
+  describe('sync history persistence', () => {
+    it('should create and complete sync history entry on successful sync', async () => {
+      mockCreateSyncHistoryEntry.mockResolvedValue(42)
+      const mockDtos = [createMockBacklogItem({ id: 'i-1' })]
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
+
+      await service.runSync({ triggerType: 'manual', triggeredBy: 5 })
+
+      expect(mockCreateSyncHistoryEntry).toHaveBeenCalledWith({
+        triggerType: 'manual',
+        triggeredBy: 5,
+      })
+      expect(mockCompleteSyncHistoryEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 42,
+          status: 'success',
+          itemsSynced: 1,
+        }),
+      )
+    })
+
+    it('should create and complete sync history entry on failed sync', async () => {
+      mockCreateSyncHistoryEntry.mockResolvedValue(10)
+      mockGetIssuesByProject.mockRejectedValue(new Error('Network error'))
+
+      await service.runSync({ triggerType: 'scheduled' })
+
+      expect(mockCreateSyncHistoryEntry).toHaveBeenCalledWith({
+        triggerType: 'scheduled',
+        triggeredBy: null,
+      })
+      expect(mockCompleteSyncHistoryEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 10,
+          status: 'error',
+          errorMessage: 'Network error',
+          errorDetails: expect.objectContaining({ errorCode: 'SYNC_UNKNOWN_ERROR' }),
+        }),
+      )
+    })
+
+    it('should pass triggerType through to history for scheduled sync', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: [], failures: [] })
+
+      await service.runSync({ triggerType: 'scheduled' })
+
+      expect(mockCreateSyncHistoryEntry).toHaveBeenCalledWith({
+        triggerType: 'scheduled',
+        triggeredBy: null,
+      })
+    })
+
+    it('should pass triggerType through to history for startup sync', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: [], failures: [] })
+
+      await service.runSync({ triggerType: 'startup' })
+
+      expect(mockCreateSyncHistoryEntry).toHaveBeenCalledWith({
+        triggerType: 'startup',
+        triggeredBy: null,
+      })
+    })
+
+    it('should default triggerType to manual when not specified', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: [], failures: [] })
+
+      await service.runSync()
+
+      expect(mockCreateSyncHistoryEntry).toHaveBeenCalledWith({
+        triggerType: 'manual',
+        triggeredBy: null,
+      })
+    })
+
+    it('should complete history with error when LINEAR_PROJECT_ID is missing', async () => {
+      delete process.env.LINEAR_PROJECT_ID
+      mockCreateSyncHistoryEntry.mockResolvedValue(99)
+
+      await service.runSync({ triggerType: 'startup' })
+
+      expect(mockCompleteSyncHistoryEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 99,
+          status: 'error',
+          errorMessage: 'LINEAR_PROJECT_ID not configured — cannot sync',
+          errorDetails: { errorCode: 'SYNC_CONFIG_ERROR' },
+        }),
+      )
+    })
+
+    it('should continue sync even if history creation fails', async () => {
+      mockCreateSyncHistoryEntry.mockRejectedValue(new Error('DB down'))
+      const mockDtos = [createMockBacklogItem()]
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
+
+      await service.runSync()
+
+      // Sync still succeeds
+      expect(service.getStatus().status).toBe('success')
+      // History completion is not called since we don't have a historyId
+      expect(mockCompleteSyncHistoryEntry).not.toHaveBeenCalled()
+    })
+
+    it('should continue sync even if history completion fails', async () => {
+      mockCreateSyncHistoryEntry.mockResolvedValue(1)
+      mockCompleteSyncHistoryEntry.mockRejectedValue(new Error('DB write failed'))
+      const mockDtos = [createMockBacklogItem()]
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
+
+      await service.runSync()
+
+      // Sync still succeeds (in-memory status is correct)
+      expect(service.getStatus().status).toBe('success')
     })
   })
 })

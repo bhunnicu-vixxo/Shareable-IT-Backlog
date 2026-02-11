@@ -9,9 +9,9 @@ import {
 // ============================================================================
 // WCAG 2.1 Contrast Ratios (against white #FFFFFF)
 // ============================================================================
-// Vixxo Green   #8E992E → 4.2:1  ⚠️ Fails AA for normal text (needs 4.5:1)
-//   → Use greenAccessible #6F7B24 for normal text on white (≥4.5:1 = 4.63:1)
-//   → Original green OK for large text (≥18px bold / 24px regular, needs 3:1)
+// Vixxo Green   #8E992E → ~3.11:1 ⚠️ Fails AA for normal text (needs 4.5:1)
+//   → Use greenAccessible #6F7B24 for normal text on white (≥4.5:1 = ~4.63:1)
+//   → Original green OK for large text (needs 3:1)
 // Vixxo Gray    #3E4543 → 12.5:1 ✅ Excellent
 // Vixxo Teal    #2C7B80 → 4.8:1  ✅ Meets AA
 // Vixxo Yellow  #EDA200 → 1.8:1  ❌ NEVER use as text on white
@@ -20,7 +20,7 @@ import {
 // Vixxo Copper  #956125 → 5.0:1  ✅ Meets AA
 // Error Red     #E53E3E → 4.13:1 ⚠️ Fails AA for normal text (needs 4.5:1)
 //   → Use redAccessible #C53030 for normal text on white (≥4.5:1 = 5.47:1)
-// White on Green #8E992E → 4.2:1 ✅ Meets AA for large text only
+// White on Green #8E992E → ~3.11:1 ✅ Meets AA for large text only
 // ============================================================================
 
 // ---------------------------------------------------------------------------

@@ -49,6 +49,7 @@ export const backlogItemDtoSchema = z.object({
   completedAt: z.iso.datetime().nullable(),
   dueDate: z.iso.date().nullable(),
   sortOrder: z.number(),
+  prioritySortOrder: z.number(),
   url: z.url(),
   isNew: z.boolean(),
 })

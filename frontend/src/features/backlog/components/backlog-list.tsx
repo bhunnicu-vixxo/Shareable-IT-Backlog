@@ -165,7 +165,9 @@ export function BacklogList() {
           return aIsNone ? 1 : -1
         }
         const base = a.priority - b.priority
-        return sortDirection === 'asc' ? base : -base
+        if (base !== 0) return sortDirection === 'asc' ? base : -base
+        // Tiebreaker: preserve Linear's stack-rank order within same priority
+        return a.prioritySortOrder - b.prioritySortOrder
       }
 
       let cmp = 0
@@ -196,7 +198,7 @@ export function BacklogList() {
     )
   }
 
-  if (isError) {
+  if (isError && (!data || data.items.length === 0)) {
     return (
       <BacklogErrorState
         message={error?.message ?? 'Please try again or contact your admin.'}
@@ -204,6 +206,8 @@ export function BacklogList() {
       />
     )
   }
+  // When isError && data.items.length > 0: fall through to normal rendering.
+  // The SyncStatusIndicator in BacklogPage already warns "Data shown may be outdated".
 
   if (items.length === 0) {
     return <BacklogEmptyState onRetry={() => void refetch()} />

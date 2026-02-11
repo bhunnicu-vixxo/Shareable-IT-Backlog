@@ -42,8 +42,10 @@ export interface BacklogItem {
   completedAt: string | null
   /** ISO 8601 date string or null */
   dueDate: string | null
-  /** Linear's sort order for priority display */
+  /** Linear's general sort order */
   sortOrder: number
+  /** Linear's sort order within the priority view */
+  prioritySortOrder: number
   /** Deep-link URL to the issue in Linear */
   url: string
   /** Whether the item is considered "new" (recently created, needs prioritization) */
@@ -119,9 +121,13 @@ export interface BacklogDetailResponse {
 /** Sync status as returned by the API. */
 export interface SyncStatus {
   lastSyncedAt: string | null
-  status: 'idle' | 'syncing' | 'success' | 'error'
+  status: 'idle' | 'syncing' | 'success' | 'error' | 'partial'
   itemCount: number | null
   errorMessage: string | null
   /** Standardized error classification code (e.g. SYNC_API_UNAVAILABLE), or null when no error */
   errorCode: string | null
+  /** Count of successfully synced items, or null when not applicable */
+  itemsSynced: number | null
+  /** Count of items that failed to transform, or null when not applicable */
+  itemsFailed: number | null
 }
