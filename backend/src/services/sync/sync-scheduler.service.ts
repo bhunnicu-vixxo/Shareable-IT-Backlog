@@ -30,34 +30,41 @@ function isEnvFalse(value: string | undefined): boolean {
 class SyncSchedulerService {
   private task: cron.ScheduledTask | null = null
   private currentSchedule: string | null = null
+  private starting: boolean = false
 
   /**
    * Start the sync scheduler.
    *
    * Reads the cron schedule from the database (falling back to env / default),
-   * creates a cron task, and fires an initial sync immediately.
+   * creates a cron task, and optionally fires an initial sync immediately.
    *
    * No-ops (with a log) if `SYNC_ENABLED` is `"false"` or the cron
    * expression is invalid.
+   *
+   * @param options.runInitialSync - Whether to run an initial sync immediately (default: true).
+   *   Set to false when restarting for a schedule change.
    */
-  async start(): Promise<void> {
+  async start(options: { runInitialSync?: boolean } = {}): Promise<void> {
+    const { runInitialSync = true } = options
+
     if (isEnvFalse(process.env.SYNC_ENABLED)) {
       // If we were already running, ensure we stop.
       this.stop()
-      logger.info(
+      logger.info({ service: 'sync-scheduler' }, 'Sync scheduler disabled via SYNC_ENABLED=false')
+      return
+    }
+
+    // Guard against concurrent start() calls — check both `task` and `starting` flag
+    if (this.task || this.starting) {
+      logger.warn(
         { service: 'sync-scheduler' },
-        'Sync scheduler disabled via SYNC_ENABLED=false',
+        'Sync scheduler already running or starting; start() is a no-op',
       )
       return
     }
 
-    if (this.task) {
-      logger.warn(
-        { service: 'sync-scheduler' },
-        'Sync scheduler already running; start() is a no-op',
-      )
-      return
-    }
+    // Set flag synchronously before any await to prevent race conditions
+    this.starting = true
 
     let schedule: string
     try {
@@ -71,6 +78,7 @@ class SyncSchedulerService {
     }
 
     if (!cron.validate(schedule)) {
+      this.starting = false
       logger.error(
         { service: 'sync-scheduler', schedule },
         'Invalid sync cron schedule — scheduler not started',
@@ -83,6 +91,7 @@ class SyncSchedulerService {
       logger.info({ service: 'sync-scheduler' }, 'Scheduled sync triggered')
       await syncService.runSync({ triggerType: 'scheduled', triggeredBy: null })
     })
+    this.starting = false
 
     logger.info(
       { service: 'sync-scheduler', schedule, source: 'database' },
@@ -91,18 +100,19 @@ class SyncSchedulerService {
 
     // Run initial sync on startup so cache is populated immediately.
     // Fire-and-forget — doesn't block server startup.
-    syncService.runSync({ triggerType: 'startup', triggeredBy: null }).catch((error) => {
-      logger.error(
-        { service: 'sync-scheduler', error },
-        'Initial sync failed',
-      )
-    })
+    // Skip when restarting for a schedule change (runInitialSync = false).
+    if (runInitialSync) {
+      syncService.runSync({ triggerType: 'startup', triggeredBy: null }).catch((error) => {
+        logger.error({ service: 'sync-scheduler', error }, 'Initial sync failed')
+      })
+    }
   }
 
   /**
    * Stop the scheduler and destroy the cron task.
    */
   stop(): void {
+    this.starting = false
     if (this.task) {
       this.task.stop()
       this.task = null
@@ -116,10 +126,12 @@ class SyncSchedulerService {
    *
    * Useful after an admin updates the cron schedule via the API — call
    * `restart()` to pick up the new value without a server restart.
+   *
+   * Does not trigger an immediate sync — only updates the cron schedule.
    */
   async restart(): Promise<void> {
     this.stop()
-    await this.start()
+    await this.start({ runInitialSync: false })
   }
 
   /**

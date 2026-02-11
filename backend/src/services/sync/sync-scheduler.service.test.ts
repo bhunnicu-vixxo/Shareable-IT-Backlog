@@ -74,10 +74,7 @@ describe('SyncSchedulerService', () => {
 
       expect(mockGetSyncCronSchedule).toHaveBeenCalledOnce()
       expect(mockValidate).toHaveBeenCalledWith('*/15 * * * *')
-      expect(mockSchedule).toHaveBeenCalledWith(
-        '*/15 * * * *',
-        expect.any(Function),
-      )
+      expect(mockSchedule).toHaveBeenCalledWith('*/15 * * * *', expect.any(Function))
       expect(scheduler.isRunning()).toBe(true)
       expect(scheduler.getSchedule()).toBe('*/15 * * * *')
     })
@@ -90,10 +87,7 @@ describe('SyncSchedulerService', () => {
       await scheduler.start()
 
       expect(mockValidate).toHaveBeenCalledWith('0 */6 * * *')
-      expect(mockSchedule).toHaveBeenCalledWith(
-        '0 */6 * * *',
-        expect.any(Function),
-      )
+      expect(mockSchedule).toHaveBeenCalledWith('0 */6 * * *', expect.any(Function))
     })
 
     it('should fall back to hardcoded default when getSyncCronSchedule throws', async () => {
@@ -104,10 +98,7 @@ describe('SyncSchedulerService', () => {
       await scheduler.start()
 
       expect(mockValidate).toHaveBeenCalledWith('*/15 * * * *')
-      expect(mockSchedule).toHaveBeenCalledWith(
-        '*/15 * * * *',
-        expect.any(Function),
-      )
+      expect(mockSchedule).toHaveBeenCalledWith('*/15 * * * *', expect.any(Function))
       expect(scheduler.isRunning()).toBe(true)
     })
 
@@ -148,6 +139,26 @@ describe('SyncSchedulerService', () => {
       await scheduler.start()
       await scheduler.start()
 
+      expect(mockSchedule).toHaveBeenCalledTimes(1)
+      expect(scheduler.isRunning()).toBe(true)
+    })
+
+    it('should prevent race condition when start is called concurrently', async () => {
+      const mockTask = { stop: vi.fn() }
+      mockSchedule.mockReturnValue(mockTask)
+
+      // Delay the getSyncCronSchedule to simulate DB latency
+      mockGetSyncCronSchedule.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve('*/15 * * * *'), 50)),
+      )
+
+      // Start two concurrent calls
+      const start1 = scheduler.start()
+      const start2 = scheduler.start()
+
+      await Promise.all([start1, start2])
+
+      // Only one cron task should be created, not two
       expect(mockSchedule).toHaveBeenCalledTimes(1)
       expect(scheduler.isRunning()).toBe(true)
     })
@@ -250,6 +261,28 @@ describe('SyncSchedulerService', () => {
       expect(mockTask.stop).toHaveBeenCalled()
       expect(scheduler.getSchedule()).toBe('*/30 * * * *')
       expect(scheduler.isRunning()).toBe(true)
+    })
+
+    it('should NOT trigger initial sync when restarting for schedule change', async () => {
+      const mockTask = { stop: vi.fn() }
+      mockSchedule.mockReturnValue(mockTask)
+
+      // First start with default schedule - this should trigger initial sync
+      await scheduler.start()
+      expect(mockRunSync).toHaveBeenCalledTimes(1)
+
+      // Clear the mock to track only the restart call
+      mockRunSync.mockClear()
+
+      // Change the schedule returned by DB
+      mockGetSyncCronSchedule.mockResolvedValue('*/30 * * * *')
+      const newMockTask = { stop: vi.fn() }
+      mockSchedule.mockReturnValue(newMockTask)
+
+      await scheduler.restart()
+
+      // Restart should NOT trigger another initial sync
+      expect(mockRunSync).not.toHaveBeenCalled()
     })
   })
 
