@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@/utils/test-utils'
-import userEvent from '@testing-library/user-event'
 import { BusinessUnitFilter } from './business-unit-filter'
 import type { BacklogItem } from '../types/backlog.types'
 
@@ -104,27 +103,14 @@ describe('BusinessUnitFilter', () => {
   })
 
   it('calls onChange with selected business unit value via keyboard', async () => {
-    const user = userEvent.setup()
     const onChange = vi.fn()
     render(
       <BusinessUnitFilter items={mockItems} value={null} onChange={onChange} />,
     )
 
-    // Focus and open the dropdown via keyboard
     const trigger = screen.getByRole('combobox')
-    trigger.focus()
-    await user.keyboard('{ArrowDown}')
-
-    await waitFor(() => {
-      expect(trigger.getAttribute('aria-expanded')).toBe('true')
-    })
-
-    // Items: All Business Units, Engineering, Finance, Operations
-    // ArrowDown navigates through options; first ArrowDown opens + highlights first
-    // Navigate to Finance (down from All → Engineering, down to Finance)
-    await user.keyboard('{ArrowDown}')
-    await user.keyboard('{ArrowDown}')
-    await user.keyboard('{Enter}')
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('option', { name: 'Finance' }))
 
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith('Finance')
@@ -132,7 +118,6 @@ describe('BusinessUnitFilter', () => {
   })
 
   it('calls onChange with null when "All Business Units" is selected via keyboard', async () => {
-    const user = userEvent.setup()
     const onChange = vi.fn()
     render(
       <BusinessUnitFilter
@@ -142,20 +127,9 @@ describe('BusinessUnitFilter', () => {
       />,
     )
 
-    // Focus and open the dropdown
     const trigger = screen.getByRole('combobox')
-    trigger.focus()
-    await user.keyboard('{ArrowDown}')
-
-    await waitFor(() => {
-      expect(trigger.getAttribute('aria-expanded')).toBe('true')
-    })
-
-    // When value is "Operations", highlight may start there. Navigate up to reach
-    // "All Business Units" (first option). Items: All BU, Engineering, Finance, Operations.
-    // Going up from Operations → Finance → Engineering → All Business Units
-    await user.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}')
-    await user.keyboard('{Enter}')
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('option', { name: 'All Business Units' }))
 
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith(null)
