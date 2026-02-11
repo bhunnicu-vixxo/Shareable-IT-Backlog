@@ -35,7 +35,8 @@ export async function apiFetchJson<T>(
   init?: RequestInit,
   options?: { fallbackMessage?: string },
 ): Promise<T> {
-  const res = init ? await fetch(input, init) : await fetch(input)
+  const merged: RequestInit = { ...init, credentials: 'include' }
+  const res = await fetch(input, merged)
   if (res.ok) {
     return (await res.json()) as T
   }
@@ -47,8 +48,12 @@ export async function apiFetchJson<T>(
     setNetworkDenied(true)
   }
 
+  const fallback = res.statusText
+    ? `Request failed: ${res.statusText}`
+    : `Request failed with status ${res.status}`
+
   throw new ApiError(
-    message ?? options?.fallbackMessage ?? 'Request failed. Please try again.',
+    message ?? options?.fallbackMessage ?? fallback,
     res.status,
     code ?? 'UNKNOWN_ERROR',
   )

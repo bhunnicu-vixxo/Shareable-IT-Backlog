@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Select, Text, createListCollection } from '@chakra-ui/react'
 import type { BacklogItem } from '../types/backlog.types'
 
@@ -25,7 +25,7 @@ const ALL_VALUE = '__all__'
  * Vixxo Green active state indicates when a filter is applied.
  * Includes ARIA live region for screen reader announcements.
  */
-export function BusinessUnitFilter({
+export const BusinessUnitFilter = memo(function BusinessUnitFilter({
   items,
   value,
   onChange,
@@ -158,4 +158,5 @@ export function BusinessUnitFilter({
       </Box>
     </Box>
   )
-}
+})
+BusinessUnitFilter.displayName = 'BusinessUnitFilter'

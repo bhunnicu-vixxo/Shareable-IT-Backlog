@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { Box, Button, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { useBacklogItems } from '../hooks/use-backlog-items'
 import { useDebouncedValue } from '../hooks/use-debounced-value'
@@ -189,6 +189,28 @@ export function BacklogList() {
     return sorted
   }, [items, selectedBusinessUnit, showNewOnly, searchTokens, sortBy, sortDirection])
 
+  // Stabilize callback handlers with useCallback to maintain referential stability
+  // for memoized child components (React.memo). State setters are stable references.
+  const handleClearKeyword = useCallback(() => setKeywordQuery(''), [])
+  const handleClearBusinessUnit = useCallback(() => setSelectedBusinessUnit(null), [])
+  const handleClearNewOnly = useCallback(() => setShowNewOnly(false), [])
+  const handleClearAll = useCallback(() => {
+    setKeywordQuery('')
+    setSelectedBusinessUnit(null)
+    setShowNewOnly(false)
+  }, [])
+  const handleToggleNewOnly = useCallback(() => setShowNewOnly((prev) => !prev), [])
+  // Note: Each card still gets a per-item inline closure in the .map() below
+  // (to capture item.id). This means BacklogItemCard's onClick prop changes on
+  // every parent render, partially defeating React.memo for that prop. This is
+  // acceptable — the item/highlightTokens props remain stable, and the closure
+  // cost for typical backlog sizes (< 500 items) is negligible.
+  const handleItemClick = useCallback((itemId: string) => {
+    lastClickedCardRef.current = cardRefs.current[itemId] ?? null
+    setSelectedItemId(itemId)
+  }, [])
+  const handleCloseDetail = useCallback(() => setSelectedItemId(null), [])
+
   if (isLoading) {
     return (
       <Box data-testid="backlog-list-loading">
@@ -253,13 +275,13 @@ export function BacklogList() {
         <KeywordSearch
           value={keywordQuery}
           onChange={setKeywordQuery}
-          onClear={() => setKeywordQuery('')}
+          onClear={handleClearKeyword}
         />
         {newItemCount > 0 && (
           <Button
             size="sm"
             variant={showNewOnly ? 'solid' : 'outline'}
-            onClick={() => setShowNewOnly(!showNewOnly)}
+            onClick={handleToggleNewOnly}
             aria-pressed={showNewOnly}
             aria-label={showNewOnly ? 'Show all items' : 'Show only new items'}
           >
@@ -285,14 +307,10 @@ export function BacklogList() {
           keyword={debouncedQuery}
           businessUnit={selectedBusinessUnit}
           showNewOnly={showNewOnly}
-          onClearKeyword={() => setKeywordQuery('')}
-          onClearBusinessUnit={() => setSelectedBusinessUnit(null)}
-          onClearNewOnly={() => setShowNewOnly(false)}
-          onClearAll={() => {
-            setKeywordQuery('')
-            setSelectedBusinessUnit(null)
-            setShowNewOnly(false)
-          }}
+          onClearKeyword={handleClearKeyword}
+          onClearBusinessUnit={handleClearBusinessUnit}
+          onClearNewOnly={handleClearNewOnly}
+          onClearAll={handleClearAll}
         />
       ) : (
         <>
@@ -307,10 +325,7 @@ export function BacklogList() {
                 <BacklogItemCard
                   item={item}
                   highlightTokens={searchTokens}
-                  onClick={() => {
-                    lastClickedCardRef.current = cardRefs.current[item.id] ?? null
-                    setSelectedItemId(item.id)
-                  }}
+                  onClick={() => handleItemClick(item.id)}
                 />
               </Box>
             ))}
@@ -318,7 +333,7 @@ export function BacklogList() {
           <ItemDetailModal
             isOpen={!!selectedItemId}
             itemId={selectedItemId}
-            onClose={() => setSelectedItemId(null)}
+            onClose={handleCloseDetail}
             triggerRef={lastClickedCardRef}
           />
         </>

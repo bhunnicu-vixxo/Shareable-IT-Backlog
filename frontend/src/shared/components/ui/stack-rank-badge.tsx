@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Box } from '@chakra-ui/react'
 import {
   getBadgeDimensions,
@@ -41,7 +42,7 @@ export interface StackRankBadgeProps {
  * - Optional `size` prop overrides auto-sizing for explicit control.
  * - Optional `variant` prop controls visual style (solid/outline/subtle).
  */
-export function StackRankBadge({
+export const StackRankBadge = memo(function StackRankBadge({
   priority,
   priorityLabel,
   size: sizeProp,
@@ -87,4 +88,5 @@ export function StackRankBadge({
       {displayValue}
     </Box>
   )
-}
+})
+StackRankBadge.displayName = 'StackRankBadge'

@@ -84,6 +84,7 @@ describe('useBacklogItemDetail', () => {
     expect(result.current.data).toEqual(detailResponse)
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/backlog-items/issue-1'),
+      expect.objectContaining({ credentials: 'include' }),
     )
   })
 

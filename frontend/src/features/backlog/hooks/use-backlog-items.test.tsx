@@ -71,6 +71,7 @@ describe('useBacklogItems', () => {
     expect(result.current.data).toEqual(mockResponse)
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/backlog-items'),
+      expect.objectContaining({ credentials: 'include' }),
     )
   })
 

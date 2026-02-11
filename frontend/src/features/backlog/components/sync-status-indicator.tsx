@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Alert, Box, Button, HStack, Spinner, Text, VStack } from '@chakra-ui/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSyncStatus } from '../hooks/use-sync-status'
@@ -52,7 +52,7 @@ interface SyncStatusIndicatorProps {
  * - Auto-refreshing relative timestamps every 60 seconds
  * - Optional compact variant for tight layouts
  */
-export function SyncStatusIndicator({ compact = false }: SyncStatusIndicatorProps) {
+export const SyncStatusIndicator = memo(function SyncStatusIndicator({ compact = false }: SyncStatusIndicatorProps) {
   const { syncStatus, isLoading } = useSyncStatus()
   const queryClient = useQueryClient()
 
@@ -212,4 +212,5 @@ export function SyncStatusIndicator({ compact = false }: SyncStatusIndicatorProp
       </HStack>
     </Box>
   )
-}
+})
+SyncStatusIndicator.displayName = 'SyncStatusIndicator'

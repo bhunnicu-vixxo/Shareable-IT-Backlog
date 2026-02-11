@@ -18,13 +18,15 @@ async function fetchBacklogItems(): Promise<BacklogListResponse> {
 /**
  * TanStack Query hook for fetching and caching backlog items.
  *
- * - Caches for 5 minutes (configured in QueryClient staleTime)
+ * - Stale after 5 minutes (QueryClient default staleTime)
+ * - Cached for 10 minutes (explicit gcTime) to survive navigation
+ * - Retries up to 2x for server/network errors; skips retry for 4xx (QueryClient default)
  * - Provides `isLoading`, `error`, `data`, and `refetch`
- * - Retries once on failure (configured in QueryClient defaults: retry: 1)
  */
 export function useBacklogItems() {
   return useQuery({
     queryKey: ['backlog-items'],
     queryFn: fetchBacklogItems,
+    gcTime: 10 * 60 * 1000, // 10 minutes — survive navigation back to list
   })
 }
