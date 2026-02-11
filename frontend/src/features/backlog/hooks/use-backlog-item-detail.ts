@@ -37,14 +37,7 @@ export function useBacklogItemDetail(id: string | null) {
     queryFn: () => fetchBacklogItemDetail(id!),
     enabled: !!id,
     staleTime: 2 * 60 * 1000, // 2 minutes — slightly fresher than list data
-    retry: (failureCount, error) => {
-      // Don't retry any 4xx errors — client errors are not transient
-      if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
-        return false
-      }
-      // Retry server/network errors up to 2 times
-      return failureCount < 2
-    },
+    // retry: inherited from global queryDefaults (skip 4xx, retry server errors up to 2×)
     placeholderData: () => {
       // Use the list cache to show item data instantly while detail fetches
       const listData = queryClient.getQueryData<BacklogListResponse>(['backlog-items'])
