@@ -176,7 +176,9 @@ development_status:
     status: done
     linear_id: "VIX-368"
     linear_url: ""
-  8-3-implement-backlogitemcard-component: backlog
+  8-3-implement-backlogitemcard-component:
+    status: review
+    linear_id: "VIX-369"
   8-4-implement-syncstatusindicator-component: backlog
   8-5-implement-businessunitfilter-component: backlog
   8-6-implement-emptystatewithguidance-component: backlog

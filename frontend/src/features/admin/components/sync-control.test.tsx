@@ -127,7 +127,7 @@ describe('SyncControl', () => {
     expect(screen.getByText(/42 items synced/i)).toBeInTheDocument()
   })
 
-  it('shows error alert with retry button on failure', () => {
+  it('shows error alert with retry button on failure', async () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: {
         lastSyncedAt: '2026-02-10T06:00:00.000Z',
@@ -144,16 +144,16 @@ describe('SyncControl', () => {
     })
 
     render(<SyncControl />)
-    expect(screen.getByText(/sync failed/i)).toBeInTheDocument()
-    expect(screen.getByText(/network error/i)).toBeInTheDocument()
+    expect(await screen.findByText(/sync failed/i)).toBeInTheDocument()
+    expect(await screen.findByText(/network error/i)).toBeInTheDocument()
 
-    const retryButton = screen.getByRole('button', { name: /retry/i })
+    const retryButton = await screen.findByRole('button', { name: /retry/i })
     expect(retryButton).toBeInTheDocument()
     fireEvent.click(retryButton)
     expect(mockTriggerSync).toHaveBeenCalledTimes(1)
   })
 
-  it('shows error code in error alert title', () => {
+  it('shows error code in error alert title', async () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: {
         lastSyncedAt: '2026-02-10T06:00:00.000Z',
@@ -170,10 +170,10 @@ describe('SyncControl', () => {
     })
 
     render(<SyncControl />)
-    expect(screen.getByText(/SYNC_AUTH_FAILED/)).toBeInTheDocument()
+    expect(await screen.findByText(/SYNC_AUTH_FAILED/)).toBeInTheDocument()
   })
 
-  it('shows last successful sync time in error alert', () => {
+  it('shows last successful sync time in error alert', async () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: {
         lastSyncedAt: '2026-02-10T06:00:00.000Z',
@@ -190,7 +190,7 @@ describe('SyncControl', () => {
     })
 
     render(<SyncControl />)
-    expect(screen.getByText(/Last successful sync/)).toBeInTheDocument()
+    expect(await screen.findByText(/Last successful sync/)).toBeInTheDocument()
   })
 
   it('displays last synced relative time', () => {
@@ -239,7 +239,7 @@ describe('SyncControl', () => {
     expect(await screen.findByText(/Synced with warnings/i)).toBeInTheDocument()
   })
 
-  it('shows items synced/failed counts in partial alert', () => {
+  it('shows items synced/failed counts in partial alert', async () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: {
         ...defaultSyncStatus,
@@ -255,11 +255,11 @@ describe('SyncControl', () => {
     })
 
     render(<SyncControl />)
-    expect(screen.getByText(/45 synced/)).toBeInTheDocument()
-    expect(screen.getByText(/3 failed/)).toBeInTheDocument()
+    expect(await screen.findByText(/45 synced/)).toBeInTheDocument()
+    expect(await screen.findByText(/3 failed/)).toBeInTheDocument()
   })
 
-  it('shows error code in partial alert description', () => {
+  it('shows error code in partial alert description', async () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: {
         ...defaultSyncStatus,
@@ -275,7 +275,7 @@ describe('SyncControl', () => {
     })
 
     render(<SyncControl />)
-    expect(screen.getByText(/SYNC_PARTIAL_SUCCESS/)).toBeInTheDocument()
+    expect(await screen.findByText(/SYNC_PARTIAL_SUCCESS/)).toBeInTheDocument()
   })
 
   it('handles null lastSyncedAt (never synced)', () => {

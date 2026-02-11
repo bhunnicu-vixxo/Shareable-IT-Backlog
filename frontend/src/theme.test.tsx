@@ -244,28 +244,64 @@ describe('Component Recipe Rendering', () => {
 })
 
 describe('Component Recipe Definitions', () => {
+  type SystemConfig = {
+    theme?: {
+      recipes?: {
+        button?: {
+          variants?: {
+            variant?: {
+              brand?: {
+                bg?: string
+                _hover?: { bg?: string }
+                _active?: { bg?: string }
+              }
+            }
+          }
+        }
+        badge?: {
+          variants?: {
+            variant?: {
+              warning?: { bg?: string; color?: string }
+            }
+          }
+        }
+      }
+      slotRecipes?: {
+        alert?: {
+          variants?: {
+            status?: {
+              success?: {
+                root?: { borderLeftWidth?: string; borderLeftColor?: string }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   it('defines brand button styles that reference expected tokens', () => {
-    const themeRecipes = (system as unknown as { _config?: unknown })._config as any
+    const themeRecipes = (system as unknown as { _config?: SystemConfig })._config
     const button = themeRecipes?.theme?.recipes?.button
     expect(button).toBeDefined()
-    expect(button.variants.variant.brand.bg).toBe('brand.green')
-    expect(button.variants.variant.brand._hover.bg).toBe('brand.greenHover')
-    expect(button.variants.variant.brand._active.bg).toBe('brand.greenActive')
+    expect(button?.variants?.variant?.brand?.bg).toBe('brand.green')
+    expect(button?.variants?.variant?.brand?._hover?.bg).toBe('brand.greenHover')
+    expect(button?.variants?.variant?.brand?._active?.bg).toBe('brand.greenActive')
   })
 
   it('defines badge status variants with WCAG-safe pairings', () => {
-    const themeRecipes = (system as unknown as { _config?: unknown })._config as any
+    const themeRecipes = (system as unknown as { _config?: SystemConfig })._config
     const badge = themeRecipes?.theme?.recipes?.badge
     expect(badge).toBeDefined()
-    expect(badge.variants.variant.warning.bg).toBe('brand.yellowLight')
-    expect(badge.variants.variant.warning.color).toBe('brand.gray')
+    expect(badge?.variants?.variant?.warning?.bg).toBe('brand.yellowLight')
+    expect(badge?.variants?.variant?.warning?.color).toBe('brand.gray')
   })
 
   it('defines alert slot recipe with left border accents', () => {
-    const themeRecipes = (system as unknown as { _config?: unknown })._config as any
+    const themeRecipes = (system as unknown as { _config?: SystemConfig })._config
     const alert = themeRecipes?.theme?.slotRecipes?.alert
     expect(alert).toBeDefined()
-    expect(alert.variants.status.success.root.borderLeftWidth).toBe('4px')
-    expect(alert.variants.status.success.root.borderLeftColor).toBe('brand.green')
+    expect(alert?.variants?.status?.success?.root?.borderLeftWidth).toBe('4px')
+    expect(alert?.variants?.status?.success?.root?.borderLeftColor).toBe('brand.green')
   })
 })

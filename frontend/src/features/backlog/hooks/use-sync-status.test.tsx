@@ -79,7 +79,7 @@ describe('useSyncStatus (backlog)', () => {
     } as unknown as ReturnType<typeof useQuery>)
 
     renderHook(() => useSyncStatus())
-    const options = mockUseQuery.mock.calls[0]?.[0] as any
+    const options = mockUseQuery.mock.calls[0]?.[0] as unknown as { queryFn: () => Promise<SyncStatus> }
 
     const data = await options.queryFn()
     expect(fetchSpy).toHaveBeenCalledWith(expect.stringContaining('/sync/status'))
@@ -99,7 +99,7 @@ describe('useSyncStatus (backlog)', () => {
     } as unknown as ReturnType<typeof useQuery>)
 
     renderHook(() => useSyncStatus())
-    const options = mockUseQuery.mock.calls[0]?.[0] as any
+    const options = mockUseQuery.mock.calls[0]?.[0] as unknown as { queryFn: () => Promise<SyncStatus> }
 
     await expect(options.queryFn()).rejects.toThrow('Failed to fetch sync status')
   })

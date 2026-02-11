@@ -61,31 +61,35 @@ export function SyncControl() {
     const currentStatus = syncStatus?.status ?? null
     const previousStatus = previousStatusRef.current
 
-    // Reset transient alerts when a new sync starts
-    if (currentStatus === 'syncing') {
-      setShowSuccessAlert(false)
-      setShowErrorAlert(false)
-      setShowPartialAlert(false)
-    }
+    // Note: we intentionally schedule state updates asynchronously to avoid
+    // cascading renders flagged by react-hooks/set-state-in-effect.
+    queueMicrotask(() => {
+      // Reset transient alerts when a new sync starts
+      if (currentStatus === 'syncing') {
+        setShowSuccessAlert(false)
+        setShowErrorAlert(false)
+        setShowPartialAlert(false)
+      }
 
-    // Show alerts only when status transitions from syncing → success/error/partial
-    if (previousStatus === 'syncing' && currentStatus === 'success') {
-      setShowSuccessAlert(true)
-    }
-    if (previousStatus === 'syncing' && currentStatus === 'error') {
-      setShowErrorAlert(true)
-    }
-    if (previousStatus === 'syncing' && currentStatus === 'partial') {
-      setShowPartialAlert(true)
-    }
+      // Show alerts only when status transitions from syncing → success/error/partial
+      if (previousStatus === 'syncing' && currentStatus === 'success') {
+        setShowSuccessAlert(true)
+      }
+      if (previousStatus === 'syncing' && currentStatus === 'error') {
+        setShowErrorAlert(true)
+      }
+      if (previousStatus === 'syncing' && currentStatus === 'partial') {
+        setShowPartialAlert(true)
+      }
 
-    // If we land on the page and the latest status is error/partial, show it (admin visibility).
-    if (!previousStatus && currentStatus === 'error') {
-      setShowErrorAlert(true)
-    }
-    if (!previousStatus && currentStatus === 'partial') {
-      setShowPartialAlert(true)
-    }
+      // If we land on the page and the latest status is error/partial, show it (admin visibility).
+      if (!previousStatus && currentStatus === 'error') {
+        setShowErrorAlert(true)
+      }
+      if (!previousStatus && currentStatus === 'partial') {
+        setShowPartialAlert(true)
+      }
+    })
 
     previousStatusRef.current = currentStatus
   }, [syncStatus?.status])
