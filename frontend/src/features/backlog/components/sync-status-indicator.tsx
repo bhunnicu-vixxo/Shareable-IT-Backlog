@@ -16,8 +16,9 @@ import type { SyncStatus } from '../types/backlog.types'
  * - brand.grayLight: never synced (lastSyncedAt is null)
  */
 function getStatusDotColor(syncStatus: SyncStatus | null): string {
-  if (!syncStatus || syncStatus.lastSyncedAt === null) return 'brand.grayLight'
+  if (!syncStatus) return 'brand.grayLight'
   if (syncStatus.status === 'error') return 'error.red'
+  if (syncStatus.lastSyncedAt === null) return 'brand.grayLight'
   if (syncStatus.status === 'partial') return 'brand.yellow'
 
   const lastSynced = new Date(syncStatus.lastSyncedAt)
@@ -98,7 +99,10 @@ export function SyncStatusIndicator({ compact = false }: SyncStatusIndicatorProp
           <Text fontSize="xs" color="fg.muted">
             Synced with warnings
             {syncStatus.itemsFailed != null && syncStatus.itemsFailed > 0 && (
-              <> — {syncStatus.itemsFailed} item{syncStatus.itemsFailed !== 1 ? 's' : ''} failed</>
+              <>
+                {' '}
+                — {syncStatus.itemsFailed} item{syncStatus.itemsFailed !== 1 ? 's' : ''} failed
+              </>
             )}
           </Text>
         </HStack>
@@ -143,8 +147,7 @@ export function SyncStatusIndicator({ compact = false }: SyncStatusIndicatorProp
                 {errorDisplay.title}
               </Alert.Title>
               <Alert.Description fontSize="xs" color="fg.muted">
-                {errorDisplay.description}{' '}
-                {errorDisplay.guidance}
+                {errorDisplay.description} {errorDisplay.guidance}
                 {syncStatus.lastSyncedAt && (
                   <> Last successful sync: {formatRelativeTime(syncStatus.lastSyncedAt)}.</>
                 )}
