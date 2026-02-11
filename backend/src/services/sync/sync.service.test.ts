@@ -549,7 +549,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue(mockDtos)
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
 
       await service.runSync({ triggerType: 'manual', triggeredBy: 5 })
 
@@ -592,7 +592,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue([])
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: [], failures: [] })
 
       await service.runSync({ triggerType: 'scheduled' })
 
@@ -608,7 +608,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue([])
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: [], failures: [] })
 
       await service.runSync({ triggerType: 'startup' })
 
@@ -624,7 +624,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue([])
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: [], failures: [] })
 
       await service.runSync()
 
@@ -658,7 +658,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue(mockDtos)
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
 
       await service.runSync()
 
@@ -677,7 +677,7 @@ describe('SyncService', () => {
         rateLimit: null,
         pageInfo: { hasNextPage: false, endCursor: null },
       })
-      mockToBacklogItemDtos.mockResolvedValue(mockDtos)
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
 
       await service.runSync()
 

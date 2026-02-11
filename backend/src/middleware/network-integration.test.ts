@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import { createServer, type Server } from 'http'
 import type { AddressInfo } from 'net'
 
