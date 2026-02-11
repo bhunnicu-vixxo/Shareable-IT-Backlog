@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@/utils/test-utils'
-import { BacklogItemCard } from './backlog-item-card'
+import { BacklogItemCard, BacklogItemCardSkeleton } from './backlog-item-card'
 import type { BacklogItem } from '../types/backlog.types'
 
 function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
@@ -144,5 +144,142 @@ describe('BacklogItemCard', () => {
     expect(
       screen.getByRole('article', { name: 'Implement login page, Priority High' }),
     ).toBeInTheDocument()
+  })
+
+  // --- Task 1: Description display tests ---
+
+  it('renders description when present', () => {
+    const item = createMockItem({ description: 'This is a detailed description of the task' })
+    render(<BacklogItemCard item={item} />)
+    expect(screen.getByText('This is a detailed description of the task')).toBeInTheDocument()
+  })
+
+  it('does not render description when null', () => {
+    const item = createMockItem({ description: null })
+    render(<BacklogItemCard item={item} />)
+    expect(screen.queryByText(/description/i)).not.toBeInTheDocument()
+  })
+
+  it('does not render description when empty string', () => {
+    const item = createMockItem({ description: '' })
+    render(<BacklogItemCard item={item} />)
+    // Verify no extra empty DOM nodes for description
+    const card = screen.getByRole('article', { name: 'Implement login page, Priority High' })
+    expect(card.querySelector('[data-testid="card-description"]')).not.toBeInTheDocument()
+  })
+
+  // --- Task 2: Date metadata tests ---
+
+  it('displays relative "Updated" time when updatedAt differs from createdAt', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-02-11T14:00:00.000Z'))
+
+    const item = createMockItem({
+      createdAt: '2026-02-09T10:00:00.000Z',
+      updatedAt: '2026-02-11T12:00:00.000Z',
+    })
+    render(<BacklogItemCard item={item} />)
+    expect(screen.getByText(/Updated about 2 hours ago/)).toBeInTheDocument()
+
+    vi.useRealTimers()
+  })
+
+  it('displays relative "Created" time when updatedAt equals createdAt', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-02-11T14:00:00.000Z'))
+
+    const item = createMockItem({
+      createdAt: '2026-02-09T10:00:00.000Z',
+      updatedAt: '2026-02-09T10:00:00.000Z',
+    })
+    render(<BacklogItemCard item={item} />)
+    expect(screen.getByText(/Created 2 days ago/)).toBeInTheDocument()
+
+    vi.useRealTimers()
+  })
+
+  // --- Task 3: Variant prop tests ---
+
+  it('default variant shows full layout with description and labels', () => {
+    const item = createMockItem({
+      description: 'A full description',
+      labels: [{ id: 'l1', name: 'Backend', color: '#0000ff' }],
+    })
+    render(<BacklogItemCard item={item} variant="default" />)
+    const card = screen.getByRole('article')
+    expect(card).toHaveAttribute('data-variant', 'default')
+    expect(screen.getByText('A full description')).toBeInTheDocument()
+    expect(screen.getByText('Backend')).toBeInTheDocument()
+  })
+
+  it('compact variant hides description and labels', () => {
+    const item = createMockItem({
+      description: 'Hidden description',
+      labels: [{ id: 'l1', name: 'Backend', color: '#0000ff' }],
+    })
+    render(<BacklogItemCard item={item} variant="compact" />)
+    const card = screen.getByRole('article')
+    expect(card).toHaveAttribute('data-variant', 'compact')
+    // Description and labels are rendered with display:none in compact mode
+    const description = screen.queryByTestId('card-description')
+    expect(description).toHaveStyle({ display: 'none' })
+    // Labels container is hidden
+    const labelsContainer = screen.getByText('Backend').closest('[class*="stack"]')
+    expect(labelsContainer).toHaveStyle({ display: 'none' })
+  })
+
+  it('compact variant sets data-variant attribute', () => {
+    render(<BacklogItemCard item={createMockItem()} variant="compact" />)
+    const card = screen.getByRole('article')
+    expect(card).toHaveAttribute('data-variant', 'compact')
+  })
+
+  it('omitting variant defaults to "default" behavior', () => {
+    const item = createMockItem({ description: 'Visible description' })
+    render(<BacklogItemCard item={item} />)
+    expect(screen.getByText('Visible description')).toBeInTheDocument()
+  })
+
+  it('highlights search tokens in description text', () => {
+    const item = createMockItem({ description: 'This task handles authentication flow' })
+    render(<BacklogItemCard item={item} highlightTokens={['authentication']} />)
+    // The highlighted text in the description should have a mark element
+    const descriptionEl = screen.getByTestId('card-description')
+    const marks = descriptionEl.querySelectorAll('mark')
+    expect(marks.length).toBe(1)
+    expect(marks[0].textContent).toBe('authentication')
+  })
+
+  it('strips common markdown from the description preview', () => {
+    const item = createMockItem({
+      description:
+        '**Submitter name:** Craig\n\n- Item 1\n- Item 2\n\nSee [docs](https://example.com).',
+    })
+    render(<BacklogItemCard item={item} />)
+    // We render a plain-text preview (markdown removed)
+    expect(screen.getByText(/Submitter name: Craig/)).toBeInTheDocument()
+    expect(screen.queryByText(/\*\*Submitter name:\*\*/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Item 1/)).toBeInTheDocument()
+    expect(screen.getByText(/docs/)).toBeInTheDocument()
+  })
+})
+
+describe('BacklogItemCardSkeleton', () => {
+  it('renders skeleton container', () => {
+    render(<BacklogItemCardSkeleton />)
+    const skeleton = screen.getByTestId('backlog-item-card-skeleton')
+    expect(skeleton).toBeInTheDocument()
+  })
+
+  it('renders with default variant', () => {
+    render(<BacklogItemCardSkeleton />)
+    const skeleton = screen.getByTestId('backlog-item-card-skeleton')
+    expect(skeleton).toHaveAttribute('data-variant', 'default')
+  })
+
+  it('renders with compact variant', () => {
+    render(<BacklogItemCardSkeleton variant="compact" />)
+    const skeleton = screen.getByTestId('backlog-item-card-skeleton')
+    expect(skeleton).toHaveAttribute('data-variant', 'compact')
   })
 })

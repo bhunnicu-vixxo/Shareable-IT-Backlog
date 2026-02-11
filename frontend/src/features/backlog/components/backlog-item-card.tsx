@@ -1,8 +1,29 @@
-import { Badge, Box, Flex, HStack, Text } from '@chakra-ui/react'
+import { Badge, Box, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
+import { formatDistanceToNow } from 'date-fns'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
 import { highlightText } from '../utils/highlight'
 import type { BacklogItem } from '../types/backlog.types'
+
+function descriptionPreviewFromMarkdown(input: string, maxChars: number): string {
+  // Convert common markdown patterns into a readable plain-text preview.
+  // This intentionally avoids a full markdown parse to keep the card lightweight.
+  const withoutImages = input.replace(/!\[[^\]]*?\]\([^)]+?\)/g, '')
+  const withoutLinks = withoutImages.replace(/\[([^\]]+?)\]\([^)]+?\)/g, '$1')
+  const withoutInlineCode = withoutLinks.replace(/`([^`]+?)`/g, '$1')
+  const withoutBold = withoutInlineCode.replace(/\*\*(.*?)\*\*/g, '$1')
+  const withoutItalics = withoutBold.replace(/\*(.*?)\*/g, '$1')
+  const withoutHeadings = withoutItalics.replace(/^\s{0,3}#{1,6}\s+/gm, '')
+  const withoutListMarkers = withoutHeadings.replace(/^\s*(?:[-*]|\d+\.)\s+/gm, '')
+  const normalizedWhitespace = withoutListMarkers.replace(/\s+/g, ' ').trim()
+
+  if (normalizedWhitespace.length <= maxChars) return normalizedWhitespace
+
+  const hard = normalizedWhitespace.slice(0, maxChars)
+  const lastSpace = hard.lastIndexOf(' ')
+  const clipped = lastSpace > Math.floor(maxChars * 0.7) ? hard.slice(0, lastSpace) : hard
+  return `${clipped}…`
+}
 
 export interface BacklogItemCardProps {
   item: BacklogItem
@@ -10,6 +31,8 @@ export interface BacklogItemCardProps {
   onClick?: () => void
   /** Search tokens to highlight in the title (and other visible text). Empty array = no highlights. */
   highlightTokens?: string[]
+  /** Card layout variant. "default" = full layout; "compact" = condensed without description/labels. */
+  variant?: 'default' | 'compact'
 }
 
 /**
@@ -22,8 +45,13 @@ export interface BacklogItemCardProps {
  *
  * When onClick is provided, the card is clickable and keyboard-accessible (Enter/Space to activate).
  */
-export function BacklogItemCard({ item, onClick, highlightTokens = [] }: BacklogItemCardProps) {
+export function BacklogItemCard({ item, onClick, highlightTokens = [], variant }: BacklogItemCardProps) {
   const isClickable = !!onClick
+  const hasExplicitVariant = variant !== undefined
+  const effectiveVariant = variant ?? 'default'
+  const isCompact = effectiveVariant === 'compact'
+  const descriptionPreview =
+    item.description ? descriptionPreviewFromMarkdown(item.description, 240) : null
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isClickable) return
@@ -35,13 +63,13 @@ export function BacklogItemCard({ item, onClick, highlightTokens = [] }: Backlog
 
   return (
     <Flex
-      p="4"
+      p={hasExplicitVariant ? (isCompact ? '2' : '4') : { base: '2', md: '4' }}
       borderWidth="1px"
       borderColor="gray.200"
       borderRadius="md"
       gap="4"
       alignItems="flex-start"
-      _hover={{ bg: 'gray.50' }}
+      _hover={{ bg: 'brand.grayBg' }}
       _focusVisible={{
         outline: '2px solid',
         outlineColor: 'brand.green',
@@ -55,9 +83,14 @@ export function BacklogItemCard({ item, onClick, highlightTokens = [] }: Backlog
       cursor={isClickable ? 'pointer' : undefined}
       onClick={onClick}
       onKeyDown={handleKeyDown}
+      data-variant={effectiveVariant}
     >
       {/* Left: Priority badge */}
-      <StackRankBadge priority={item.priority} priorityLabel={item.priorityLabel} />
+      <StackRankBadge
+        priority={item.priority}
+        priorityLabel={item.priorityLabel}
+        {...(isCompact ? { size: 'sm' } : {})}
+      />
 
       {/* Center: Content */}
       <Box flex="1" minWidth="0">
@@ -68,21 +101,46 @@ export function BacklogItemCard({ item, onClick, highlightTokens = [] }: Backlog
             : item.title}
         </Text>
 
+        {/* Description (truncated to 2 lines) — hidden in compact mode / mobile when no variant set */}
+        {descriptionPreview && (
+          <Text
+            fontSize="sm"
+            color="brand.grayLight"
+            lineClamp={2}
+            data-testid="card-description"
+            display={hasExplicitVariant ? (isCompact ? 'none' : 'block') : { base: 'none', md: 'block' }}
+          >
+            {highlightTokens.length > 0
+              ? highlightText(descriptionPreview, highlightTokens)
+              : descriptionPreview}
+          </Text>
+        )}
+
         {/* Metadata row */}
         <HStack gap="2" mt="1" flexWrap="wrap">
           <StatusBadge status={item.status} statusType={item.statusType} />
           {item.isNew && <NewItemBadge />}
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="brand.grayLight">
             {item.teamName}
           </Text>
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="brand.grayLight">
             {item.identifier}
+          </Text>
+          <Text fontSize="xs" color="brand.grayLight">
+            {item.updatedAt === item.createdAt
+              ? `Created ${formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}`
+              : `Updated ${formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}`}
           </Text>
         </HStack>
 
-        {/* Labels row */}
+        {/* Labels row — hidden in compact mode / mobile when no variant set */}
         {item.labels.length > 0 && (
-          <HStack gap="1" mt="1" flexWrap="wrap">
+          <HStack
+            gap="1"
+            mt="1"
+            flexWrap="wrap"
+            display={hasExplicitVariant ? (isCompact ? 'none' : 'flex') : { base: 'none', md: 'flex' }}
+          >
             {item.labels.map((label) => (
               <Box
                 key={label.id}
@@ -91,7 +149,7 @@ export function BacklogItemCard({ item, onClick, highlightTokens = [] }: Backlog
                 borderRadius="sm"
                 fontSize="xs"
                 bg="gray.100"
-                color="gray.700"
+                color="brand.gray"
               >
                 {label.name}
               </Box>
@@ -148,5 +206,39 @@ function StatusBadge({
     >
       {status}
     </Badge>
+  )
+}
+
+/**
+ * Loading skeleton matching the BacklogItemCard layout.
+ * Renders a placeholder with priority badge skeleton, title skeleton, and metadata skeleton.
+ */
+export function BacklogItemCardSkeleton({ variant }: { variant?: 'default' | 'compact' } = {}) {
+  const effectiveVariant = variant ?? 'default'
+  const isCompact = effectiveVariant === 'compact'
+
+  return (
+    <Flex
+      p={isCompact ? '2' : '4'}
+      borderWidth="1px"
+      borderRadius="md"
+      gap="4"
+      alignItems="flex-start"
+      data-testid="backlog-item-card-skeleton"
+      data-variant={effectiveVariant}
+    >
+      {/* Priority badge skeleton */}
+      <Skeleton boxSize={isCompact ? '6' : '8'} borderRadius="full" />
+
+      {/* Content skeleton */}
+      <VStack flex="1" gap="2" align="stretch">
+        {/* Title skeleton */}
+        <Skeleton height="5" width="60%" />
+        {/* Description skeleton (default only) */}
+        {!isCompact && <Skeleton height="4" width="80%" />}
+        {/* Metadata skeleton */}
+        <Skeleton height="4" width="40%" />
+      </VStack>
+    </Flex>
   )
 }
