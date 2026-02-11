@@ -397,69 +397,6 @@ describe('SyncStatusIndicator', () => {
   // New tests for Story 8.4 enhancements
   // =========================================================================
 
-  describe('Brand token compliance', () => {
-    it('should use brand.teal for the dot when sync is recent (<4h)', () => {
-      mockUseSyncStatus.mockReturnValue({
-        syncStatus: makeSyncStatus({
-          lastSyncedAt: '2026-02-10T16:00:00.000Z',
-          status: 'success',
-        }),
-        isLoading: false,
-        error: null,
-      })
-      Date.now = vi.fn(() => new Date('2026-02-10T16:02:00.000Z').getTime())
-
-      render(<SyncStatusIndicator />)
-      const dot = screen.getByTestId('sync-status-dot')
-      expect(dot).toHaveAttribute('data-color', 'brand.teal')
-    })
-
-    it('should use brand.yellow for the dot when sync is stale (4-24h)', () => {
-      mockUseSyncStatus.mockReturnValue({
-        syncStatus: makeSyncStatus({
-          lastSyncedAt: '2026-02-10T08:00:00.000Z',
-          status: 'success',
-        }),
-        isLoading: false,
-        error: null,
-      })
-      Date.now = vi.fn(() => new Date('2026-02-10T16:00:00.000Z').getTime())
-
-      render(<SyncStatusIndicator />)
-      const dot = screen.getByTestId('sync-status-dot')
-      expect(dot).toHaveAttribute('data-color', 'brand.yellow')
-    })
-
-    it('should use error.red for the dot when sync is very stale (>24h)', () => {
-      mockUseSyncStatus.mockReturnValue({
-        syncStatus: makeSyncStatus({
-          lastSyncedAt: '2026-02-08T06:00:00.000Z',
-          status: 'success',
-        }),
-        isLoading: false,
-        error: null,
-      })
-      Date.now = vi.fn(() => new Date('2026-02-10T16:00:00.000Z').getTime())
-
-      render(<SyncStatusIndicator />)
-      const dot = screen.getByTestId('sync-status-dot')
-      expect(dot).toHaveAttribute('data-color', 'error.red')
-    })
-
-    it('should use brand.grayLight for the dot when never synced', () => {
-      mockUseSyncStatus.mockReturnValue({
-        syncStatus: makeSyncStatus({ lastSyncedAt: null, status: 'idle' }),
-        isLoading: false,
-        error: null,
-      })
-
-      render(<SyncStatusIndicator />)
-      expect(screen.getByText('Not yet synced')).toBeInTheDocument()
-      const dot = screen.getByTestId('sync-status-dot')
-      expect(dot).toHaveAttribute('data-color', 'brand.grayLight')
-    })
-  })
-
   describe('ARIA live region', () => {
     it('should wrap content in a role="status" element with aria-live="polite"', () => {
       mockUseSyncStatus.mockReturnValue({

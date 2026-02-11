@@ -16,8 +16,9 @@ import type { SyncStatus } from '../types/backlog.types'
  * - brand.grayLight: never synced (lastSyncedAt is null)
  */
 function getStatusDotColor(syncStatus: SyncStatus | null): string {
-  if (!syncStatus || syncStatus.lastSyncedAt === null) return 'brand.grayLight'
+  if (!syncStatus) return 'brand.grayLight'
   if (syncStatus.status === 'error') return 'error.red'
+  if (syncStatus.lastSyncedAt === null) return 'brand.grayLight'
   if (syncStatus.status === 'partial') return 'brand.yellow'
 
   const lastSynced = new Date(syncStatus.lastSyncedAt)
