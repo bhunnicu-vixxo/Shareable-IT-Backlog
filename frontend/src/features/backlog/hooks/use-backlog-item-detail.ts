@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { API_URL } from '@/utils/constants'
 import { ApiError } from '@/utils/api-error'
 import { apiFetchJson } from '@/utils/api-fetch'
-import type { BacklogDetailResponse } from '../types/backlog.types'
+import type { BacklogDetailResponse, BacklogListResponse } from '../types/backlog.types'
 
 /**
  * Fetch a single backlog item by ID with its comments.
@@ -22,22 +22,36 @@ async function fetchBacklogItemDetail(id: string): Promise<BacklogDetailResponse
 /**
  * TanStack Query hook for fetching a single backlog item and its comments.
  *
- * - Skips fetch when id is null
+ * - Skips fetch when id is null (`enabled: !!id`)
  * - Uses queryKey: ['backlog-item', id]
- * - Provides isLoading, error, data, and refetch
- * - Does NOT retry 404 errors (item genuinely deleted)
- * - Retries other errors up to 2 times
+ * - staleTime: 2 minutes (fresher than list data at 5 min)
+ * - Does NOT retry any 4xx errors (client errors are not transient)
+ * - Retries server/network errors up to 2 times
+ * - Uses list cache as placeholderData for instant perceived navigation
  */
 export function useBacklogItemDetail(id: string | null) {
+  const queryClient = useQueryClient()
+
   return useQuery<BacklogDetailResponse, ApiError | Error>({
     queryKey: ['backlog-item', id],
     queryFn: () => fetchBacklogItemDetail(id!),
     enabled: !!id,
+    staleTime: 2 * 60 * 1000, // 2 minutes — slightly fresher than list data
     retry: (failureCount, error) => {
-      // Don't retry 404s — item is genuinely gone
-      if (error instanceof ApiError && error.isNotFound) return false
-      // Retry other errors up to 2 times
+      // Don't retry any 4xx errors — client errors are not transient
+      if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+        return false
+      }
+      // Retry server/network errors up to 2 times
       return failureCount < 2
+    },
+    placeholderData: () => {
+      // Use the list cache to show item data instantly while detail fetches
+      const listData = queryClient.getQueryData<BacklogListResponse>(['backlog-items'])
+      const item = listData?.items.find((i) => i.id === id)
+      if (!item) return undefined
+      // Return a partial detail response using list data as placeholder
+      return { item, comments: [], activities: [] }
     },
   })
 }

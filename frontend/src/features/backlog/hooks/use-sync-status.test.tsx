@@ -82,7 +82,10 @@ describe('useSyncStatus (backlog)', () => {
     const options = mockUseQuery.mock.calls[0]?.[0] as unknown as { queryFn: () => Promise<SyncStatus> }
 
     const data = await options.queryFn()
-    expect(fetchSpy).toHaveBeenCalledWith(expect.stringContaining('/sync/status'))
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/sync/status'),
+      expect.objectContaining({ credentials: 'include' }),
+    )
     expect(data).toEqual(mockSuccessStatus)
   })
 

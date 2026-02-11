@@ -191,8 +191,11 @@ development_status:
   epic-8-retrospective: optional
 
   # Epic 9: Performance & Optimization
-  epic-9: backlog
-  9-1-implement-client-side-caching-and-state-management: backlog
+  epic-9: in-progress
+  9-1-implement-client-side-caching-and-state-management:
+    status: done
+    linear_id: "VIX-374"
+    linear_url: "https://linear.app/vixxo/issue/VIX-374/implement-client-side-caching-and-state-management"
   9-2-implement-virtual-scrolling-or-pagination: backlog
   9-3-optimize-api-response-times: backlog
   9-4-implement-loading-states-and-skeleton-screens: backlog

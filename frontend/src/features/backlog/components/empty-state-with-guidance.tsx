@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Button, EmptyState, HStack } from '@chakra-ui/react'
 import { FilterX, SearchX } from 'lucide-react'
 
@@ -86,7 +87,7 @@ function getDescription(
  * Built on Chakra UI v3 EmptyState parts with contextual icons, headings,
  * descriptions, and action buttons based on active filter combination.
  */
-export function EmptyStateWithGuidance({
+export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
   keyword,
   businessUnit,
   showNewOnly,
@@ -169,4 +170,5 @@ export function EmptyStateWithGuidance({
       </HStack>
     </EmptyState.Root>
   )
-}
+})
+EmptyStateWithGuidance.displayName = 'EmptyStateWithGuidance'

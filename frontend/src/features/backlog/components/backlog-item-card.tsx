@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Badge, Box, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { formatDistanceToNow } from 'date-fns'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
@@ -45,7 +46,7 @@ export interface BacklogItemCardProps {
  *
  * When onClick is provided, the card is clickable and keyboard-accessible (Enter/Space to activate).
  */
-export function BacklogItemCard({ item, onClick, highlightTokens = [], variant }: BacklogItemCardProps) {
+export const BacklogItemCard = memo(function BacklogItemCard({ item, onClick, highlightTokens = [], variant }: BacklogItemCardProps) {
   const isClickable = !!onClick
   const hasExplicitVariant = variant !== undefined
   const effectiveVariant = variant ?? 'default'
@@ -159,7 +160,8 @@ export function BacklogItemCard({ item, onClick, highlightTokens = [], variant }
       </Box>
     </Flex>
   )
-}
+})
+BacklogItemCard.displayName = 'BacklogItemCard'
 
 /**
  * "New" badge for items recently added to the backlog.
