@@ -9,5 +9,7 @@ const PORT = Number.isFinite(portFromEnv) ? portFromEnv : 3000
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, 'Server started')
-  syncScheduler.start()
+  syncScheduler.start().catch((error) => {
+    logger.error({ error }, 'Failed to start sync scheduler')
+  })
 })
