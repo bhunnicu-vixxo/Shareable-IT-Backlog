@@ -1,10 +1,11 @@
 import cron from 'node-cron'
 
 import { syncService } from './sync.service.js'
+import { getSyncCronSchedule } from '../settings/app-settings.service.js'
 import { logger } from '../../utils/logger.js'
 
-/** Default cron schedule: 6 AM and 12 PM daily. */
-const DEFAULT_CRON_SCHEDULE = '0 6,12 * * *'
+/** Hard-coded fallback used only when both DB and env are unavailable. */
+const FALLBACK_CRON_SCHEDULE = '*/15 * * * *'
 
 function isEnvFalse(value: string | undefined): boolean {
   if (!value) return false
@@ -15,9 +16,12 @@ function isEnvFalse(value: string | undefined): boolean {
 /**
  * Manages the cron-based scheduling of automatic sync operations.
  *
- * Reads configuration from environment variables:
- * - `SYNC_ENABLED` — set to `"false"` to disable entirely (default: `true`)
- * - `SYNC_CRON_SCHEDULE` — cron expression (default: `0 6,12 * * *`)
+ * Reads configuration from:
+ * 1. `app_settings` database table (`sync_cron_schedule` key)
+ * 2. `SYNC_CRON_SCHEDULE` environment variable (legacy fallback)
+ * 3. Hard-coded default: every 15 minutes
+ *
+ * `SYNC_ENABLED` env var can still disable scheduling entirely.
  *
  * On `start()`, validates the cron expression, creates the scheduled task,
  * and fires an immediate initial sync so the cache is populated without
@@ -25,15 +29,18 @@ function isEnvFalse(value: string | undefined): boolean {
  */
 class SyncSchedulerService {
   private task: cron.ScheduledTask | null = null
+  private currentSchedule: string | null = null
 
   /**
    * Start the sync scheduler.
    *
-   * Creates a cron task and fires an initial sync immediately.
+   * Reads the cron schedule from the database (falling back to env / default),
+   * creates a cron task, and fires an initial sync immediately.
+   *
    * No-ops (with a log) if `SYNC_ENABLED` is `"false"` or the cron
    * expression is invalid.
    */
-  start(): void {
+  async start(): Promise<void> {
     if (isEnvFalse(process.env.SYNC_ENABLED)) {
       // If we were already running, ensure we stop.
       this.stop()
@@ -52,23 +59,33 @@ class SyncSchedulerService {
       return
     }
 
-    const schedule = process.env.SYNC_CRON_SCHEDULE || DEFAULT_CRON_SCHEDULE
+    let schedule: string
+    try {
+      schedule = await getSyncCronSchedule()
+    } catch {
+      logger.warn(
+        { service: 'sync-scheduler', schedule: FALLBACK_CRON_SCHEDULE },
+        'Failed to read sync schedule from database — using fallback',
+      )
+      schedule = FALLBACK_CRON_SCHEDULE
+    }
 
     if (!cron.validate(schedule)) {
       logger.error(
         { service: 'sync-scheduler', schedule },
-        'Invalid SYNC_CRON_SCHEDULE — scheduler not started',
+        'Invalid sync cron schedule — scheduler not started',
       )
       return
     }
 
+    this.currentSchedule = schedule
     this.task = cron.schedule(schedule, async () => {
       logger.info({ service: 'sync-scheduler' }, 'Scheduled sync triggered')
       await syncService.runSync({ triggerType: 'scheduled', triggeredBy: null })
     })
 
     logger.info(
-      { service: 'sync-scheduler', schedule },
+      { service: 'sync-scheduler', schedule, source: 'database' },
       'Sync scheduler started',
     )
 
@@ -89,8 +106,20 @@ class SyncSchedulerService {
     if (this.task) {
       this.task.stop()
       this.task = null
+      this.currentSchedule = null
       logger.info({ service: 'sync-scheduler' }, 'Sync scheduler stopped')
     }
+  }
+
+  /**
+   * Restart the scheduler with the latest schedule from the database.
+   *
+   * Useful after an admin updates the cron schedule via the API — call
+   * `restart()` to pick up the new value without a server restart.
+   */
+  async restart(): Promise<void> {
+    this.stop()
+    await this.start()
   }
 
   /**
@@ -98,6 +127,13 @@ class SyncSchedulerService {
    */
   isRunning(): boolean {
     return this.task !== null
+  }
+
+  /**
+   * The cron expression the scheduler is currently using, or null if stopped.
+   */
+  getSchedule(): string | null {
+    return this.currentSchedule
   }
 }
 

@@ -1,7 +1,10 @@
 import type { Request, Response, NextFunction } from 'express'
+import cron from 'node-cron'
 import { getPendingUsers, approveUser, getAllUsers, disableUser, enableUser } from '../services/users/user.service.js'
 import { syncService } from '../services/sync/sync.service.js'
+import { syncScheduler } from '../services/sync/sync-scheduler.service.js'
 import { listSyncHistory } from '../services/sync/sync-history.service.js'
+import { getSyncCronSchedule, setSyncCronSchedule } from '../services/settings/app-settings.service.js'
 import { logger } from '../utils/logger.js'
 
 /**
@@ -143,6 +146,74 @@ export async function getSyncHistory(req: Request, res: Response, next: NextFunc
 
     const history = await listSyncHistory({ limit })
     res.json(history)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * GET /api/admin/settings/sync-schedule
+ * Returns the current sync cron schedule and whether the scheduler is running.
+ */
+export async function getSyncSchedule(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const schedule = await getSyncCronSchedule()
+    res.json({
+      schedule,
+      isRunning: syncScheduler.isRunning(),
+      activeSchedule: syncScheduler.getSchedule(),
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * PUT /api/admin/settings/sync-schedule
+ * Updates the sync cron schedule in the database and restarts the scheduler.
+ *
+ * Request body: `{ "schedule": "<cron expression>" }` (e.g. every 15 min)
+ */
+export async function updateSyncSchedule(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { schedule } = req.body as { schedule?: string }
+
+    if (!schedule || typeof schedule !== 'string' || !schedule.trim()) {
+      res.status(400).json({
+        error: {
+          message: 'Missing required field: schedule (cron expression)',
+          code: 'VALIDATION_ERROR',
+        },
+      })
+      return
+    }
+
+    const trimmed = schedule.trim()
+
+    if (!cron.validate(trimmed)) {
+      res.status(400).json({
+        error: {
+          message: `Invalid cron expression: "${trimmed}"`,
+          code: 'VALIDATION_ERROR',
+        },
+      })
+      return
+    }
+
+    // Persist to database
+    await setSyncCronSchedule(trimmed)
+
+    // Restart the scheduler to pick up the new schedule
+    await syncScheduler.restart()
+
+    const adminId = Number(req.session.userId)
+    logger.info({ adminId, schedule: trimmed }, 'Admin updated sync schedule')
+
+    res.json({
+      schedule: trimmed,
+      isRunning: syncScheduler.isRunning(),
+      activeSchedule: syncScheduler.getSchedule(),
+    })
   } catch (err) {
     next(err)
   }
