@@ -179,7 +179,9 @@ development_status:
   8-3-implement-backlogitemcard-component:
     status: review
     linear_id: "VIX-369"
-  8-4-implement-syncstatusindicator-component: backlog
+  8-4-implement-syncstatusindicator-component:
+    status: done
+    linear_id: "VIX-370"
   8-5-implement-businessunitfilter-component: backlog
   8-6-implement-emptystatewithguidance-component: backlog
   epic-8-retrospective: optional
