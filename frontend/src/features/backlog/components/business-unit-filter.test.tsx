@@ -22,6 +22,7 @@ function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
     completedAt: null,
     dueDate: null,
     sortOrder: 1.0,
+    prioritySortOrder: 1.0,
     url: 'https://linear.app/vixxo/issue/VIX-1',
     isNew: false,
     ...overrides,
@@ -102,22 +103,23 @@ describe('BusinessUnitFilter', () => {
     expect(screen.getByRole('option', { name: 'All Business Units' })).toBeInTheDocument()
   })
 
-  it('calls onChange with selected business unit value via keyboard', async () => {
+  it('calls onChange with selected business unit value', async () => {
     const onChange = vi.fn()
     render(
       <BusinessUnitFilter items={mockItems} value={null} onChange={onChange} />,
     )
 
-    const trigger = screen.getByRole('combobox')
+    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
     fireEvent.click(trigger)
-    fireEvent.click(await screen.findByRole('option', { name: 'Finance' }))
+    const option = await screen.findByRole('option', { name: 'Finance' })
+    fireEvent.click(option)
 
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith('Finance')
     })
   })
 
-  it('calls onChange with null when "All Business Units" is selected via keyboard', async () => {
+  it('calls onChange with null when "All Business Units" is selected', async () => {
     const onChange = vi.fn()
     render(
       <BusinessUnitFilter
@@ -127,9 +129,10 @@ describe('BusinessUnitFilter', () => {
       />,
     )
 
-    const trigger = screen.getByRole('combobox')
+    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
     fireEvent.click(trigger)
-    fireEvent.click(await screen.findByRole('option', { name: 'All Business Units' }))
+    const option = await screen.findByRole('option', { name: 'All Business Units' })
+    fireEvent.click(option)
 
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith(null)

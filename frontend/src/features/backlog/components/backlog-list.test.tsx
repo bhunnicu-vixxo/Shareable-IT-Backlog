@@ -27,6 +27,7 @@ function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
     completedAt: null,
     dueDate: null,
     sortOrder: 1.0,
+    prioritySortOrder: 1.0,
     url: 'https://linear.app/vixxo/issue/VIX-1',
     isNew: false,
     ...overrides,
@@ -131,6 +132,42 @@ describe('BacklogList', () => {
     })
     expect(screen.getByText('Service temporarily unavailable')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Try Again' })).toBeInTheDocument()
+  })
+
+  it('preserves stale data when refetch fails but cached data exists (AC #2)', async () => {
+    const { focusManager } = await import('@tanstack/react-query')
+
+    // Phase 1: Load data successfully
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Stale item A' }),
+        createMockItem({ id: '2', title: 'Stale item B' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Stale item A')).toBeInTheDocument()
+    })
+
+    // Phase 2: Make subsequent fetches fail, then trigger refetch via focus
+    mockFetchError('Linear API unavailable')
+    focusManager.setFocused(true)
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalled()
+    })
+
+    // Items should still be visible (stale data preserved, not error state)
+    expect(screen.getByText('Stale item A')).toBeInTheDocument()
+    expect(screen.getByText('Stale item B')).toBeInTheDocument()
+    expect(screen.queryByText('Failed to load backlog items')).not.toBeInTheDocument()
+
+    // Cleanup focusManager state
+    focusManager.setFocused(undefined)
   })
 
   it('shows empty state when no items returned', async () => {
@@ -357,9 +394,10 @@ describe('BacklogList', () => {
       expect(screen.getByText('Ops item')).toBeInTheDocument()
     })
 
-    const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    fireEvent.click(combobox)
-    fireEvent.click(await screen.findByRole('option', { name: 'Finance' }))
+    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    fireEvent.click(trigger)
+    const financeOption = await screen.findByRole('option', { name: 'Finance' })
+    fireEvent.click(financeOption)
 
     await waitFor(() => {
       expect(screen.getByText('Fin item')).toBeInTheDocument()
@@ -386,9 +424,10 @@ describe('BacklogList', () => {
       expect(screen.getByText('Showing 3 items')).toBeInTheDocument()
     })
 
-    const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    fireEvent.click(combobox)
-    fireEvent.click(await screen.findByRole('option', { name: 'Operations' }))
+    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    fireEvent.click(trigger)
+    const operationsOption = await screen.findByRole('option', { name: 'Operations' })
+    fireEvent.click(operationsOption)
 
     await waitFor(() => {
       expect(screen.getByText('Showing 2 items for Operations')).toBeInTheDocument()
@@ -413,9 +452,10 @@ describe('BacklogList', () => {
       expect(screen.getByText('Ops old')).toBeInTheDocument()
     })
 
-    const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    fireEvent.click(combobox)
-    fireEvent.click(await screen.findByRole('option', { name: 'Operations' }))
+    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    fireEvent.click(trigger)
+    const operationsOption = await screen.findByRole('option', { name: 'Operations' })
+    fireEvent.click(operationsOption)
 
     await waitFor(() => {
       expect(screen.queryByText('Fin new')).not.toBeInTheDocument()
@@ -450,9 +490,10 @@ describe('BacklogList', () => {
       expect(screen.getByText('Ops item')).toBeInTheDocument()
     })
 
-    const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    fireEvent.click(combobox)
-    fireEvent.click(await screen.findByRole('option', { name: 'Finance' }))
+    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    fireEvent.click(trigger)
+    const financeOption = await screen.findByRole('option', { name: 'Finance' })
+    fireEvent.click(financeOption)
 
     await waitFor(() => {
       expect(screen.getByText('Fin item')).toBeInTheDocument()
@@ -486,9 +527,10 @@ describe('BacklogList', () => {
       expect(screen.getByText('Ops item')).toBeInTheDocument()
     })
 
-    const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    fireEvent.click(combobox)
-    fireEvent.click(await screen.findByRole('option', { name: 'Finance' }))
+    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    fireEvent.click(trigger)
+    const financeOption = await screen.findByRole('option', { name: 'Finance' })
+    fireEvent.click(financeOption)
 
     await waitFor(() => {
       expect(screen.getByText('Fin item')).toBeInTheDocument()
@@ -528,10 +570,10 @@ describe('BacklogList', () => {
       expect(screen.getByText('Ops item')).toBeInTheDocument()
     })
 
-    // Select Finance
-    const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    fireEvent.click(combobox)
-    fireEvent.click(await screen.findByRole('option', { name: 'Finance' }))
+    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    fireEvent.click(trigger)
+    const financeOption = await screen.findByRole('option', { name: 'Finance' })
+    fireEvent.click(financeOption)
 
     await waitFor(() => {
       expect(screen.getByText('Fin item')).toBeInTheDocument()
@@ -1027,10 +1069,10 @@ describe('BacklogList', () => {
       expect(screen.getByText('Newest')).toBeInTheDocument()
     })
 
-    // Change sort field to Date Created
-    const sortCombobox = screen.getByRole('combobox', { name: /sort backlog items/i })
-    fireEvent.click(sortCombobox)
-    fireEvent.click(await screen.findByRole('option', { name: 'Date Created' }))
+    const trigger = screen.getByRole('combobox', { name: /sort backlog items/i })
+    fireEvent.click(trigger)
+    const option = await screen.findByRole('option', { name: 'Date Created' })
+    fireEvent.click(option)
 
     // Ascending date: oldest first → Oldest, Middle, Newest
     // Cards use role="button" with aria-label like "Title, Priority Label"

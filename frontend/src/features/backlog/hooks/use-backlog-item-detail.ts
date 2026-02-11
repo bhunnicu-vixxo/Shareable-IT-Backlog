@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { API_URL } from '@/utils/constants'
 import { ApiError } from '@/utils/api-error'
+import { apiFetchJson } from '@/utils/api-fetch'
 import type { BacklogDetailResponse } from '../types/backlog.types'
 
 /**
@@ -11,20 +12,11 @@ import type { BacklogDetailResponse } from '../types/backlog.types'
  * from transient server errors.
  */
 async function fetchBacklogItemDetail(id: string): Promise<BacklogDetailResponse> {
-  const res = await fetch(`${API_URL}/backlog-items/${encodeURIComponent(id)}`)
-  if (!res.ok) {
-    let message = 'Failed to load item details. Please try again.'
-    let code = 'UNKNOWN_ERROR'
-    try {
-      const errorBody = await res.json()
-      message = errorBody?.error?.message ?? message
-      code = errorBody?.error?.code ?? code
-    } catch {
-      // Response body not parseable — use defaults
-    }
-    throw new ApiError(message, res.status, code)
-  }
-  return res.json() as Promise<BacklogDetailResponse>
+  return apiFetchJson<BacklogDetailResponse>(
+    `${API_URL}/backlog-items/${encodeURIComponent(id)}`,
+    undefined,
+    { fallbackMessage: 'Failed to load item details. Please try again.' },
+  )
 }
 
 /**

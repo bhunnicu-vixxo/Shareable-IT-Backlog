@@ -30,6 +30,8 @@ const defaultSyncStatus: SyncStatus = {
   itemCount: 42,
   errorMessage: null,
   errorCode: null,
+  itemsSynced: null,
+  itemsFailed: null,
 }
 
 describe('SyncControl', () => {
@@ -122,6 +124,8 @@ describe('SyncControl', () => {
         itemCount: null,
         errorMessage: 'Network error',
         errorCode: 'SYNC_UNKNOWN_ERROR',
+        itemsSynced: null,
+        itemsFailed: null,
       },
       isLoading: false,
       error: null,
@@ -146,6 +150,8 @@ describe('SyncControl', () => {
         itemCount: null,
         errorMessage: 'Linear API authentication failed',
         errorCode: 'SYNC_AUTH_FAILED',
+        itemsSynced: null,
+        itemsFailed: null,
       },
       isLoading: false,
       error: null,
@@ -164,6 +170,8 @@ describe('SyncControl', () => {
         itemCount: null,
         errorMessage: 'Connection refused',
         errorCode: 'SYNC_API_UNAVAILABLE',
+        itemsSynced: null,
+        itemsFailed: null,
       },
       isLoading: false,
       error: null,
@@ -188,6 +196,77 @@ describe('SyncControl', () => {
     expect(matches.length).toBeGreaterThanOrEqual(1)
   })
 
+  it('shows partial success alert after sync transitions to partial', async () => {
+    const partialStatus = {
+      ...defaultSyncStatus,
+      status: 'partial' as const,
+      itemsSynced: 45,
+      itemsFailed: 3,
+      errorCode: 'SYNC_PARTIAL_SUCCESS',
+      errorMessage: '3 item(s) failed to sync',
+    }
+
+    mockUseSyncStatus.mockReturnValueOnce({
+      syncStatus: { ...defaultSyncStatus, status: 'syncing' },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    const { rerender } = render(<SyncControl />)
+    expect(screen.queryByText(/Synced with warnings/i)).not.toBeInTheDocument()
+
+    // Switch to persistent partial status for subsequent renders
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: partialStatus,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    rerender(<SyncControl />)
+    expect(await screen.findByText(/Synced with warnings/i)).toBeInTheDocument()
+  })
+
+  it('shows items synced/failed counts in partial alert', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: {
+        ...defaultSyncStatus,
+        status: 'partial',
+        itemsSynced: 45,
+        itemsFailed: 3,
+        errorCode: 'SYNC_PARTIAL_SUCCESS',
+        errorMessage: '3 item(s) failed to sync',
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    render(<SyncControl />)
+    expect(screen.getByText(/45 synced/)).toBeInTheDocument()
+    expect(screen.getByText(/3 failed/)).toBeInTheDocument()
+  })
+
+  it('shows error code in partial alert description', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: {
+        ...defaultSyncStatus,
+        status: 'partial',
+        itemsSynced: 45,
+        itemsFailed: 3,
+        errorCode: 'SYNC_PARTIAL_SUCCESS',
+        errorMessage: '3 item(s) failed to sync',
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    render(<SyncControl />)
+    expect(screen.getByText(/SYNC_PARTIAL_SUCCESS/)).toBeInTheDocument()
+  })
+
   it('handles null lastSyncedAt (never synced)', () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: {
@@ -195,6 +274,9 @@ describe('SyncControl', () => {
         status: 'idle',
         itemCount: null,
         errorMessage: null,
+        errorCode: null,
+        itemsSynced: null,
+        itemsFailed: null,
       },
       isLoading: false,
       error: null,

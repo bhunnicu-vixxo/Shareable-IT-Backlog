@@ -24,6 +24,8 @@ const mockSyncingStatus: SyncStatus = {
   itemCount: null,
   errorMessage: null,
   errorCode: null,
+  itemsSynced: null,
+  itemsFailed: null,
 }
 
 describe('useSyncTrigger', () => {

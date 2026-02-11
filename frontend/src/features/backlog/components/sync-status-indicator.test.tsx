@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@/utils/test-utils'
+import { render, screen, fireEvent } from '@/utils/test-utils'
 import { SyncStatusIndicator } from './sync-status-indicator'
 import type { SyncStatus } from '../types/backlog.types'
 
@@ -7,6 +7,18 @@ import type { SyncStatus } from '../types/backlog.types'
 vi.mock('../hooks/use-sync-status', () => ({
   useSyncStatus: vi.fn(),
 }))
+
+// Mock useQueryClient from TanStack Query
+const mockInvalidateQueries = vi.fn()
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>()
+  return {
+    ...actual,
+    useQueryClient: () => ({
+      invalidateQueries: mockInvalidateQueries,
+    }),
+  }
+})
 
 // Import the mocked module to control return values per test
 import { useSyncStatus } from '../hooks/use-sync-status'
@@ -47,6 +59,8 @@ function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
     itemCount: 42,
     errorMessage: null,
     errorCode: null,
+    itemsSynced: null,
+    itemsFailed: null,
     ...overrides,
   }
 }
@@ -56,6 +70,7 @@ describe('SyncStatusIndicator', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks()
+    mockInvalidateQueries.mockClear()
     // Default: loading state
     vi.mocked(useSyncStatus).mockReturnValue({
       syncStatus: null,
@@ -239,5 +254,129 @@ describe('SyncStatusIndicator', () => {
 
     render(<SyncStatusIndicator />)
     expect(screen.getByText(/Data shown may be outdated/)).toBeInTheDocument()
+  })
+
+  it('should render "Refresh data" button in error state', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: makeSyncStatus({
+        status: 'error',
+        errorMessage: 'Connection refused',
+        errorCode: 'SYNC_API_UNAVAILABLE',
+      }),
+      isLoading: false,
+      error: null,
+    })
+
+    render(<SyncStatusIndicator />)
+    const refreshBtn = screen.getByTestId('sync-error-refresh-btn')
+    expect(refreshBtn).toBeInTheDocument()
+    expect(refreshBtn).toHaveTextContent('Refresh data')
+    expect(refreshBtn).toHaveAttribute('aria-label', 'Refresh backlog data')
+  })
+
+  it('should call invalidateQueries when "Refresh data" button is clicked', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: makeSyncStatus({
+        status: 'error',
+        errorMessage: 'Connection refused',
+        errorCode: 'SYNC_API_UNAVAILABLE',
+      }),
+      isLoading: false,
+      error: null,
+    })
+
+    render(<SyncStatusIndicator />)
+    const refreshBtn = screen.getByTestId('sync-error-refresh-btn')
+    fireEvent.click(refreshBtn)
+
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['backlog-items'] })
+  })
+
+  it('should render yellow dot with "Synced with warnings" when status is partial', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: makeSyncStatus({
+        status: 'partial',
+        itemsSynced: 45,
+        itemsFailed: 3,
+        errorCode: 'SYNC_PARTIAL_SUCCESS',
+        errorMessage: '3 item(s) failed to sync',
+      }),
+      isLoading: false,
+      error: null,
+    })
+
+    render(<SyncStatusIndicator />)
+    const dot = screen.getByTestId('sync-status-dot')
+    expect(dot).toBeInTheDocument()
+    expect(dot).toHaveAttribute('data-color', 'yellow.500')
+    expect(screen.getByText(/Synced with warnings/)).toBeInTheDocument()
+  })
+
+  it('should show count of failed items in partial status', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: makeSyncStatus({
+        status: 'partial',
+        itemsSynced: 45,
+        itemsFailed: 3,
+        errorCode: 'SYNC_PARTIAL_SUCCESS',
+      }),
+      isLoading: false,
+      error: null,
+    })
+
+    render(<SyncStatusIndicator />)
+    expect(screen.getByText(/3 items failed/)).toBeInTheDocument()
+  })
+
+  it('should show singular "item" when exactly 1 item failed in partial status', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: makeSyncStatus({
+        status: 'partial',
+        itemsSynced: 49,
+        itemsFailed: 1,
+        errorCode: 'SYNC_PARTIAL_SUCCESS',
+      }),
+      isLoading: false,
+      error: null,
+    })
+
+    render(<SyncStatusIndicator />)
+    expect(screen.getByText(/1 item failed/)).toBeInTheDocument()
+    // Should NOT have plural "items"
+    expect(screen.queryByText(/1 items failed/)).not.toBeInTheDocument()
+  })
+
+  it('should not show error alert banner for partial status', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: makeSyncStatus({
+        status: 'partial',
+        itemsSynced: 45,
+        itemsFailed: 3,
+        errorCode: 'SYNC_PARTIAL_SUCCESS',
+      }),
+      isLoading: false,
+      error: null,
+    })
+
+    render(<SyncStatusIndicator />)
+    // Should NOT render the error alert
+    expect(screen.queryByTestId('sync-error-title')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sync-error-refresh-btn')).not.toBeInTheDocument()
+  })
+
+  it('should not render "Refresh data" button when status is success', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: makeSyncStatus({
+        status: 'success',
+        lastSyncedAt: '2026-02-10T16:00:00.000Z',
+      }),
+      isLoading: false,
+      error: null,
+    })
+
+    Date.now = vi.fn(() => new Date('2026-02-10T16:02:00.000Z').getTime())
+
+    render(<SyncStatusIndicator />)
+    expect(screen.queryByTestId('sync-error-refresh-btn')).not.toBeInTheDocument()
   })
 })

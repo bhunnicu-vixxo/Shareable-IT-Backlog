@@ -30,8 +30,12 @@ vi.mock('../utils/logger.js', () => ({
 describe('Sync Routes (route integration)', () => {
   let server: Server
   let baseUrl: string
+  let originalNetworkCheckEnabled: string | undefined
 
   beforeAll(async () => {
+    // Disable network verification for route integration tests
+    originalNetworkCheckEnabled = process.env.NETWORK_CHECK_ENABLED
+    process.env.NETWORK_CHECK_ENABLED = 'false'
     const { default: app } = await import('../app.js')
     server = createServer(app)
 
@@ -47,6 +51,11 @@ describe('Sync Routes (route integration)', () => {
     await new Promise<void>((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()))
     })
+    if (originalNetworkCheckEnabled !== undefined) {
+      process.env.NETWORK_CHECK_ENABLED = originalNetworkCheckEnabled
+    } else {
+      delete process.env.NETWORK_CHECK_ENABLED
+    }
   })
 
   beforeEach(() => {
@@ -62,6 +71,8 @@ describe('Sync Routes (route integration)', () => {
         itemCount: 42,
         errorMessage: null,
         errorCode: null,
+        itemsSynced: null,
+        itemsFailed: null,
       }
       mockGetStatus.mockReturnValue(mockStatus)
 
@@ -95,8 +106,10 @@ describe('Sync Routes (route integration)', () => {
           status: 'error',
           itemCount: null,
           errorMessage: 'Network error',
-          errorCode: 'SYNC_UNKNOWN_ERROR',
-        }
+        errorCode: 'SYNC_UNKNOWN_ERROR',
+        itemsSynced: null,
+        itemsFailed: null,
+      }
         mockGetStatus.mockReturnValue(mockStatus)
 
         const res = await fetch(`${baseUrl}/api/sync/status`)
@@ -121,8 +134,10 @@ describe('Sync Routes (route integration)', () => {
           status: 'error',
           itemCount: null,
           errorMessage: 'Network error',
-          errorCode: 'SYNC_UNKNOWN_ERROR',
-        }
+        errorCode: 'SYNC_UNKNOWN_ERROR',
+        itemsSynced: null,
+        itemsFailed: null,
+      }
         mockGetStatus.mockReturnValue(mockStatus)
 
         const res = await fetch(`${baseUrl}/api/sync/status`, {
@@ -145,6 +160,8 @@ describe('Sync Routes (route integration)', () => {
         itemCount: null,
         errorMessage: null,
         errorCode: null,
+        itemsSynced: null,
+        itemsFailed: null,
       }
       const syncingStatus: SyncStatusResponse = {
         lastSyncedAt: null,
@@ -152,6 +169,8 @@ describe('Sync Routes (route integration)', () => {
         itemCount: null,
         errorMessage: null,
         errorCode: null,
+        itemsSynced: null,
+        itemsFailed: null,
       }
       mockGetStatus.mockReturnValueOnce(idleStatus).mockReturnValueOnce(syncingStatus)
 
@@ -168,6 +187,8 @@ describe('Sync Routes (route integration)', () => {
         itemCount: null,
         errorMessage: null,
         errorCode: null,
+        itemsSynced: null,
+        itemsFailed: null,
       }
       mockGetStatus.mockReturnValue(syncingStatus)
 
@@ -185,6 +206,8 @@ describe('Sync Routes (route integration)', () => {
         itemCount: null,
         errorMessage: null,
         errorCode: null,
+        itemsSynced: null,
+        itemsFailed: null,
       }
       mockGetStatus.mockReturnValue(idleStatus)
 
@@ -205,6 +228,8 @@ describe('Sync Routes (route integration)', () => {
           itemCount: null,
           errorMessage: null,
           errorCode: null,
+          itemsSynced: null,
+          itemsFailed: null,
         })
 
         const res = await fetch(`${baseUrl}/api/sync/trigger`, { method: 'POST' })
@@ -231,6 +256,8 @@ describe('Sync Routes (route integration)', () => {
           itemCount: null,
           errorMessage: null,
           errorCode: null,
+          itemsSynced: null,
+          itemsFailed: null,
         }
         const syncingStatus: SyncStatusResponse = {
           lastSyncedAt: null,
@@ -238,6 +265,8 @@ describe('Sync Routes (route integration)', () => {
           itemCount: null,
           errorMessage: null,
           errorCode: null,
+          itemsSynced: null,
+          itemsFailed: null,
         }
         mockGetStatus.mockReturnValueOnce(idleStatus).mockReturnValueOnce(syncingStatus)
 

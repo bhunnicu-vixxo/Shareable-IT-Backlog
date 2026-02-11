@@ -55,8 +55,10 @@ export interface BacklogItemDto {
   completedAt: string | null
   /** ISO 8601 date string or null */
   dueDate: string | null
-  /** Linear's sort order for priority display */
+  /** Linear's general sort order */
   sortOrder: number
+  /** Linear's sort order within the priority view */
+  prioritySortOrder: number
   /** Deep-link URL to the issue in Linear */
   url: string
   /** Whether the item is considered "new" (created within configurable threshold) */

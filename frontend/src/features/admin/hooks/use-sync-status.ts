@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { API_URL, SYNC_TRIGGER_TOKEN } from '@/utils/constants'
+import { apiFetchJson } from '@/utils/api-fetch'
 import type { SyncStatus } from '@/features/backlog/types/backlog.types'
 
 export function getSyncStatusRefetchInterval(
@@ -28,13 +29,11 @@ export function useSyncStatus(options?: { pollWhileSyncing?: boolean }) {
   const query = useQuery<SyncStatus>({
     queryKey: ['sync-status'],
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/sync/status`, {
+      return apiFetchJson<SyncStatus>(`${API_URL}/sync/status`, {
         headers: getAdminAuthHeaders(),
+      }, {
+        fallbackMessage: 'Failed to fetch sync status',
       })
-      if (!response.ok) {
-        throw new Error('Failed to fetch sync status')
-      }
-      return response.json()
     },
     // Poll every 2s while syncing, otherwise don't poll
     refetchInterval: (query) => {

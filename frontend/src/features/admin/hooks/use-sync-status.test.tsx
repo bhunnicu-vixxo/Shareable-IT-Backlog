@@ -22,6 +22,8 @@ const mockIdleStatus: SyncStatus = {
   itemCount: null,
   errorMessage: null,
   errorCode: null,
+  itemsSynced: null,
+  itemsFailed: null,
 }
 
 const mockSyncingStatus: SyncStatus = {
@@ -30,6 +32,8 @@ const mockSyncingStatus: SyncStatus = {
   itemCount: null,
   errorMessage: null,
   errorCode: null,
+  itemsSynced: null,
+  itemsFailed: null,
 }
 
 const mockSuccessStatus: SyncStatus = {
@@ -38,6 +42,8 @@ const mockSuccessStatus: SyncStatus = {
   itemCount: 42,
   errorMessage: null,
   errorCode: null,
+  itemsSynced: null,
+  itemsFailed: null,
 }
 
 describe('useSyncStatus', () => {

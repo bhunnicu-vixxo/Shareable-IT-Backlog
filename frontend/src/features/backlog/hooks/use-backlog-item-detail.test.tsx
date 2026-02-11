@@ -60,6 +60,7 @@ describe('useBacklogItemDetail', () => {
         completedAt: null,
         dueDate: null,
         sortOrder: 1,
+        prioritySortOrder: 1,
         url: 'https://linear.app/vixxo/issue/VIX-1',
         isNew: false,
       },

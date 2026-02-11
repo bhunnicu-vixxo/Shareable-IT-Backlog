@@ -77,6 +77,7 @@ function createMockBacklogItem(overrides: Partial<BacklogItemDto> = {}): Backlog
     completedAt: null,
     dueDate: null,
     sortOrder: 1.0,
+    prioritySortOrder: 1.0,
     url: 'https://linear.app/vixxo/issue/VIX-1',
     isNew: false,
     ...overrides,
@@ -171,11 +172,11 @@ describe('BacklogService', () => {
       expect(result.items.map((i) => i.priority)).toEqual([1, 2, 3, 4, 0])
     })
 
-    it('should sort by sortOrder within the same priority level', async () => {
+    it('should sort by prioritySortOrder within the same priority level', async () => {
       const items: BacklogItemDto[] = [
-        createMockBacklogItem({ id: '1', priority: 2, sortOrder: 3.0 }),
-        createMockBacklogItem({ id: '2', priority: 2, sortOrder: 1.0 }),
-        createMockBacklogItem({ id: '3', priority: 2, sortOrder: 2.0 }),
+        createMockBacklogItem({ id: '1', priority: 2, prioritySortOrder: 3.0 }),
+        createMockBacklogItem({ id: '2', priority: 2, prioritySortOrder: 1.0 }),
+        createMockBacklogItem({ id: '3', priority: 2, prioritySortOrder: 2.0 }),
       ]
 
       mockGetIssuesByProject.mockResolvedValue({ data: [] as never[], rateLimit: null })
@@ -252,9 +253,10 @@ describe('BacklogService', () => {
       })
     })
 
-    it('should propagate errors from linearClient', async () => {
+    it('should propagate errors from linearClient when cache is bypassed', async () => {
       mockGetIssuesByProject.mockRejectedValue(new Error('Linear API unavailable'))
 
+      // Cache bypass path (different projectId) — errors should still propagate
       await expect(service.getBacklogItems({ projectId: 'custom-project-id' })).rejects.toThrow('Linear API unavailable')
     })
 
@@ -263,6 +265,66 @@ describe('BacklogService', () => {
       mockToBacklogItemDtos.mockRejectedValue(new Error('Transform failed'))
 
       await expect(service.getBacklogItems({ projectId: 'custom-project-id' })).rejects.toThrow('Transform failed')
+    })
+
+    describe('graceful degradation (AC #6)', () => {
+      it('should return empty paginated response when cache is empty and live fetch fails', async () => {
+        mockGetCachedItems.mockReturnValue(null)
+        mockGetIssuesByProject.mockRejectedValue(new Error('Linear API unavailable'))
+
+        // Default path (no projectId override) → canUseCache = true
+        const result = await service.getBacklogItems()
+
+        expect(result).toEqual({
+          items: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+          totalCount: 0,
+        })
+      })
+
+      it('should still trigger background sync before graceful degradation', async () => {
+        mockGetCachedItems.mockReturnValue(null)
+        mockGetIssuesByProject.mockRejectedValue(new Error('Linear API unavailable'))
+
+        await service.getBacklogItems()
+
+        expect(mockRunSync).toHaveBeenCalledTimes(1)
+      })
+
+      it('should serve from cache when cache is populated even if Linear would fail', async () => {
+        const cachedItems = [
+          createMockBacklogItem({ id: 'c-1' }),
+          createMockBacklogItem({ id: 'c-2' }),
+        ]
+        mockGetCachedItems.mockReturnValue(cachedItems)
+        // linearClient should NOT be called when cache has data
+        mockGetIssuesByProject.mockRejectedValue(new Error('Should not be called'))
+
+        const result = await service.getBacklogItems()
+
+        expect(result.items).toHaveLength(2)
+        expect(result.items[0].id).toBe('c-1')
+        expect(mockGetIssuesByProject).not.toHaveBeenCalled()
+      })
+
+      it('should return live data when cache is empty and live fetch succeeds', async () => {
+        mockGetCachedItems.mockReturnValue(null)
+        const mockDtos = [
+          createMockBacklogItem({ id: 'live-1' }),
+          createMockBacklogItem({ id: 'live-2' }),
+        ]
+        mockGetIssuesByProject.mockResolvedValue({
+          data: [] as never[],
+          rateLimit: null,
+          pageInfo: { hasNextPage: false, endCursor: null },
+        })
+        mockToBacklogItemDtos.mockResolvedValue(mockDtos)
+
+        const result = await service.getBacklogItems()
+
+        expect(result.items).toHaveLength(2)
+        expect(result.items[0].id).toBe('live-1')
+      })
     })
 
     it('should handle empty results', async () => {
@@ -393,12 +455,39 @@ describe('BacklogService', () => {
       expect(result).toBeNull()
     })
 
-    it('should return null when issue fetch rejects', async () => {
+    it('should throw when issue fetch rejects and item is NOT in sync cache', async () => {
       mockGetIssueById.mockRejectedValue(new Error('Issue fetch failed'))
       mockGetIssueComments.mockResolvedValue({ data: [], rateLimit: null })
       mockGetIssueHistory.mockResolvedValue({ data: [], rateLimit: null })
+      mockGetCachedItems.mockReturnValue(null)
 
       await expect(service.getBacklogItemById('bad-id')).rejects.toThrow('Issue fetch failed')
+    })
+
+    it('should return cached item with empty comments/activities when live fetch fails and item is in cache', async () => {
+      const cachedItem = createMockBacklogItem({ id: 'cached-issue-1', title: 'Cached Issue' })
+      mockGetIssueById.mockRejectedValue(new Error('Linear API unavailable'))
+      mockGetIssueComments.mockResolvedValue({ data: [], rateLimit: null })
+      mockGetIssueHistory.mockResolvedValue({ data: [], rateLimit: null })
+      mockGetCachedItems.mockReturnValue([cachedItem])
+
+      const result = await service.getBacklogItemById('cached-issue-1')
+
+      expect(result).not.toBeNull()
+      expect(result?.item.id).toBe('cached-issue-1')
+      expect(result?.item.title).toBe('Cached Issue')
+      expect(result?.comments).toEqual([])
+      expect(result?.activities).toEqual([])
+    })
+
+    it('should throw when live fetch fails and item is not in sync cache (different id)', async () => {
+      const cachedItem = createMockBacklogItem({ id: 'other-issue', title: 'Other Issue' })
+      mockGetIssueById.mockRejectedValue(new Error('Linear API unavailable'))
+      mockGetIssueComments.mockResolvedValue({ data: [], rateLimit: null })
+      mockGetIssueHistory.mockResolvedValue({ data: [], rateLimit: null })
+      mockGetCachedItems.mockReturnValue([cachedItem])
+
+      await expect(service.getBacklogItemById('not-in-cache')).rejects.toThrow('Linear API unavailable')
     })
 
     it('should return empty comments array when issue has no comments', async () => {

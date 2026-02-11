@@ -136,13 +136,20 @@ development_status:
     status: in-progress
     linear_id: "VIX-357"
     linear_url: "https://linear.app/vixxo/issue/VIX-357/implement-sync-error-handling-and-messages"
-  6-5-handle-linear-api-unavailability: backlog
-  6-6-handle-partial-sync-failures: backlog
+  6-5-handle-linear-api-unavailability:
+    status: done
+    linear_id: "VIX-358"
+    linear_url: "https://linear.app/vixxo/issue/VIX-358/handle-linear-api-unavailability"
+  6-6-handle-partial-sync-failures:
+    status: done
+    linear_id: "VIX-359"
   epic-6-retrospective: optional
 
   # Epic 7: User Management & Access Control
-  epic-7: backlog
-  7-1-implement-network-based-access-verification: backlog
+  epic-7: in-progress
+  7-1-implement-network-based-access-verification:
+    status: done
+    linear_id: "VIX-361"
   7-2-implement-user-approval-workflow: backlog
   7-3-implement-admin-dashboard: backlog
   7-4-implement-user-management-interface: backlog

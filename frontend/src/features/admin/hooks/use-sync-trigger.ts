@@ -1,22 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { API_URL, SYNC_TRIGGER_TOKEN } from '@/utils/constants'
 import type { SyncStatus } from '@/features/backlog/types/backlog.types'
-
-async function safeParseJson(response: Response): Promise<unknown | null> {
-  try {
-    return await response.json()
-  } catch {
-    return null
-  }
-}
-
-function getApiErrorMessage(data: unknown): string | null {
-  if (typeof data !== 'object' || !data) return null
-  const maybeError = (data as { error?: unknown }).error
-  if (typeof maybeError !== 'object' || !maybeError) return null
-  const maybeMessage = (maybeError as { message?: unknown }).message
-  return typeof maybeMessage === 'string' ? maybeMessage : null
-}
+import { ApiError } from '@/utils/api-error'
+import { apiFetchJson } from '@/utils/api-fetch'
 
 /**
  * TanStack Query mutation hook for triggering a manual sync.
@@ -33,22 +19,19 @@ export function useSyncTrigger() {
         ? { Authorization: `Bearer ${SYNC_TRIGGER_TOKEN}` }
         : undefined
 
-      const response = await fetch(`${API_URL}/sync/trigger`, {
-        method: 'POST',
-        headers,
-      })
-
-      const data = await safeParseJson(response)
-
-      if (response.status === 409) {
-        throw new Error('Sync already in progress')
+      try {
+        return await apiFetchJson<SyncStatus>(`${API_URL}/sync/trigger`, {
+          method: 'POST',
+          headers,
+        }, {
+          fallbackMessage: 'Failed to trigger sync',
+        })
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 409) {
+          throw new Error('Sync already in progress')
+        }
+        throw err
       }
-      if (!response.ok) {
-        const message = getApiErrorMessage(data)
-        throw new Error(message ?? 'Failed to trigger sync')
-      }
-
-      return data as SyncStatus
     },
     onSuccess: () => {
       // Invalidate sync status to start polling

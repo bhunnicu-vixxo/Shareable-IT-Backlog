@@ -19,10 +19,12 @@ export function SyncControl() {
   const isSyncing = syncStatus?.status === 'syncing'
   const isSuccess = syncStatus?.status === 'success'
   const isError = syncStatus?.status === 'error'
+  const isPartial = syncStatus?.status === 'partial'
 
   const previousStatusRef = useRef<SyncStatus['status'] | null>(null)
   const [showSuccessAlert, setShowSuccessAlert] = useState(false)
   const [showErrorAlert, setShowErrorAlert] = useState(false)
+  const [showPartialAlert, setShowPartialAlert] = useState(false)
 
   useEffect(() => {
     const currentStatus = syncStatus?.status ?? null
@@ -32,19 +34,26 @@ export function SyncControl() {
     if (currentStatus === 'syncing') {
       setShowSuccessAlert(false)
       setShowErrorAlert(false)
+      setShowPartialAlert(false)
     }
 
-    // Show alerts only when status transitions from syncing → success/error
+    // Show alerts only when status transitions from syncing → success/error/partial
     if (previousStatus === 'syncing' && currentStatus === 'success') {
       setShowSuccessAlert(true)
     }
     if (previousStatus === 'syncing' && currentStatus === 'error') {
       setShowErrorAlert(true)
     }
+    if (previousStatus === 'syncing' && currentStatus === 'partial') {
+      setShowPartialAlert(true)
+    }
 
-    // If we land on the page and the latest status is error, show it (admin visibility).
+    // If we land on the page and the latest status is error/partial, show it (admin visibility).
     if (!previousStatus && currentStatus === 'error') {
       setShowErrorAlert(true)
+    }
+    if (!previousStatus && currentStatus === 'partial') {
+      setShowPartialAlert(true)
     }
 
     previousStatusRef.current = currentStatus
@@ -103,6 +112,31 @@ export function SyncControl() {
                 Sync completed — {syncStatus.itemCount} items synced
               </Alert.Title>
               <Alert.Description mt="1" fontSize="sm">
+                Completed at {formatDateTime(syncStatus.lastSyncedAt)}
+              </Alert.Description>
+            </Box>
+          </Alert.Root>
+        )}
+
+        {/* Partial success alert */}
+        {showPartialAlert && isPartial && syncStatus?.lastSyncedAt && (
+          <Alert.Root
+            status="warning"
+            variant="subtle"
+            borderRadius="md"
+            role="alert"
+            aria-live="polite"
+          >
+            <Alert.Indicator />
+            <Box flex="1">
+              <Alert.Title>
+                Synced with warnings
+                {syncStatus.itemsSynced != null && syncStatus.itemsFailed != null && (
+                  <> — {syncStatus.itemsSynced} synced, {syncStatus.itemsFailed} failed</>
+                )}
+              </Alert.Title>
+              <Alert.Description mt="1" fontSize="sm">
+                {syncStatus.errorCode && <>Error code: {syncStatus.errorCode}. </>}
                 Completed at {formatDateTime(syncStatus.lastSyncedAt)}
               </Alert.Description>
             </Box>

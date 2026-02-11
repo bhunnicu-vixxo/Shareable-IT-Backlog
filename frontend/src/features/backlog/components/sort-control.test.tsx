@@ -40,13 +40,14 @@ describe('SortControl', () => {
     })
   })
 
-  it('calls onSortByChange when a different sort option is selected via keyboard', async () => {
+  it('calls onSortByChange when a different sort option is selected', async () => {
     const onSortByChange = vi.fn()
     render(<SortControl {...defaultProps} onSortByChange={onSortByChange} />)
 
-    const trigger = screen.getByRole('combobox')
-    fireEvent.click(trigger) // open dropdown
-    fireEvent.click(await screen.findByRole('option', { name: 'Date Created' }))
+    const trigger = screen.getByRole('combobox', { name: /sort backlog items/i })
+    fireEvent.click(trigger)
+    const option = await screen.findByRole('option', { name: 'Date Created' })
+    fireEvent.click(option)
 
     await waitFor(() => {
       expect(onSortByChange).toHaveBeenCalledWith('dateCreated')

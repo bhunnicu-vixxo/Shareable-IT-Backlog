@@ -8,6 +8,7 @@ import {
   toUserDto,
   toWorkflowStateDto,
   toBacklogItemDtos,
+  toBacklogItemDtosResilient,
   toCommentDtos,
   toIssueActivityDto,
   toIssueActivityDtos,
@@ -36,6 +37,7 @@ function createMockIssue(overrides: Record<string, unknown> = {}): Issue {
     description: 'Test description',
     priority: 2,
     sortOrder: 1.5,
+    prioritySortOrder: 1.5,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-02-01T14:30:00.000Z'),
     completedAt: undefined,
@@ -205,6 +207,7 @@ describe('toBacklogItemDto', () => {
       completedAt: null,
       dueDate: null,
       sortOrder: 1.5,
+    prioritySortOrder: 1.5,
       url: 'https://linear.app/vixxo/issue/VIX-1',
       isNew: expect.any(Boolean),
     })
@@ -902,6 +905,7 @@ describe('Zod schema validation', () => {
       completedAt: null,
       dueDate: null,
       sortOrder: 1.5,
+    prioritySortOrder: 1.5,
       url: 'https://linear.app/vixxo/issue/VIX-1',
       isNew: false,
     }
@@ -951,5 +955,102 @@ describe('Zod schema validation', () => {
 
     const result = workflowStateDtoSchema.safeParse(dto)
     expect(result.success).toBe(true)
+  })
+})
+
+// ─── toBacklogItemDtosResilient tests ──────────────────────────────────────
+
+describe('toBacklogItemDtosResilient', () => {
+  it('should return all items with empty failures when all succeed', async () => {
+    const issues = [
+      createMockIssue({ id: 'i-1', identifier: 'VIX-1' }),
+      createMockIssue({ id: 'i-2', identifier: 'VIX-2' }),
+    ]
+
+    const result = await toBacklogItemDtosResilient(issues)
+
+    expect(result.items).toHaveLength(2)
+    expect(result.failures).toHaveLength(0)
+    expect(result.items[0].id).toBe('i-1')
+    expect(result.items[1].id).toBe('i-2')
+  })
+
+  it('should capture failure and continue with remaining items when one throws', async () => {
+    const goodIssue = createMockIssue({ id: 'i-1', identifier: 'VIX-1' })
+    const badIssue = createMockIssue({
+      id: 'i-2',
+      identifier: 'VIX-2',
+      get state() {
+        return Promise.reject(new Error('SDK lazy-load failed'))
+      },
+    })
+    const anotherGoodIssue = createMockIssue({ id: 'i-3', identifier: 'VIX-3' })
+
+    const result = await toBacklogItemDtosResilient([goodIssue, badIssue, anotherGoodIssue])
+
+    expect(result.items).toHaveLength(2)
+    expect(result.items[0].id).toBe('i-1')
+    expect(result.items[1].id).toBe('i-3')
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0].issueId).toBe('i-2')
+    expect(result.failures[0].identifier).toBe('VIX-2')
+    expect(result.failures[0].error).toBe('SDK lazy-load failed')
+  })
+
+  it('should return empty items with all failures when all items fail', async () => {
+    const badIssue1 = createMockIssue({
+      id: 'i-1',
+      identifier: 'VIX-1',
+      get state() {
+        return Promise.reject(new Error('Fail 1'))
+      },
+    })
+    const badIssue2 = createMockIssue({
+      id: 'i-2',
+      identifier: 'VIX-2',
+      get state() {
+        return Promise.reject(new Error('Fail 2'))
+      },
+    })
+
+    const result = await toBacklogItemDtosResilient([badIssue1, badIssue2])
+
+    expect(result.items).toHaveLength(0)
+    expect(result.failures).toHaveLength(2)
+    expect(result.failures[0].issueId).toBe('i-1')
+    expect(result.failures[1].issueId).toBe('i-2')
+  })
+
+  it('should capture error message correctly from non-Error rejection', async () => {
+    const badIssue = createMockIssue({
+      id: 'i-1',
+      identifier: 'VIX-1',
+      get state() {
+        return Promise.reject('string rejection')
+      },
+    })
+
+    const result = await toBacklogItemDtosResilient([badIssue])
+
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0].error).toBe('string rejection')
+  })
+
+  it('should handle empty input', async () => {
+    const result = await toBacklogItemDtosResilient([])
+    expect(result.items).toHaveLength(0)
+    expect(result.failures).toHaveLength(0)
+  })
+
+  it('should respect concurrency parameter', async () => {
+    // Create 6 issues, use concurrency of 2 — should process in 3 batches
+    const issues = Array.from({ length: 6 }, (_, i) =>
+      createMockIssue({ id: `i-${i}`, identifier: `VIX-${i}` }),
+    )
+
+    const result = await toBacklogItemDtosResilient(issues, 2)
+
+    expect(result.items).toHaveLength(6)
+    expect(result.failures).toHaveLength(0)
   })
 })

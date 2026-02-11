@@ -120,4 +120,12 @@ describe('classifySyncError', () => {
     expect(result.code).toBe(SYNC_ERROR_CODES.UNKNOWN)
     expect(result.message).toBe('Unknown sync error')
   })
+
+  it('should include PARTIAL_SUCCESS in SYNC_ERROR_CODES', () => {
+    expect(SYNC_ERROR_CODES.PARTIAL_SUCCESS).toBe('SYNC_PARTIAL_SUCCESS')
+  })
+
+  it('should include TRANSFORM_FAILED in SYNC_ERROR_CODES', () => {
+    expect(SYNC_ERROR_CODES.TRANSFORM_FAILED).toBe('SYNC_TRANSFORM_FAILED')
+  })
 })

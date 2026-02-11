@@ -1,11 +1,11 @@
 import { Router } from 'express'
-import healthRoutes from './health.routes.js'
 import backlogRoutes from './backlog.routes.js'
 import syncRoutes from './sync.routes.js'
 
 const router = Router()
 
-router.use(healthRoutes)
+// Note: Health routes are mounted directly in app.ts BEFORE network verification
+// middleware so they remain accessible to load balancers and monitoring tools.
 router.use(backlogRoutes)
 router.use(syncRoutes)
 

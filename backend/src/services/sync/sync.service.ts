@@ -3,10 +3,11 @@ import type { Issue } from '@linear/sdk'
 import type { BacklogItemDto } from '../../types/linear-entities.types.js'
 import type { SyncStatusResponse } from '../../types/api.types.js'
 import { linearClient } from './linear-client.service.js'
-import { toBacklogItemDtos } from './linear-transformers.js'
+import { toBacklogItemDtosResilient } from './linear-transformers.js'
+import type { TransformFailure } from './linear-transformers.js'
 import { sortBacklogItems } from '../backlog/backlog.service.js'
 import { logger } from '../../utils/logger.js'
-import { classifySyncError } from './sync-error-classifier.js'
+import { classifySyncError, SYNC_ERROR_CODES } from './sync-error-classifier.js'
 
 /**
  * Orchestrates scheduled sync of Linear issues into an in-memory cache.
@@ -24,12 +25,17 @@ import { classifySyncError } from './sync-error-classifier.js'
  */
 class SyncService {
   private cachedItems: BacklogItemDto[] = []
+  /** Stores the most recent transform failures for admin visibility (volatile, lost on restart). */
+  private lastTransformFailures: TransformFailure[] = []
+  private static readonly MAX_FAILURE_DETAILS = 200
   private syncStatus: SyncStatusResponse = {
     lastSyncedAt: null,
     status: 'idle',
     itemCount: null,
     errorMessage: null,
     errorCode: null,
+    itemsSynced: null,
+    itemsFailed: null,
   }
 
   /**
@@ -46,13 +52,21 @@ class SyncService {
     }
 
     const startTime = Date.now()
-    this.syncStatus = { ...this.syncStatus, status: 'syncing', errorMessage: null, errorCode: null }
+    this.syncStatus = {
+      ...this.syncStatus,
+      status: 'syncing',
+      errorMessage: null,
+      errorCode: null,
+      itemCount: null,
+      itemsSynced: null,
+      itemsFailed: null,
+    }
 
     const projectId = process.env.LINEAR_PROJECT_ID
     if (!projectId) {
       const msg = 'LINEAR_PROJECT_ID not configured — cannot sync'
       logger.error({ service: 'sync' }, msg)
-      this.syncStatus = { ...this.syncStatus, status: 'error', errorCode: 'SYNC_CONFIG_ERROR', errorMessage: msg }
+      this.syncStatus = { ...this.syncStatus, status: 'error', errorCode: 'SYNC_CONFIG_ERROR', errorMessage: msg, itemsSynced: null, itemsFailed: null }
       return
     }
 
@@ -62,28 +76,77 @@ class SyncService {
       // 1. Fetch ALL issues, paginating through the full dataset
       const allIssues = await this.fetchAllIssues(projectId)
 
-      // 2. Transform SDK issues to DTOs
-      const dtos = await toBacklogItemDtos(allIssues)
-
-      // 3. Sort (reuse same logic as backlog.service.ts)
-      const sorted = sortBacklogItems(dtos)
-
-      // 4. Replace cache atomically
-      this.cachedItems = sorted
-
-      const durationMs = Date.now() - startTime
-      this.syncStatus = {
-        lastSyncedAt: new Date().toISOString(),
-        status: 'success',
-        itemCount: sorted.length,
-        errorMessage: null,
-        errorCode: null,
+      // 2. Transform SDK issues to DTOs (resilient — individual failures won't reject the batch)
+      const { items: dtos, failures } = await toBacklogItemDtosResilient(allIssues)
+      this.lastTransformFailures = failures.slice(0, SyncService.MAX_FAILURE_DETAILS)
+      if (failures.length > this.lastTransformFailures.length) {
+        logger.warn(
+          {
+            service: 'sync',
+            itemsFailed: failures.length,
+            storedFailureDetails: this.lastTransformFailures.length,
+          },
+          'Transform failures truncated for in-memory storage',
+        )
       }
 
-      logger.info(
-        { service: 'sync', itemCount: sorted.length, durationMs },
-        'Sync completed successfully',
-      )
+      const durationMs = Date.now() - startTime
+
+      // 3. ALL items failed → treat as error, preserve previous cache
+      if (dtos.length === 0 && failures.length > 0) {
+        this.syncStatus = {
+          ...this.syncStatus,
+          status: 'error',
+          errorCode: SYNC_ERROR_CODES.TRANSFORM_FAILED,
+          errorMessage: `All ${failures.length} item(s) failed to transform`,
+          itemsSynced: 0,
+          itemsFailed: failures.length,
+        }
+
+        logger.error(
+          { service: 'sync', itemsFailed: failures.length, durationMs },
+          'Sync failed — all items failed to transform',
+        )
+        return
+      }
+
+      // 4. Sort and replace cache (partial fresh data > fully stale data)
+      const sorted = sortBacklogItems(dtos)
+      this.cachedItems = sorted
+
+      if (failures.length > 0) {
+        // 5a. Partial success — some items succeeded, some failed
+        this.syncStatus = {
+          lastSyncedAt: new Date().toISOString(),
+          status: 'partial',
+          itemCount: sorted.length,
+          itemsSynced: sorted.length,
+          itemsFailed: failures.length,
+          errorCode: SYNC_ERROR_CODES.PARTIAL_SUCCESS,
+          errorMessage: `${failures.length} item(s) failed to sync`,
+        }
+
+        logger.warn(
+          { service: 'sync', itemsSynced: sorted.length, itemsFailed: failures.length, durationMs },
+          'Sync completed with partial failures',
+        )
+      } else {
+        // 5b. Full success — all items succeeded
+        this.syncStatus = {
+          lastSyncedAt: new Date().toISOString(),
+          status: 'success',
+          itemCount: sorted.length,
+          errorMessage: null,
+          errorCode: null,
+          itemsSynced: sorted.length,
+          itemsFailed: 0,
+        }
+
+        logger.info(
+          { service: 'sync', itemCount: sorted.length, durationMs },
+          'Sync completed successfully',
+        )
+      }
     } catch (error) {
       const durationMs = Date.now() - startTime
       const classified = classifySyncError(error)
@@ -94,6 +157,8 @@ class SyncService {
         status: 'error',
         errorCode: classified.code,
         errorMessage: classified.message,
+        itemsSynced: null,
+        itemsFailed: null,
       }
 
       logger.error(
@@ -144,6 +209,16 @@ class SyncService {
    */
   getStatus(): SyncStatusResponse {
     return { ...this.syncStatus }
+  }
+
+  /**
+   * Return the most recent transform failures, if any.
+   *
+   * Intended for admin visibility — allows the admin panel to display
+   * which specific items failed during the last sync. Volatile (lost on restart).
+   */
+  getLastTransformFailures(): TransformFailure[] {
+    return [...this.lastTransformFailures]
   }
 
   /**

@@ -30,6 +30,21 @@ import type {
   WorkflowStateDto,
 } from '../../types/linear-entities.types.js'
 
+import { logger } from '../../utils/logger.js'
+
+/** Describes a single item that failed to transform from SDK Issue to DTO. */
+export interface TransformFailure {
+  issueId: string
+  identifier: string
+  error: string
+}
+
+/** Result of a resilient batch transformation — successful items + failures. */
+export interface TransformResult {
+  items: BacklogItemDto[]
+  failures: TransformFailure[]
+}
+
 /**
  * Maps Linear SDK priority number (0-4) to human-readable label.
  *
@@ -149,6 +164,7 @@ export async function toBacklogItemDto(issue: Issue): Promise<BacklogItemDto> {
     completedAt: issue.completedAt ? issue.completedAt.toISOString() : null,
     dueDate: issue.dueDate ?? null,
     sortOrder: issue.sortOrder,
+    prioritySortOrder: issue.prioritySortOrder,
     url: issue.url,
     isNew: isItemNew(issue.createdAt),
   }
@@ -488,6 +504,49 @@ export async function toBacklogItemDtos(
   }
 
   return results
+}
+
+/**
+ * Resilient batch-convert of SDK Issues to BacklogItemDtos.
+ *
+ * Uses `Promise.allSettled` instead of `Promise.all` so that individual
+ * item transform failures don't reject the entire batch. Successfully
+ * transformed items are collected alongside failure details.
+ *
+ * Each failure is logged at `warn` level with the issue identifier.
+ */
+export async function toBacklogItemDtosResilient(
+  issues: Issue[],
+  concurrency = 5,
+): Promise<TransformResult> {
+  const items: BacklogItemDto[] = []
+  const failures: TransformFailure[] = []
+
+  for (let i = 0; i < issues.length; i += concurrency) {
+    const batch = issues.slice(i, i + concurrency)
+    const settled = await Promise.allSettled(batch.map(toBacklogItemDto))
+
+    settled.forEach((result, idx) => {
+      const issue = batch[idx]
+      if (result.status === 'fulfilled') {
+        items.push(result.value)
+      } else {
+        const errorMessage =
+          result.reason instanceof Error ? result.reason.message : String(result.reason)
+        failures.push({
+          issueId: issue.id,
+          identifier: issue.identifier,
+          error: errorMessage,
+        })
+        logger.warn(
+          { service: 'sync', issueId: issue.id, identifier: issue.identifier, error: errorMessage },
+          `Transform failed for issue ${issue.identifier}`,
+        )
+      }
+    })
+  }
+
+  return { items, failures }
 }
 
 /**

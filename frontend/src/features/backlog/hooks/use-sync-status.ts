@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { API_URL } from '@/utils/constants'
+import { apiFetchJson } from '@/utils/api-fetch'
 import type { SyncStatus } from '../types/backlog.types'
 
 /**
@@ -14,11 +15,9 @@ export function useSyncStatus() {
   const query = useQuery<SyncStatus>({
     queryKey: ['sync-status', 'backlog'],
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/sync/status`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch sync status')
-      }
-      return response.json()
+      return apiFetchJson<SyncStatus>(`${API_URL}/sync/status`, undefined, {
+        fallbackMessage: 'Failed to fetch sync status',
+      })
     },
     // Keep this low to meet AC timing (show error quickly when sync fails).
     refetchInterval: 5_000,

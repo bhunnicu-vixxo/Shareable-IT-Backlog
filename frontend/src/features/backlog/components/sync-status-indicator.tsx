@@ -1,4 +1,5 @@
-import { Alert, Box, HStack, Spinner, Text, VStack } from '@chakra-ui/react'
+import { Alert, Box, Button, HStack, Spinner, Text, VStack } from '@chakra-ui/react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSyncStatus } from '../hooks/use-sync-status'
 import { formatRelativeTime } from '@/utils/formatters'
 import { getUserFriendlyErrorMessage } from '@/utils/sync-error-messages'
@@ -15,6 +16,7 @@ import type { SyncStatus } from '../types/backlog.types'
 function getStatusDotColor(syncStatus: SyncStatus | null): string {
   if (!syncStatus || syncStatus.lastSyncedAt === null) return 'gray.400'
   if (syncStatus.status === 'error') return 'red.500'
+  if (syncStatus.status === 'partial') return 'yellow.500'
 
   const lastSynced = new Date(syncStatus.lastSyncedAt)
   const hoursAgo = (Date.now() - lastSynced.getTime()) / 3_600_000
@@ -33,6 +35,7 @@ function getStatusDotColor(syncStatus: SyncStatus | null): string {
  */
 export function SyncStatusIndicator() {
   const { syncStatus, isLoading } = useSyncStatus()
+  const queryClient = useQueryClient()
 
   // Don't show anything during initial load
   if (isLoading) return null
@@ -44,6 +47,29 @@ export function SyncStatusIndicator() {
         <Spinner size="xs" />
         <Text fontSize="xs" color="fg.muted">
           Syncing...
+        </Text>
+      </HStack>
+    )
+  }
+
+  // Partial sync — yellow dot with warning text
+  if (syncStatus?.status === 'partial') {
+    return (
+      <HStack gap={1.5}>
+        <Box
+          w={2}
+          h={2}
+          borderRadius="full"
+          bg="yellow.500"
+          flexShrink={0}
+          data-testid="sync-status-dot"
+          data-color="yellow.500"
+        />
+        <Text fontSize="xs" color="fg.muted">
+          Synced with warnings
+          {syncStatus.itemsFailed != null && syncStatus.itemsFailed > 0 && (
+            <> — {syncStatus.itemsFailed} item{syncStatus.itemsFailed !== 1 ? 's' : ''} failed</>
+          )}
         </Text>
       </HStack>
     )
@@ -69,6 +95,16 @@ export function SyncStatusIndicator() {
               )}
             </Alert.Description>
           </Box>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['backlog-items'] })}
+            aria-label="Refresh backlog data"
+            data-testid="sync-error-refresh-btn"
+            flexShrink={0}
+          >
+            Refresh data
+          </Button>
         </Alert.Root>
       </VStack>
     )

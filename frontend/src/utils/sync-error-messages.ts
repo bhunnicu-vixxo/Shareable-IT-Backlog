@@ -43,6 +43,16 @@ const ERROR_MESSAGES: Record<string, SyncErrorDisplay> = {
     description: 'An unexpected issue occurred while refreshing data.',
     guidance: 'Data shown may be outdated. The system will retry automatically.',
   },
+  SYNC_PARTIAL_SUCCESS: {
+    title: 'Synced with warnings',
+    description: 'Most items were synced, but some could not be updated.',
+    guidance: 'The system will retry on the next sync. Displayed data may be incomplete.',
+  },
+  SYNC_TRANSFORM_FAILED: {
+    title: 'Sync issue',
+    description: 'Unable to process the latest Linear data.',
+    guidance: 'Data shown may be outdated. Please contact your administrator.',
+  },
 }
 
 const DEFAULT_ERROR: SyncErrorDisplay = {

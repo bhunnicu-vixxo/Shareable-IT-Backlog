@@ -22,7 +22,8 @@ export interface GetBacklogItemsOptions {
 
 /**
  * Sort backlog items by priority ascending, with priority 0 (None) last.
- * Within the same priority level, items are sorted by sortOrder ascending.
+ * Within the same priority level, items are sorted by prioritySortOrder ascending
+ * (Linear's drag-and-drop ordering in the priority view).
  *
  * Returns a new array — does NOT mutate the input.
  */
@@ -31,7 +32,7 @@ export function sortBacklogItems(items: BacklogItemDto[]): BacklogItemDto[] {
     const aPriority = a.priority === 0 ? 5 : a.priority // Push "None" after "Low"
     const bPriority = b.priority === 0 ? 5 : b.priority
     if (aPriority !== bPriority) return aPriority - bPriority
-    return a.sortOrder - b.sortOrder
+    return a.prioritySortOrder - b.prioritySortOrder
   })
 }
 
@@ -120,10 +121,29 @@ export class BacklogService {
     // 1. Fetch raw issues from Linear via the GraphQL client.
     //    Note: When bypassing cache (projectId override), we retain cursor-based
     //    pagination from Linear. Sorting is applied after transformation.
-    const result = await linearClient.getIssuesByProject(projectId, {
-      first,
-      after: options?.after,
-    })
+    let result: Awaited<ReturnType<typeof linearClient.getIssuesByProject>>
+    try {
+      result = await linearClient.getIssuesByProject(projectId, {
+        first,
+        after: options?.after,
+      })
+    } catch (error) {
+      if (canUseCache) {
+        // Graceful degradation: cache was empty and live Linear fetch failed.
+        // Return an empty paginated response instead of a 500 error.
+        logger.warn(
+          { service: 'backlog', operation: 'getBacklogItems', source: 'degraded-empty', error },
+          'Live Linear fetch failed and sync cache is empty — returning empty result',
+        )
+        return {
+          items: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+          totalCount: 0,
+        }
+      }
+      // Cache bypass path (different projectId): propagate the error
+      throw error
+    }
 
     // 2. Transform SDK Issue instances to flat, JSON-safe DTOs
     const dtos = await toBacklogItemDtos(result.data)
@@ -167,11 +187,24 @@ export class BacklogService {
 
     // Issue is required:
     // - If Linear returns `null` (not found) → return null (404)
-    // - If the fetch fails (network/auth/etc.) → throw so controller returns 5xx (not a fake 404)
+    // - If the fetch fails (network/auth/etc.) → try sync cache before giving up
     if (issueResult.status === 'rejected') {
+      // Try sync cache before giving up
+      const cachedItems = syncService.getCachedItems()
+      const cachedItem = cachedItems?.find((item) => item.id === issueId) ?? null
+
+      if (cachedItem) {
+        logger.info(
+          { service: 'backlog', operation: 'getBacklogItemById', issueId, source: 'cache-fallback' },
+          'Live fetch failed — serving item from sync cache (no comments/activities)',
+        )
+        return { item: cachedItem, comments: [], activities: [] }
+      }
+
+      // Not in cache either — throw original error
       logger.error(
         { service: 'backlog', operation: 'getBacklogItemById', issueId, error: issueResult.reason },
-        'Failed to fetch issue',
+        'Failed to fetch issue and item not in sync cache',
       )
       throw issueResult.reason
     }
