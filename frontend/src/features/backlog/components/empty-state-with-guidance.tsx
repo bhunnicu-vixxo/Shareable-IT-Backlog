@@ -17,6 +17,8 @@ export interface EmptyStateWithGuidanceProps {
   onClearNewOnly: () => void
   /** Callback to clear all active filters at once. */
   onClearAll: () => void
+  /** When true, renders a condensed layout suitable for tight spaces. */
+  compact?: boolean
 }
 
 /** Returns the contextual heading based on which filters are active. */
@@ -92,6 +94,7 @@ export function EmptyStateWithGuidance({
   onClearBusinessUnit,
   onClearNewOnly,
   onClearAll,
+  compact = false,
 }: EmptyStateWithGuidanceProps) {
   const trimmedKeyword = keyword.trim()
   const hasKeyword = trimmedKeyword.length > 0
@@ -100,91 +103,66 @@ export function EmptyStateWithGuidance({
     <EmptyState.Root
       size="md"
       role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-testid="empty-state-with-guidance"
+      data-compact={compact || undefined}
       borderWidth="1px"
       borderRadius="md"
       borderColor="gray.200"
       bg="white"
-      px="6"
-      py="10"
+      px={compact ? '4' : '6'}
+      py={compact ? '6' : '10'}
       textAlign="center"
     >
       <EmptyState.Content>
-        <EmptyState.Indicator>
-          {hasKeyword ? (
-            <SearchX
-              aria-hidden="true"
-              focusable="false"
-              data-testid="empty-state-icon-search"
-              color="var(--chakra-colors-brand-teal)"
-            />
-          ) : (
-            <FilterX
-              aria-hidden="true"
-              focusable="false"
-              data-testid="empty-state-icon-filter"
-              color="var(--chakra-colors-brand-teal)"
-            />
-          )}
-        </EmptyState.Indicator>
-        <EmptyState.Title color="gray.800">
+        {!compact && (
+          <EmptyState.Indicator color="brand.teal">
+            {hasKeyword ? (
+              <SearchX
+                aria-hidden="true"
+                focusable="false"
+                data-testid="empty-state-icon-search"
+              />
+            ) : (
+              <FilterX
+                aria-hidden="true"
+                focusable="false"
+                data-testid="empty-state-icon-filter"
+              />
+            )}
+          </EmptyState.Indicator>
+        )}
+        <EmptyState.Title
+          color="brand.gray"
+          fontSize={compact ? 'sm' : undefined}
+        >
           {getHeading(keyword, businessUnit, showNewOnly)}
         </EmptyState.Title>
-        <EmptyState.Description color="gray.600" maxW="72ch">
+        <EmptyState.Description
+          color="brand.grayLight"
+          maxW="72ch"
+          fontSize={compact ? 'xs' : undefined}
+        >
           {getDescription(keyword, businessUnit, showNewOnly)}
         </EmptyState.Description>
       </EmptyState.Content>
       <HStack gap="2" flexWrap="wrap" justifyContent="center">
-        <Button
-          onClick={onClearAll}
-          variant="outline"
-          size="sm"
-          _focusVisible={{
-            outline: '2px solid',
-            outlineColor: 'brand.green',
-            outlineOffset: '2px',
-          }}
-        >
+        <Button onClick={onClearAll} variant="outline" size="sm">
           Clear all filters
         </Button>
-        {hasKeyword && (
-          <Button
-            onClick={onClearKeyword}
-            variant="outline"
-            size="sm"
-            _focusVisible={{
-              outline: '2px solid',
-              outlineColor: 'brand.green',
-              outlineOffset: '2px',
-            }}
-          >
+        {!compact && hasKeyword && (
+          <Button onClick={onClearKeyword} variant="outline" size="sm">
             Clear search filter
           </Button>
         )}
-        {businessUnit && (
-          <Button
-            onClick={onClearBusinessUnit}
-            variant="outline"
-            size="sm"
-            _focusVisible={{
-              outline: '2px solid',
-              outlineColor: 'brand.green',
-              outlineOffset: '2px',
-            }}
-          >
+        {!compact && businessUnit && (
+          <Button onClick={onClearBusinessUnit} variant="outline" size="sm">
             Clear business unit filter
           </Button>
         )}
-        {showNewOnly && (
-          <Button
-            onClick={onClearNewOnly}
-            variant="outline"
-            size="sm"
-            _focusVisible={{
-              outline: '2px solid',
-              outlineColor: 'brand.green',
-              outlineOffset: '2px',
-            }}
-          >
+        {!compact && showNewOnly && (
+          <Button onClick={onClearNewOnly} variant="outline" size="sm">
             Turn off New only
           </Button>
         )}

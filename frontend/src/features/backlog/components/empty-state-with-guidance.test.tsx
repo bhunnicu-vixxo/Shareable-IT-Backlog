@@ -207,4 +207,169 @@ describe('EmptyStateWithGuidance', () => {
       expect(button).not.toBeDisabled()
     })
   })
+
+  // ─── Brand Token Compliance Tests ───
+
+  it('title uses brand.gray token (no gray.800 or CSS variable anti-patterns)', () => {
+    renderComponent({ keyword: 'test' })
+    const title = screen.getByText('No items found matching "test"')
+    // Chakra v3 applies color tokens via CSS classes, not inline styles.
+    // Verify the rendered element's outerHTML doesn't contain anti-patterns:
+    // no CSS variable references (old icon pattern) and no old generic gray token names.
+    expect(title.outerHTML).not.toContain('var(--chakra-colors-')
+    expect(title.outerHTML).not.toContain('gray-800')
+    expect(title.outerHTML).not.toContain('gray.800')
+  })
+
+  it('description uses brand.grayLight token (no gray.600 or CSS variable anti-patterns)', () => {
+    renderComponent({ keyword: 'test' })
+    const description = screen.getByText(
+      'Try different keywords, adjust your filters, or check that items are assigned to the expected business unit.',
+    )
+    // Chakra v3 applies color tokens via CSS classes, not inline styles.
+    // Verify the rendered element's outerHTML doesn't contain anti-patterns.
+    expect(description.outerHTML).not.toContain('var(--chakra-colors-')
+    expect(description.outerHTML).not.toContain('gray-600')
+    expect(description.outerHTML).not.toContain('gray.600')
+  })
+
+  it('icon color inherits from Indicator wrapper (no CSS variable on icon SVG)', () => {
+    renderComponent({ keyword: 'test' })
+    const icon = screen.getByTestId('empty-state-icon-search')
+    const iconColor = icon.getAttribute('color')
+    // Icon should NOT have a color attribute — it inherits via currentColor from the Indicator wrapper
+    expect(iconColor).toBeNull()
+  })
+
+  it('filter icon color inherits from Indicator wrapper (no CSS variable on icon SVG)', () => {
+    renderComponent({ businessUnit: 'Finance' })
+    const icon = screen.getByTestId('empty-state-icon-filter')
+    const iconColor = icon.getAttribute('color')
+    // Icon should NOT have a color attribute — it inherits via currentColor from the Indicator wrapper
+    expect(iconColor).toBeNull()
+  })
+
+  it('buttons do NOT have inline _focusVisible style overrides', () => {
+    renderComponent({ keyword: 'test', businessUnit: 'Finance', showNewOnly: true })
+    const buttons = screen.getAllByRole('button')
+    buttons.forEach((button) => {
+      // Check the full outerHTML (not just the style attribute) for focus-related
+      // anti-patterns. Inline _focusVisible overrides would inject CSS variable
+      // references or outline properties into the rendered element.
+      const html = button.outerHTML
+      expect(html).not.toContain('outlineColor')
+      expect(html).not.toContain('outline-color')
+      expect(html).not.toContain('var(--chakra-colors-')
+    })
+  })
+
+  // ─── ARIA Live Region Tests ───
+
+  it('root has aria-live="polite" and aria-atomic="true"', () => {
+    renderComponent({ showNewOnly: true })
+    const root = screen.getByRole('status')
+    expect(root).toHaveAttribute('aria-live', 'polite')
+    expect(root).toHaveAttribute('aria-atomic', 'true')
+  })
+
+  // ─── Data Testid Tests ───
+
+  it('root has data-testid="empty-state-with-guidance"', () => {
+    renderComponent({ showNewOnly: true })
+    expect(screen.getByTestId('empty-state-with-guidance')).toBeInTheDocument()
+  })
+
+  // ─── Compact Variant Tests ───
+
+  it('compact mode adds data-compact attribute', () => {
+    renderComponent({ showNewOnly: true, compact: true })
+    const root = screen.getByTestId('empty-state-with-guidance')
+    expect(root).toHaveAttribute('data-compact')
+  })
+
+  it('compact mode hides indicator/icon', () => {
+    renderComponent({ keyword: 'test', compact: true })
+    expect(screen.queryByTestId('empty-state-icon-search')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('empty-state-icon-filter')).not.toBeInTheDocument()
+  })
+
+  it('compact mode hides indicator/icon (filter variant)', () => {
+    renderComponent({ businessUnit: 'Finance', compact: true })
+    expect(screen.queryByTestId('empty-state-icon-filter')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('empty-state-icon-search')).not.toBeInTheDocument()
+  })
+
+  it('compact mode hides individual clear buttons (only "Clear all filters" shown)', () => {
+    renderComponent({
+      keyword: 'test',
+      businessUnit: 'Finance',
+      showNewOnly: true,
+      compact: true,
+    })
+    expect(screen.getByRole('button', { name: 'Clear all filters' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Clear search filter' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Clear business unit filter' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Turn off New only' })).not.toBeInTheDocument()
+  })
+
+  it('non-compact mode (default) renders at standard size with all buttons', () => {
+    renderComponent({ keyword: 'test', businessUnit: 'Finance', showNewOnly: true })
+    expect(screen.getByTestId('empty-state-icon-search')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear all filters' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear search filter' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear business unit filter' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Turn off New only' })).toBeInTheDocument()
+  })
+
+  it('compact prop is optional — backward compatible when omitted', () => {
+    renderComponent({ showNewOnly: true })
+    const root = screen.getByTestId('empty-state-with-guidance')
+    expect(root).not.toHaveAttribute('data-compact')
+    expect(screen.getByRole('button', { name: 'Turn off New only' })).toBeInTheDocument()
+  })
+
+  it('non-compact mode does not have data-compact attribute', () => {
+    renderComponent({ showNewOnly: true, compact: false })
+    const root = screen.getByTestId('empty-state-with-guidance')
+    expect(root).not.toHaveAttribute('data-compact')
+  })
+
+  it('compact mode applies reduced font sizes to title and description', () => {
+    const { unmount } = renderComponent({ showNewOnly: true, compact: true })
+    const compactTitle = screen.getByText('No new items')
+    const compactTitleClass = compactTitle.className
+    const compactDesc = screen.getByText(
+      'All items have been reviewed. Remove the filter to see all items.',
+    )
+    const compactDescClass = compactDesc.className
+    unmount()
+
+    renderComponent({ showNewOnly: true })
+    const normalTitle = screen.getByText('No new items')
+    const normalTitleClass = normalTitle.className
+    const normalDesc = screen.getByText(
+      'All items have been reviewed. Remove the filter to see all items.',
+    )
+    const normalDescClass = normalDesc.className
+
+    // Compact mode (fontSize="sm"/"xs") produces different CSS classes than default
+    expect(compactTitleClass).not.toBe(normalTitleClass)
+    expect(compactDescClass).not.toBe(normalDescClass)
+  })
+
+  it('compact mode applies reduced padding to root element', () => {
+    const { unmount } = renderComponent({ showNewOnly: true, compact: true })
+    const compactRoot = screen.getByTestId('empty-state-with-guidance')
+    const compactRootClass = compactRoot.className
+    unmount()
+
+    renderComponent({ showNewOnly: true })
+    const normalRoot = screen.getByTestId('empty-state-with-guidance')
+    const normalRootClass = normalRoot.className
+
+    // Compact mode (px="4"/py="6") produces different CSS classes than default (px="6"/py="10")
+    expect(compactRootClass).not.toBe(normalRootClass)
+  })
 })
