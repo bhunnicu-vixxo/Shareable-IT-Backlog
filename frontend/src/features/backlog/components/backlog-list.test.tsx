@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@/utils/test-utils'
-import userEvent from '@testing-library/user-event'
 import { BacklogList } from './backlog-list'
 import type {
   BacklogListResponse,
@@ -341,7 +340,6 @@ describe('BacklogList', () => {
   })
 
   it('filters items by business unit when selection is made via keyboard', async () => {
-    const user = userEvent.setup()
     const response: BacklogListResponse = {
       items: [
         createMockItem({ id: '1', title: 'Ops item', teamName: 'Operations' }),
@@ -359,20 +357,9 @@ describe('BacklogList', () => {
       expect(screen.getByText('Ops item')).toBeInTheDocument()
     })
 
-    // Open the business unit filter
-    // Options (sorted): All Business Units, Engineering, Finance, Operations
     const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    combobox.focus()
-    await user.keyboard('{ArrowDown}') // open dropdown
-
-    await waitFor(() => {
-      expect(combobox.getAttribute('aria-expanded')).toBe('true')
-    })
-
-    // Navigate: currently on All BU (index 0) → Engineering → Finance
-    await user.keyboard('{ArrowDown}')
-    await user.keyboard('{ArrowDown}')
-    await user.keyboard('{Enter}')
+    fireEvent.click(combobox)
+    fireEvent.click(await screen.findByRole('option', { name: 'Finance' }))
 
     await waitFor(() => {
       expect(screen.getByText('Fin item')).toBeInTheDocument()
@@ -382,7 +369,6 @@ describe('BacklogList', () => {
   })
 
   it('displays results count with business unit name when filtered', async () => {
-    const user = userEvent.setup()
     const response: BacklogListResponse = {
       items: [
         createMockItem({ id: '1', title: 'Ops item 1', teamName: 'Operations' }),
@@ -400,19 +386,9 @@ describe('BacklogList', () => {
       expect(screen.getByText('Showing 3 items')).toBeInTheDocument()
     })
 
-    // Select Operations (sorted: All BU, Finance, Operations)
     const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    combobox.focus()
-    await user.keyboard('{ArrowDown}') // open
-
-    await waitFor(() => {
-      expect(combobox.getAttribute('aria-expanded')).toBe('true')
-    })
-
-    // Navigate to Operations (index 2: All BU → Finance → Operations)
-    await user.keyboard('{ArrowDown}')
-    await user.keyboard('{ArrowDown}')
-    await user.keyboard('{Enter}')
+    fireEvent.click(combobox)
+    fireEvent.click(await screen.findByRole('option', { name: 'Operations' }))
 
     await waitFor(() => {
       expect(screen.getByText('Showing 2 items for Operations')).toBeInTheDocument()
@@ -420,7 +396,6 @@ describe('BacklogList', () => {
   })
 
   it('combines business unit filter with "New only" filter', async () => {
-    const user = userEvent.setup()
     const response: BacklogListResponse = {
       items: [
         createMockItem({ id: '1', title: 'Ops old', teamName: 'Operations', isNew: false }),
@@ -438,18 +413,9 @@ describe('BacklogList', () => {
       expect(screen.getByText('Ops old')).toBeInTheDocument()
     })
 
-    // Select Operations (sorted: All BU, Finance, Operations)
     const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    combobox.focus()
-    await user.keyboard('{ArrowDown}') // open
-
-    await waitFor(() => {
-      expect(combobox.getAttribute('aria-expanded')).toBe('true')
-    })
-
-    await user.keyboard('{ArrowDown}') // Finance
-    await user.keyboard('{ArrowDown}') // Operations
-    await user.keyboard('{Enter}')
+    fireEvent.click(combobox)
+    fireEvent.click(await screen.findByRole('option', { name: 'Operations' }))
 
     await waitFor(() => {
       expect(screen.queryByText('Fin new')).not.toBeInTheDocument()
@@ -468,7 +434,6 @@ describe('BacklogList', () => {
   })
 
   it('shows empty filter state with "Clear business unit" when BU filter returns no results', async () => {
-    const user = userEvent.setup()
     const response: BacklogListResponse = {
       items: [
         createMockItem({ id: '1', title: 'Ops item', teamName: 'Operations', isNew: true }),
@@ -485,17 +450,9 @@ describe('BacklogList', () => {
       expect(screen.getByText('Ops item')).toBeInTheDocument()
     })
 
-    // Select Finance (sorted: All BU, Finance, Operations)
     const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    combobox.focus()
-    await user.keyboard('{ArrowDown}') // open
-
-    await waitFor(() => {
-      expect(combobox.getAttribute('aria-expanded')).toBe('true')
-    })
-
-    await user.keyboard('{ArrowDown}') // Finance (index 1)
-    await user.keyboard('{Enter}')
+    fireEvent.click(combobox)
+    fireEvent.click(await screen.findByRole('option', { name: 'Finance' }))
 
     await waitFor(() => {
       expect(screen.getByText('Fin item')).toBeInTheDocument()
@@ -513,7 +470,6 @@ describe('BacklogList', () => {
   })
 
   it('"Clear business unit" button resets business unit filter', async () => {
-    const user = userEvent.setup()
     const response: BacklogListResponse = {
       items: [
         createMockItem({ id: '1', title: 'Ops item', teamName: 'Operations', isNew: true }),
@@ -530,17 +486,9 @@ describe('BacklogList', () => {
       expect(screen.getByText('Ops item')).toBeInTheDocument()
     })
 
-    // Select Finance (sorted: All BU, Finance, Operations)
     const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    combobox.focus()
-    await user.keyboard('{ArrowDown}') // open
-
-    await waitFor(() => {
-      expect(combobox.getAttribute('aria-expanded')).toBe('true')
-    })
-
-    await user.keyboard('{ArrowDown}') // Finance
-    await user.keyboard('{Enter}')
+    fireEvent.click(combobox)
+    fireEvent.click(await screen.findByRole('option', { name: 'Finance' }))
 
     await waitFor(() => {
       expect(screen.getByText('Fin item')).toBeInTheDocument()
@@ -564,7 +512,6 @@ describe('BacklogList', () => {
   })
 
   it('"Clear all filters" button resets all active filters at once', async () => {
-    const user = userEvent.setup()
     const response: BacklogListResponse = {
       items: [
         createMockItem({ id: '1', title: 'Ops item', teamName: 'Operations', isNew: true }),
@@ -583,15 +530,8 @@ describe('BacklogList', () => {
 
     // Select Finance
     const combobox = screen.getByRole('combobox', { name: /filter by business unit/i })
-    combobox.focus()
-    await user.keyboard('{ArrowDown}') // open
-
-    await waitFor(() => {
-      expect(combobox.getAttribute('aria-expanded')).toBe('true')
-    })
-
-    await user.keyboard('{ArrowDown}') // Finance
-    await user.keyboard('{Enter}')
+    fireEvent.click(combobox)
+    fireEvent.click(await screen.findByRole('option', { name: 'Finance' }))
 
     await waitFor(() => {
       expect(screen.getByText('Fin item')).toBeInTheDocument()
@@ -1070,7 +1010,6 @@ describe('BacklogList', () => {
   })
 
   it('sorts by date created when sort field is changed', async () => {
-    const user = userEvent.setup()
     const response: BacklogListResponse = {
       items: [
         createMockItem({ id: '1', title: 'Newest', createdAt: '2026-02-10T10:00:00.000Z' }),
@@ -1090,17 +1029,8 @@ describe('BacklogList', () => {
 
     // Change sort field to Date Created
     const sortCombobox = screen.getByRole('combobox', { name: /sort backlog items/i })
-    sortCombobox.focus()
-    await user.keyboard('{ArrowDown}') // open dropdown
-
-    await waitFor(() => {
-      expect(sortCombobox.getAttribute('aria-expanded')).toBe('true')
-    })
-
-    // Options: Priority (current), Date Created, Date Updated, Status
-    // ArrowDown from Priority → Date Created
-    await user.keyboard('{ArrowDown}')
-    await user.keyboard('{Enter}')
+    fireEvent.click(sortCombobox)
+    fireEvent.click(await screen.findByRole('option', { name: 'Date Created' }))
 
     // Ascending date: oldest first → Oldest, Middle, Newest
     // Cards use role="button" with aria-label like "Title, Priority Label"

@@ -150,8 +150,11 @@ development_status:
   epic-7-retrospective: optional
 
   # Epic 8: Design System & UI Components
-  epic-8: backlog
-  8-1-integrate-and-customize-chakra-ui: backlog
+  epic-8: in-progress
+  8-1-integrate-and-customize-chakra-ui:
+    status: done
+    linear_id: "VIX-367"
+    linear_url: ""
   8-2-implement-stackrankbadge-component: backlog
   8-3-implement-backlogitemcard-component: backlog
   8-4-implement-syncstatusindicator-component: backlog

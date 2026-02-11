@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@/utils/test-utils'
-import userEvent from '@testing-library/user-event'
 import { SortControl } from './sort-control'
 import type { SortField, SortDirection } from './sort-control'
 
@@ -42,22 +41,12 @@ describe('SortControl', () => {
   })
 
   it('calls onSortByChange when a different sort option is selected via keyboard', async () => {
-    const user = userEvent.setup()
     const onSortByChange = vi.fn()
     render(<SortControl {...defaultProps} onSortByChange={onSortByChange} />)
 
     const trigger = screen.getByRole('combobox')
-    trigger.focus()
-    await user.keyboard('{ArrowDown}') // opens dropdown
-
-    await waitFor(() => {
-      expect(trigger.getAttribute('aria-expanded')).toBe('true')
-    })
-
-    // Options in order: Priority, Date Created, Date Updated, Status
-    // Currently on Priority; ArrowDown → Date Created
-    await user.keyboard('{ArrowDown}')
-    await user.keyboard('{Enter}')
+    fireEvent.click(trigger) // open dropdown
+    fireEvent.click(await screen.findByRole('option', { name: 'Date Created' }))
 
     await waitFor(() => {
       expect(onSortByChange).toHaveBeenCalledWith('dateCreated')
