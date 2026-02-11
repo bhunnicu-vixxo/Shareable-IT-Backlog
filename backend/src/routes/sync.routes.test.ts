@@ -10,6 +10,12 @@ const { mockGetStatus, mockRunSync } = vi.hoisted(() => ({
   mockRunSync: vi.fn(),
 }))
 
+// Mock auth middleware to pass through (tests focus on sync logic, not auth)
+vi.mock('../middleware/auth.middleware.js', () => ({
+  requireAuth: vi.fn((_req: unknown, _res: unknown, next: () => void) => next()),
+  requireApproved: vi.fn((_req: unknown, _res: unknown, next: () => void) => next()),
+}))
+
 vi.mock('../services/sync/sync.service.js', () => ({
   syncService: {
     getStatus: mockGetStatus,

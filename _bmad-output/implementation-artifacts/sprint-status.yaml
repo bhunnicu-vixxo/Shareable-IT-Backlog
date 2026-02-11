@@ -150,9 +150,16 @@ development_status:
   7-1-implement-network-based-access-verification:
     status: done
     linear_id: "VIX-361"
-  7-2-implement-user-approval-workflow: backlog
-  7-3-implement-admin-dashboard: backlog
-  7-4-implement-user-management-interface: backlog
+  7-2-implement-user-approval-workflow:
+    status: done
+    linear_id: "VIX-362"
+  7-3-implement-admin-dashboard:
+    status: done
+    linear_id: "VIX-363"
+    linear_url: "https://linear.app/vixxo/issue/VIX-363/implement-admin-dashboard"
+  7-4-implement-user-management-interface:
+    status: done
+    linear_id: "VIX-364"
   7-5-display-sync-status-and-history-in-admin-dashboard: backlog
   epic-7-retrospective: optional
 

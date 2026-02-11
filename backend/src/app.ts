@@ -10,12 +10,13 @@ import {
   networkVerificationMiddleware,
 } from './middleware/network.middleware.js'
 import { errorMiddleware } from './middleware/error.middleware.js'
+import { createSessionMiddleware } from './config/session.config.js'
 
 const app = express()
 
 // Trust proxy — required for correct client IP via X-Forwarded-For when behind
 // a reverse proxy (nginx, AWS ALB, Azure App Gateway).
-// Use a hop count to avoid trusting arbitrary client-supplied X-Forwarded-For chains.
+// Also needed for secure cookies behind reverse proxy.
 app.set('trust proxy', 1)
 
 // Force network config parsing/validation at startup (logs warnings early).
@@ -40,6 +41,10 @@ app.use(
 // Body parsers
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+
+// Session middleware (after body parsers, before routes)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.use(createSessionMiddleware() as any)
 
 // Health check — BEFORE network verification (must be accessible by load balancers/monitors)
 app.use('/api', healthRoutes)
