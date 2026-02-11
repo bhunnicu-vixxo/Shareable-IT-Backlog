@@ -15,14 +15,18 @@ export function useSyncTrigger() {
 
   const mutation = useMutation<SyncStatus, Error>({
     mutationFn: async () => {
+      // Use the admin-protected endpoint so we can capture `triggeredBy` in sync_history.
+      // We still optionally include SYNC_TRIGGER_TOKEN to support environments that use it
+      // for additional protections on sync endpoints.
       const headers: HeadersInit | undefined = SYNC_TRIGGER_TOKEN
         ? { Authorization: `Bearer ${SYNC_TRIGGER_TOKEN}` }
         : undefined
 
       try {
-        return await apiFetchJson<SyncStatus>(`${API_URL}/sync/trigger`, {
+        return await apiFetchJson<SyncStatus>(`${API_URL}/admin/sync/trigger`, {
           method: 'POST',
           headers,
+          credentials: 'include',
         }, {
           fallbackMessage: 'Failed to trigger sync',
         })
@@ -36,6 +40,8 @@ export function useSyncTrigger() {
     onSuccess: () => {
       // Invalidate sync status to start polling
       queryClient.invalidateQueries({ queryKey: ['sync-status'] })
+      // Best-effort refresh of history (a new entry is created at sync start)
+      queryClient.invalidateQueries({ queryKey: ['admin-sync-history'] })
     },
   })
 

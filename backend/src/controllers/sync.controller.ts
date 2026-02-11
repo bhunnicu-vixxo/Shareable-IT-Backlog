@@ -84,7 +84,7 @@ export const triggerSync = async (
     }
 
     // Fire-and-forget: start sync, don't await
-    syncService.runSync().catch((error) => {
+    syncService.runSync({ triggerType: 'manual', triggeredBy: null }).catch((error) => {
       logger.error({ service: 'sync', error }, 'Manual sync trigger failed')
     })
 

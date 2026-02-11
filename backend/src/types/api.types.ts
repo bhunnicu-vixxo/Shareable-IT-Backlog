@@ -54,3 +54,25 @@ export interface SyncStatusResponse {
   /** Count of items that failed to transform, or null when not applicable */
   itemsFailed: number | null
 }
+
+/** Sync history status values stored in the sync_history table. */
+export type SyncHistoryStatus = 'syncing' | 'success' | 'error' | 'partial'
+
+/** How the sync was triggered. */
+export type SyncTriggerType = 'scheduled' | 'manual' | 'startup'
+
+/** A single sync history entry returned by the admin API. */
+export interface SyncHistoryEntry {
+  id: number
+  status: SyncHistoryStatus
+  triggerType: SyncTriggerType
+  triggeredBy: number | null
+  startedAt: string
+  completedAt: string | null
+  durationMs: number | null
+  itemsSynced: number
+  itemsFailed: number
+  errorMessage: string | null
+  errorDetails: Record<string, unknown> | null
+  createdAt: string
+}

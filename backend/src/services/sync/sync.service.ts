@@ -1,13 +1,14 @@
 import type { Issue } from '@linear/sdk'
 
 import type { BacklogItemDto } from '../../types/linear-entities.types.js'
-import type { SyncStatusResponse } from '../../types/api.types.js'
+import type { SyncStatusResponse, SyncTriggerType } from '../../types/api.types.js'
 import { linearClient } from './linear-client.service.js'
 import { toBacklogItemDtosResilient } from './linear-transformers.js'
 import type { TransformFailure } from './linear-transformers.js'
 import { sortBacklogItems } from '../backlog/backlog.service.js'
 import { logger } from '../../utils/logger.js'
 import { classifySyncError, SYNC_ERROR_CODES } from './sync-error-classifier.js'
+import { createSyncHistoryEntry, completeSyncHistoryEntry } from './sync-history.service.js'
 
 /**
  * Orchestrates scheduled sync of Linear issues into an in-memory cache.
@@ -44,8 +45,11 @@ class SyncService {
    *
    * Idempotent — returns early if a sync is already in progress.
    * On failure, preserves the previous cache contents.
+   *
+   * @param options.triggerType - How this sync was triggered (scheduled, manual, startup)
+   * @param options.triggeredBy - User ID of the admin who triggered (for manual triggers)
    */
-  async runSync(): Promise<void> {
+  async runSync(options?: { triggerType?: SyncTriggerType; triggeredBy?: number | null }): Promise<void> {
     if (this.syncStatus.status === 'syncing') {
       logger.warn({ service: 'sync' }, 'Sync already in progress, skipping')
       return
@@ -62,11 +66,37 @@ class SyncService {
       itemsFailed: null,
     }
 
+    const triggerType = options?.triggerType ?? 'manual'
+    const triggeredBy = options?.triggeredBy ?? null
+
+    // Create sync history entry (fire-and-forget on failure — don't block sync)
+    let historyId: number | null = null
+    try {
+      historyId = await createSyncHistoryEntry({ triggerType, triggeredBy })
+    } catch (err) {
+      logger.warn({ service: 'sync', err }, 'Failed to create sync history entry — continuing sync')
+    }
+
     const projectId = process.env.LINEAR_PROJECT_ID
     if (!projectId) {
       const msg = 'LINEAR_PROJECT_ID not configured — cannot sync'
       logger.error({ service: 'sync' }, msg)
       this.syncStatus = { ...this.syncStatus, status: 'error', errorCode: 'SYNC_CONFIG_ERROR', errorMessage: msg, itemsSynced: null, itemsFailed: null }
+
+      if (historyId !== null) {
+        try {
+          await completeSyncHistoryEntry({
+            id: historyId,
+            status: 'error',
+            completedAt: new Date().toISOString(),
+            durationMs: Date.now() - startTime,
+            errorMessage: msg,
+            errorDetails: { errorCode: 'SYNC_CONFIG_ERROR' },
+          })
+        } catch (err) {
+          logger.warn({ service: 'sync', err }, 'Failed to complete sync history entry')
+        }
+      }
       return
     }
 
@@ -91,6 +121,7 @@ class SyncService {
       }
 
       const durationMs = Date.now() - startTime
+      const completedAt = new Date().toISOString()
 
       // 3. ALL items failed → treat as error, preserve previous cache
       if (dtos.length === 0 && failures.length > 0) {
@@ -107,6 +138,23 @@ class SyncService {
           { service: 'sync', itemsFailed: failures.length, durationMs },
           'Sync failed — all items failed to transform',
         )
+
+        // Persist error to sync_history
+        if (historyId !== null) {
+          try {
+            await completeSyncHistoryEntry({
+              id: historyId,
+              status: 'error',
+              completedAt,
+              durationMs,
+              itemsFailed: failures.length,
+              errorMessage: `All ${failures.length} item(s) failed to transform`,
+              errorDetails: { errorCode: SYNC_ERROR_CODES.TRANSFORM_FAILED },
+            })
+          } catch (err) {
+            logger.warn({ service: 'sync', err }, 'Failed to complete sync history entry')
+          }
+        }
         return
       }
 
@@ -117,7 +165,7 @@ class SyncService {
       if (failures.length > 0) {
         // 5a. Partial success — some items succeeded, some failed
         this.syncStatus = {
-          lastSyncedAt: new Date().toISOString(),
+          lastSyncedAt: completedAt,
           status: 'partial',
           itemCount: sorted.length,
           itemsSynced: sorted.length,
@@ -130,10 +178,27 @@ class SyncService {
           { service: 'sync', itemsSynced: sorted.length, itemsFailed: failures.length, durationMs },
           'Sync completed with partial failures',
         )
+
+        // Persist partial success to sync_history
+        if (historyId !== null) {
+          try {
+            await completeSyncHistoryEntry({
+              id: historyId,
+              status: 'partial',
+              completedAt,
+              durationMs,
+              itemsSynced: sorted.length,
+              itemsFailed: failures.length,
+              errorMessage: `${failures.length} item(s) failed to sync`,
+            })
+          } catch (err) {
+            logger.warn({ service: 'sync', err }, 'Failed to complete sync history entry')
+          }
+        }
       } else {
         // 5b. Full success — all items succeeded
         this.syncStatus = {
-          lastSyncedAt: new Date().toISOString(),
+          lastSyncedAt: completedAt,
           status: 'success',
           itemCount: sorted.length,
           errorMessage: null,
@@ -146,6 +211,21 @@ class SyncService {
           { service: 'sync', itemCount: sorted.length, durationMs },
           'Sync completed successfully',
         )
+
+        // Persist success to sync_history
+        if (historyId !== null) {
+          try {
+            await completeSyncHistoryEntry({
+              id: historyId,
+              status: 'success',
+              completedAt,
+              durationMs,
+              itemsSynced: sorted.length,
+            })
+          } catch (err) {
+            logger.warn({ service: 'sync', err }, 'Failed to complete sync history entry')
+          }
+        }
       }
     } catch (error) {
       const durationMs = Date.now() - startTime
@@ -165,6 +245,22 @@ class SyncService {
         { service: 'sync', errorCode: classified.code, error, durationMs },
         'Sync failed',
       )
+
+      // Persist error to sync_history
+      if (historyId !== null) {
+        try {
+          await completeSyncHistoryEntry({
+            id: historyId,
+            status: 'error',
+            completedAt: new Date().toISOString(),
+            durationMs,
+            errorMessage: classified.message,
+            errorDetails: { errorCode: classified.code },
+          })
+        } catch (err) {
+          logger.warn({ service: 'sync', err }, 'Failed to complete sync history entry')
+        }
+      }
     }
   }
 

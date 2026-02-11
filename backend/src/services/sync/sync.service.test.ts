@@ -21,6 +21,14 @@ vi.mock('../backlog/backlog.service.js', () => ({
   backlogService: {},
 }))
 
+// Mock the sync-history service
+const mockCreateSyncHistoryEntry = vi.fn()
+const mockCompleteSyncHistoryEntry = vi.fn()
+vi.mock('./sync-history.service.js', () => ({
+  createSyncHistoryEntry: (...args: unknown[]) => mockCreateSyncHistoryEntry(...args),
+  completeSyncHistoryEntry: (...args: unknown[]) => mockCompleteSyncHistoryEntry(...args),
+}))
+
 // Import after mocking
 import { linearClient } from './linear-client.service.js'
 import { toBacklogItemDtosResilient } from './linear-transformers.js'
@@ -72,6 +80,10 @@ describe('SyncService', () => {
 
     // Default: sortBacklogItems returns items as-is
     mockSortBacklogItems.mockImplementation((items) => [...items])
+
+    // Default: sync history operations succeed
+    mockCreateSyncHistoryEntry.mockResolvedValue(1)
+    mockCompleteSyncHistoryEntry.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -525,6 +537,152 @@ describe('SyncService', () => {
 
       service.clearCache()
       expect(service.getCachedItems()).toBeNull()
+    })
+  })
+
+  describe('sync history persistence', () => {
+    it('should create and complete sync history entry on successful sync', async () => {
+      mockCreateSyncHistoryEntry.mockResolvedValue(42)
+      const mockDtos = [createMockBacklogItem({ id: 'i-1' })]
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtos.mockResolvedValue(mockDtos)
+
+      await service.runSync({ triggerType: 'manual', triggeredBy: 5 })
+
+      expect(mockCreateSyncHistoryEntry).toHaveBeenCalledWith({
+        triggerType: 'manual',
+        triggeredBy: 5,
+      })
+      expect(mockCompleteSyncHistoryEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 42,
+          status: 'success',
+          itemsSynced: 1,
+        }),
+      )
+    })
+
+    it('should create and complete sync history entry on failed sync', async () => {
+      mockCreateSyncHistoryEntry.mockResolvedValue(10)
+      mockGetIssuesByProject.mockRejectedValue(new Error('Network error'))
+
+      await service.runSync({ triggerType: 'scheduled' })
+
+      expect(mockCreateSyncHistoryEntry).toHaveBeenCalledWith({
+        triggerType: 'scheduled',
+        triggeredBy: null,
+      })
+      expect(mockCompleteSyncHistoryEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 10,
+          status: 'error',
+          errorMessage: 'Network error',
+          errorDetails: expect.objectContaining({ errorCode: 'SYNC_UNKNOWN_ERROR' }),
+        }),
+      )
+    })
+
+    it('should pass triggerType through to history for scheduled sync', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtos.mockResolvedValue([])
+
+      await service.runSync({ triggerType: 'scheduled' })
+
+      expect(mockCreateSyncHistoryEntry).toHaveBeenCalledWith({
+        triggerType: 'scheduled',
+        triggeredBy: null,
+      })
+    })
+
+    it('should pass triggerType through to history for startup sync', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtos.mockResolvedValue([])
+
+      await service.runSync({ triggerType: 'startup' })
+
+      expect(mockCreateSyncHistoryEntry).toHaveBeenCalledWith({
+        triggerType: 'startup',
+        triggeredBy: null,
+      })
+    })
+
+    it('should default triggerType to manual when not specified', async () => {
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtos.mockResolvedValue([])
+
+      await service.runSync()
+
+      expect(mockCreateSyncHistoryEntry).toHaveBeenCalledWith({
+        triggerType: 'manual',
+        triggeredBy: null,
+      })
+    })
+
+    it('should complete history with error when LINEAR_PROJECT_ID is missing', async () => {
+      delete process.env.LINEAR_PROJECT_ID
+      mockCreateSyncHistoryEntry.mockResolvedValue(99)
+
+      await service.runSync({ triggerType: 'startup' })
+
+      expect(mockCompleteSyncHistoryEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 99,
+          status: 'error',
+          errorMessage: 'LINEAR_PROJECT_ID not configured — cannot sync',
+          errorDetails: { errorCode: 'SYNC_CONFIG_ERROR' },
+        }),
+      )
+    })
+
+    it('should continue sync even if history creation fails', async () => {
+      mockCreateSyncHistoryEntry.mockRejectedValue(new Error('DB down'))
+      const mockDtos = [createMockBacklogItem()]
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtos.mockResolvedValue(mockDtos)
+
+      await service.runSync()
+
+      // Sync still succeeds
+      expect(service.getStatus().status).toBe('success')
+      // History completion is not called since we don't have a historyId
+      expect(mockCompleteSyncHistoryEntry).not.toHaveBeenCalled()
+    })
+
+    it('should continue sync even if history completion fails', async () => {
+      mockCreateSyncHistoryEntry.mockResolvedValue(1)
+      mockCompleteSyncHistoryEntry.mockRejectedValue(new Error('DB write failed'))
+      const mockDtos = [createMockBacklogItem()]
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtos.mockResolvedValue(mockDtos)
+
+      await service.runSync()
+
+      // Sync still succeeds (in-memory status is correct)
+      expect(service.getStatus().status).toBe('success')
     })
   })
 })

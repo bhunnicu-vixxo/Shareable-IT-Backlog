@@ -9,12 +9,29 @@ const { mockGetPendingUsers, mockApproveUser, mockGetAllUsers, mockDisableUser, 
   mockEnableUser: vi.fn(),
 }))
 
+const { mockGetStatus, mockRunSync, mockListSyncHistory } = vi.hoisted(() => ({
+  mockGetStatus: vi.fn(),
+  mockRunSync: vi.fn(),
+  mockListSyncHistory: vi.fn(),
+}))
+
 vi.mock('../services/users/user.service.js', () => ({
   getPendingUsers: mockGetPendingUsers,
   approveUser: mockApproveUser,
   getAllUsers: mockGetAllUsers,
   disableUser: mockDisableUser,
   enableUser: mockEnableUser,
+}))
+
+vi.mock('../services/sync/sync.service.js', () => ({
+  syncService: {
+    getStatus: mockGetStatus,
+    runSync: mockRunSync,
+  },
+}))
+
+vi.mock('../services/sync/sync-history.service.js', () => ({
+  listSyncHistory: mockListSyncHistory,
 }))
 
 vi.mock('../utils/logger.js', () => ({
@@ -26,7 +43,7 @@ vi.mock('../utils/logger.js', () => ({
   },
 }))
 
-import { listPendingUsers, approveUserHandler, listAllUsers, disableUserHandler, enableUserHandler } from './admin.controller.js'
+import { listPendingUsers, approveUserHandler, listAllUsers, disableUserHandler, enableUserHandler, adminTriggerSync, getSyncHistory } from './admin.controller.js'
 
 function createMockReqResNext(
   overrides: { params?: Record<string, string>; session?: Record<string, unknown> } = {},
@@ -211,6 +228,106 @@ describe('admin.controller', () => {
       const { req, res, next } = createMockReqResNext({ params: { id: '3' } })
 
       await enableUserHandler(req, res, next)
+
+      expect(next).toHaveBeenCalledWith(error)
+    })
+  })
+
+  describe('adminTriggerSync', () => {
+    it('should return 202 and trigger sync with admin ID', async () => {
+      mockGetStatus.mockReturnValue({ status: 'idle', lastSyncedAt: null, itemCount: null, errorMessage: null, errorCode: null })
+      mockRunSync.mockResolvedValue(undefined)
+      const { req, res, next } = createMockReqResNext()
+
+      await adminTriggerSync(req, res, next)
+
+      expect(res.status).toHaveBeenCalledWith(202)
+      expect(mockRunSync).toHaveBeenCalledWith({ triggerType: 'manual', triggeredBy: 1 })
+    })
+
+    it('should return 409 when sync is already in progress', async () => {
+      const syncingStatus = { status: 'syncing', lastSyncedAt: null, itemCount: null, errorMessage: null, errorCode: null }
+      mockGetStatus.mockReturnValue(syncingStatus)
+      const { req, res, next } = createMockReqResNext()
+
+      await adminTriggerSync(req, res, next)
+
+      expect(res.status).toHaveBeenCalledWith(409)
+      expect(res.json).toHaveBeenCalledWith(syncingStatus)
+      expect(mockRunSync).not.toHaveBeenCalled()
+    })
+
+    it('should pass errors to next', async () => {
+      const error = new Error('Unexpected error')
+      mockGetStatus.mockImplementation(() => { throw error })
+      const { req, res, next } = createMockReqResNext()
+
+      await adminTriggerSync(req, res, next)
+
+      expect(next).toHaveBeenCalledWith(error)
+    })
+  })
+
+  describe('getSyncHistory', () => {
+    it('should return sync history with default limit', async () => {
+      const history = [{ id: 1, status: 'success', triggerType: 'scheduled' }]
+      mockListSyncHistory.mockResolvedValue(history)
+      const { req, res, next } = createMockReqResNext()
+      ;(req as unknown as Record<string, unknown>).query = {}
+
+      await getSyncHistory(req, res, next)
+
+      expect(mockListSyncHistory).toHaveBeenCalledWith({ limit: undefined })
+      expect(res.json).toHaveBeenCalledWith(history)
+    })
+
+    it('should respect custom limit query param', async () => {
+      mockListSyncHistory.mockResolvedValue([])
+      const { req, res, next } = createMockReqResNext()
+      ;(req as unknown as Record<string, unknown>).query = { limit: '10' }
+
+      await getSyncHistory(req, res, next)
+
+      expect(mockListSyncHistory).toHaveBeenCalledWith({ limit: 10 })
+    })
+
+    it('should clamp limit to 200', async () => {
+      mockListSyncHistory.mockResolvedValue([])
+      const { req, res, next } = createMockReqResNext()
+      ;(req as unknown as Record<string, unknown>).query = { limit: '500' }
+
+      await getSyncHistory(req, res, next)
+
+      expect(mockListSyncHistory).toHaveBeenCalledWith({ limit: 200 })
+    })
+
+    it('should clamp limit to 1', async () => {
+      mockListSyncHistory.mockResolvedValue([])
+      const { req, res, next } = createMockReqResNext()
+      ;(req as unknown as Record<string, unknown>).query = { limit: '0' }
+
+      await getSyncHistory(req, res, next)
+
+      expect(mockListSyncHistory).toHaveBeenCalledWith({ limit: 1 })
+    })
+
+    it('should ignore non-numeric limit', async () => {
+      mockListSyncHistory.mockResolvedValue([])
+      const { req, res, next } = createMockReqResNext()
+      ;(req as unknown as Record<string, unknown>).query = { limit: 'abc' }
+
+      await getSyncHistory(req, res, next)
+
+      expect(mockListSyncHistory).toHaveBeenCalledWith({ limit: undefined })
+    })
+
+    it('should pass errors to next', async () => {
+      const error = new Error('Database error')
+      mockListSyncHistory.mockRejectedValue(error)
+      const { req, res, next } = createMockReqResNext()
+      ;(req as unknown as Record<string, unknown>).query = {}
+
+      await getSyncHistory(req, res, next)
 
       expect(next).toHaveBeenCalledWith(error)
     })

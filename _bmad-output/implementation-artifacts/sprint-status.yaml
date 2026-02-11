@@ -160,7 +160,10 @@ development_status:
   7-4-implement-user-management-interface:
     status: done
     linear_id: "VIX-364"
-  7-5-display-sync-status-and-history-in-admin-dashboard: backlog
+  7-5-display-sync-status-and-history-in-admin-dashboard:
+    status: done
+    linear_id: "VIX-365"
+    linear_url: "https://linear.app/vixxo/issue/VIX-365/display-sync-status-and-history-in-admin-dashboard"
   epic-7-retrospective: optional
 
   # Epic 8: Design System & UI Components

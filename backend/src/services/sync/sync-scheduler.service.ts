@@ -64,7 +64,7 @@ class SyncSchedulerService {
 
     this.task = cron.schedule(schedule, async () => {
       logger.info({ service: 'sync-scheduler' }, 'Scheduled sync triggered')
-      await syncService.runSync()
+      await syncService.runSync({ triggerType: 'scheduled', triggeredBy: null })
     })
 
     logger.info(
@@ -74,7 +74,7 @@ class SyncSchedulerService {
 
     // Run initial sync on startup so cache is populated immediately.
     // Fire-and-forget — doesn't block server startup.
-    syncService.runSync().catch((error) => {
+    syncService.runSync({ triggerType: 'startup', triggeredBy: null }).catch((error) => {
       logger.error(
         { service: 'sync-scheduler', error },
         'Initial sync failed',

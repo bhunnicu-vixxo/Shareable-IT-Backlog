@@ -11,6 +11,7 @@ const {
   mockGetAllUsers,
   mockDisableUser,
   mockEnableUser,
+  mockListSyncHistory,
 } = vi.hoisted(() => ({
   mockLookupOrCreateUser: vi.fn(),
   mockGetUserById: vi.fn(),
@@ -20,6 +21,7 @@ const {
   mockGetAllUsers: vi.fn(),
   mockDisableUser: vi.fn(),
   mockEnableUser: vi.fn(),
+  mockListSyncHistory: vi.fn(),
 }))
 
 vi.mock('../services/auth/auth.service.js', () => ({
@@ -68,12 +70,24 @@ vi.mock('../config/session.config.js', async () => {
   }
 })
 
-// Mock sync service
+// Mock sync service — import for re-initializing after clearAllMocks
+const { mockSyncGetStatus, mockSyncRunSync } = vi.hoisted(() => ({
+  mockSyncGetStatus: vi.fn(),
+  mockSyncRunSync: vi.fn(),
+}))
+
 vi.mock('../services/sync/sync.service.js', () => ({
   syncService: {
-    getStatus: vi.fn(),
-    runSync: vi.fn(),
+    getStatus: mockSyncGetStatus,
+    runSync: mockSyncRunSync,
   },
+}))
+
+// Mock sync history service
+vi.mock('../services/sync/sync-history.service.js', () => ({
+  listSyncHistory: mockListSyncHistory,
+  createSyncHistoryEntry: vi.fn().mockResolvedValue(1),
+  completeSyncHistoryEntry: vi.fn().mockResolvedValue(undefined),
 }))
 
 describe('Admin Routes (integration)', () => {
@@ -101,6 +115,16 @@ describe('Admin Routes (integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUpdateLastAccess.mockResolvedValue(undefined)
+    // Re-establish sync mocks after clearAllMocks (vitest v4 clears factory implementations)
+    mockSyncGetStatus.mockReturnValue({ status: 'idle', lastSyncedAt: null, itemCount: null, errorMessage: null, errorCode: null })
+    mockSyncRunSync.mockResolvedValue(undefined)
+    mockListSyncHistory.mockResolvedValue([])
+    // Ensure getUserById returns the correct user for requireApproved middleware fallback
+    mockGetUserById.mockImplementation(async (id: number) => {
+      if (id === adminUser.id) return adminUser
+      if (id === regularUser.id) return regularUser
+      return null
+    })
   })
 
   const adminUser = {
@@ -124,24 +148,32 @@ describe('Admin Routes (integration)', () => {
     isAdmin: false,
   }
 
+  // Cache cookies to avoid hitting the identify rate limiter (10 requests/min)
+  let adminCookie: string | null = null
+  let regularUserCookie: string | null = null
+
   async function authenticateAsAdmin(): Promise<string> {
+    if (adminCookie) return adminCookie
     mockLookupOrCreateUser.mockResolvedValue(adminUser)
     const res = await fetch(`${baseUrl}/api/auth/identify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'admin@vixxo.com' }),
     })
-    return res.headers.get('set-cookie') ?? ''
+    adminCookie = res.headers.get('set-cookie') ?? ''
+    return adminCookie
   }
 
   async function authenticateAsRegularUser(): Promise<string> {
+    if (regularUserCookie) return regularUserCookie
     mockLookupOrCreateUser.mockResolvedValue(regularUser)
     const res = await fetch(`${baseUrl}/api/auth/identify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'user@vixxo.com' }),
     })
-    return res.headers.get('set-cookie') ?? ''
+    regularUserCookie = res.headers.get('set-cookie') ?? ''
+    return regularUserCookie
   }
 
   describe('GET /api/admin/users/pending', () => {
@@ -312,6 +344,84 @@ describe('Admin Routes (integration)', () => {
       })
 
       expect(res.status).toBe(403)
+    })
+  })
+
+  describe('POST /api/admin/sync/trigger', () => {
+    it('should return 202 for admin sync trigger', async () => {
+      const cookie = await authenticateAsAdmin()
+
+      const res = await fetch(`${baseUrl}/api/admin/sync/trigger`, {
+        method: 'POST',
+        headers: { Cookie: cookie },
+      })
+
+      expect(res.status).toBe(202)
+    })
+
+    it('should return 403 for non-admin user', async () => {
+      const cookie = await authenticateAsRegularUser()
+
+      const res = await fetch(`${baseUrl}/api/admin/sync/trigger`, {
+        method: 'POST',
+        headers: { Cookie: cookie },
+      })
+
+      expect(res.status).toBe(403)
+    })
+
+    it('should return 401 for unauthenticated request', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/sync/trigger`, {
+        method: 'POST',
+      })
+
+      expect(res.status).toBe(401)
+    })
+  })
+
+  describe('GET /api/admin/sync/history', () => {
+    it('should return sync history for admin', async () => {
+      const cookie = await authenticateAsAdmin()
+      const history = [
+        { id: 1, status: 'success', triggerType: 'scheduled', startedAt: '2026-02-10T06:00:00.000Z' },
+      ]
+      mockListSyncHistory.mockResolvedValue(history)
+
+      const res = await fetch(`${baseUrl}/api/admin/sync/history`, {
+        headers: { Cookie: cookie },
+      })
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body).toEqual(history)
+    })
+
+    it('should return 403 for non-admin user', async () => {
+      const cookie = await authenticateAsRegularUser()
+
+      const res = await fetch(`${baseUrl}/api/admin/sync/history`, {
+        headers: { Cookie: cookie },
+      })
+
+      expect(res.status).toBe(403)
+    })
+
+    it('should return 401 for unauthenticated request', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/sync/history`)
+
+      expect(res.status).toBe(401)
+    })
+
+    it('should pass limit query param', async () => {
+      const cookie = await authenticateAsAdmin()
+      mockListSyncHistory.mockResolvedValue([])
+
+      const res = await fetch(`${baseUrl}/api/admin/sync/history?limit=10`, {
+        headers: { Cookie: cookie },
+      })
+
+      expect(res.status).toBe(200)
+      expect(mockListSyncHistory).toHaveBeenCalledWith({ limit: 10 })
     })
   })
 })

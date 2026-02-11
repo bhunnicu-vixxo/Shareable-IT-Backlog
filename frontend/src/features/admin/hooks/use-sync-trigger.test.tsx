@@ -39,7 +39,7 @@ describe('useSyncTrigger', () => {
     globalThis.fetch = originalFetch
   })
 
-  it('should call POST /api/sync/trigger', async () => {
+  it('should call POST /api/admin/sync/trigger with credentials', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 202,
@@ -58,8 +58,8 @@ describe('useSyncTrigger', () => {
     })
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/sync/trigger'),
-      expect.objectContaining({ method: 'POST' }),
+      expect.stringContaining('/admin/sync/trigger'),
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
     )
   })
 
