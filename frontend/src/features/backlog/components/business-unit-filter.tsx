@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { Select, createListCollection } from '@chakra-ui/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Box, Select, Text, createListCollection } from '@chakra-ui/react'
 import type { BacklogItem } from '../types/backlog.types'
 
 export interface BusinessUnitFilterProps {
@@ -9,6 +9,10 @@ export interface BusinessUnitFilterProps {
   value: string | null
   /** Called when user changes the filter. null = show all items */
   onChange: (value: string | null) => void
+  /** Optional count of filtered results to display beside the trigger */
+  resultCount?: number
+  /** When true, renders a compact variant with reduced sizing for tight layouts */
+  compact?: boolean
 }
 
 const ALL_VALUE = '__all__'
@@ -19,8 +23,15 @@ const ALL_VALUE = '__all__'
  *
  * Uses Chakra UI v3 Select with a list collection.
  * Vixxo Green active state indicates when a filter is applied.
+ * Includes ARIA live region for screen reader announcements.
  */
-export function BusinessUnitFilter({ items, value, onChange }: BusinessUnitFilterProps) {
+export function BusinessUnitFilter({
+  items,
+  value,
+  onChange,
+  resultCount,
+  compact = false,
+}: BusinessUnitFilterProps) {
   const businessUnits = useMemo(() => {
     const uniqueTeams = [...new Set(items.map((item) => item.teamName))].sort((a, b) =>
       a.localeCompare(b, undefined, { sensitivity: 'base' }),
@@ -36,19 +47,106 @@ export function BusinessUnitFilter({ items, value, onChange }: BusinessUnitFilte
     [businessUnits],
   )
 
+  // ARIA live region announcement text (Task 3)
+  // Skip announcement on initial mount — only announce user-initiated changes
+  const isInitialMount = useRef(true)
+  const [announceText, setAnnounceText] = useState('')
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    if (value) {
+      setAnnounceText(`Filtered to ${value}`)
+    } else {
+      setAnnounceText('Filter cleared, showing all business units')
+    }
+  }, [value])
+
+  // Determine sizing based on compact prop (Task 5)
+  const triggerMinW = compact ? '140px' : '200px'
+  const selectSize = compact ? 'xs' : 'sm'
+
   return (
-    <Select.Root
-      collection={collection}
-      value={value ? [value] : []}
-      onValueChange={(details) => {
-        const selected = details.value[0]
-        onChange(selected === ALL_VALUE || !selected ? null : selected)
-      }}
-      size="sm"
-      data-testid="business-unit-filter"
-    >
-      <Select.HiddenSelect />
-      <Select.Label
+    <Box position="relative" display="inline-flex" alignItems="center" gap="2">
+      <Select.Root
+        collection={collection}
+        value={value ? [value] : []}
+        onValueChange={(details) => {
+          const selected = details.value[0]
+          onChange(selected === ALL_VALUE || !selected ? null : selected)
+        }}
+        size={selectSize}
+        data-testid="business-unit-filter"
+        data-compact={compact || undefined}
+      >
+        <Select.HiddenSelect />
+        <Select.Label
+          position="absolute"
+          width="1px"
+          height="1px"
+          overflow="hidden"
+          clipPath="inset(50%)"
+          whiteSpace="nowrap"
+        >
+          Filter by business unit
+        </Select.Label>
+        <Select.Control>
+          <Select.Trigger
+            borderColor={value ? 'brand.green' : undefined}
+            _focusVisible={{
+              outline: '2px solid',
+              outlineColor: 'brand.green',
+              outlineOffset: '2px',
+              borderColor: 'brand.green',
+            }}
+            outline={value ? '1px solid' : undefined}
+            outlineColor={value ? 'brand.green' : undefined}
+            borderWidth="1px"
+            minW={triggerMinW}
+            {...(value ? { 'data-active': '' } : {})}
+          >
+            <Select.ValueText placeholder="All Business Units" />
+          </Select.Trigger>
+          <Select.IndicatorGroup>
+            <Select.ClearTrigger />
+            <Select.Indicator />
+          </Select.IndicatorGroup>
+        </Select.Control>
+        <Select.Positioner>
+          <Select.Content>
+            {collection.items.map((item) => (
+              <Select.Item
+                item={item}
+                key={item.value}
+                _highlighted={{ bg: 'brand.greenLight', color: 'brand.gray' }}
+                _selected={{ bg: 'brand.greenLight', color: 'brand.greenAccessible' }}
+                data-testid="business-unit-option"
+              >
+                {item.label}
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Positioner>
+      </Select.Root>
+
+      {/* Result count display (Task 4) - hidden in compact mode */}
+      {resultCount !== undefined && !compact && (
+        <Text
+          fontSize="sm"
+          color="brand.grayLight"
+          data-testid="business-unit-result-count"
+        >
+          Showing {resultCount} {resultCount === 1 ? 'item' : 'items'}
+        </Text>
+      )}
+
+      {/* ARIA live region for screen reader announcements (Task 3) */}
+      <Box
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
         position="absolute"
         width="1px"
         height="1px"
@@ -56,37 +154,8 @@ export function BusinessUnitFilter({ items, value, onChange }: BusinessUnitFilte
         clipPath="inset(50%)"
         whiteSpace="nowrap"
       >
-        Filter by business unit
-      </Select.Label>
-      <Select.Control>
-        <Select.Trigger
-          borderColor={value ? 'brand.green' : undefined}
-          _focusVisible={{
-            outline: '2px solid',
-            outlineColor: 'brand.green',
-            outlineOffset: '2px',
-            borderColor: 'brand.green',
-          }}
-          boxShadow={value ? '0 0 0 1px var(--chakra-colors-brand-green)' : undefined}
-          borderWidth="1px"
-          minW="200px"
-        >
-          <Select.ValueText placeholder="All Business Units" />
-        </Select.Trigger>
-        <Select.IndicatorGroup>
-          <Select.ClearTrigger />
-          <Select.Indicator />
-        </Select.IndicatorGroup>
-      </Select.Control>
-      <Select.Positioner>
-        <Select.Content>
-          {collection.items.map((item) => (
-            <Select.Item item={item} key={item.value}>
-              {item.label}
-            </Select.Item>
-          ))}
-        </Select.Content>
-      </Select.Positioner>
-    </Select.Root>
+        {announceText}
+      </Box>
+    </Box>
   )
 }
