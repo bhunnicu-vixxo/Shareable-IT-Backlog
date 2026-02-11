@@ -155,7 +155,10 @@ development_status:
     status: done
     linear_id: "VIX-367"
     linear_url: ""
-  8-2-implement-stackrankbadge-component: backlog
+  8-2-implement-stackrankbadge-component:
+    status: ready-for-dev
+    linear_id: "VIX-368"
+    linear_url: ""
   8-3-implement-backlogitemcard-component: backlog
   8-4-implement-syncstatusindicator-component: backlog
   8-5-implement-businessunitfilter-component: backlog
