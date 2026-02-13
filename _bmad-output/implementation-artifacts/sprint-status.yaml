@@ -235,7 +235,10 @@ development_status:
     status: done
     linear_id: "VIX-384"
     linear_url: "https://linear.app/vixxo/issue/VIX-384/implement-keyboard-navigation"
-  11-2-implement-screen-reader-support: backlog
+  11-2-implement-screen-reader-support:
+    status: review
+    linear_id: "VIX-385"
+    linear_url: "https://linear.app/vixxo/issue/VIX-385/implement-screen-reader-support"
   11-3-ensure-color-contrast-compliance:
     status: review
     linear_id: "VIX-386"
