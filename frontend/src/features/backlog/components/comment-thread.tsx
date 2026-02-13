@@ -142,7 +142,7 @@ function ThreadReplies({ replies }: { replies: BacklogItemComment[] }) {
           variant="ghost"
           size="sm"
           onClick={() => setExpanded(true)}
-          color="brand.green"
+          color="brand.greenAccessible"
           fontWeight="medium"
           aria-label={`Show ${hiddenCount} more ${hiddenCount === 1 ? 'reply' : 'replies'}`}
         >
