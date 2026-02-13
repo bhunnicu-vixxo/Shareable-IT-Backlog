@@ -4,9 +4,10 @@ import { getPendingUsers, approveUser, getAllUsers, disableUser, enableUser } fr
 import { syncService } from '../services/sync/sync.service.js'
 import { syncScheduler } from '../services/sync/sync-scheduler.service.js'
 import { listSyncHistory } from '../services/sync/sync-history.service.js'
-import { getSyncCronSchedule, setSyncCronSchedule } from '../services/settings/app-settings.service.js'
+import { getSyncCronSchedule, SETTING_KEYS } from '../services/settings/app-settings.service.js'
 import { auditService } from '../services/audit/audit.service.js'
 import { logger } from '../utils/logger.js'
+import { pool } from '../utils/database.js'
 
 /**
  * GET /api/admin/users/pending
@@ -230,25 +231,54 @@ export async function updateSyncSchedule(req: Request, res: Response, next: Next
     const beforeSchedule = await getSyncCronSchedule()
     const adminId = Number(req.session.userId)
 
-    // Write audit log BEFORE persisting — if audit fails the change must not proceed.
-    // This satisfies the guardrail: "Admin action audit logs should be transactional
-    // for state-changing admin operations."
-    await auditService.logAdminAction({
-      userId: adminId,
-      action: 'SYNC_SCHEDULE_UPDATED',
-      resource: 'admin',
-      resourceId: 'sync_cron_schedule',
-      ipAddress: req.ip ?? '',
-      isAdminAction: true,
-      details: {
-        before: { schedule: beforeSchedule },
-        after: { schedule: trimmed },
-        validated: true,
-      },
-    })
+    // Use a transaction to ensure both the audit log and the schedule update
+    // are atomic. This satisfies the guardrail: "Admin action audit logs should
+    // be transactional for state-changing admin operations."
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
 
-    // Persist to database
-    await setSyncCronSchedule(trimmed)
+      // Insert audit log within transaction
+      await client.query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details, ip_address, is_admin_action)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          adminId,
+          'SYNC_SCHEDULE_UPDATED',
+          'admin',
+          'sync_cron_schedule',
+          JSON.stringify({
+            before: { schedule: beforeSchedule },
+            after: { schedule: trimmed },
+            validated: true,
+          }),
+          req.ip ?? '',
+          true,
+        ],
+      )
+
+      // Persist schedule to database within same transaction
+      await client.query(
+        `INSERT INTO app_settings (key, value, description, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (key) DO UPDATE
+           SET value = EXCLUDED.value,
+               description = COALESCE(EXCLUDED.description, app_settings.description),
+               updated_at = NOW()`,
+        [
+          SETTING_KEYS.SYNC_CRON_SCHEDULE,
+          trimmed,
+          'Cron expression controlling how often the Linear sync runs.',
+        ],
+      )
+
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
 
     // Restart the scheduler to pick up the new schedule
     await syncScheduler.restart()

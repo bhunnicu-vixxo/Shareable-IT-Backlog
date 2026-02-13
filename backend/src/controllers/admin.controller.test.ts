@@ -15,9 +15,14 @@ const { mockGetStatus, mockRunSync, mockListSyncHistory } = vi.hoisted(() => ({
   mockListSyncHistory: vi.fn(),
 }))
 
-const { mockGetSyncCronSchedule, mockSetSyncCronSchedule } = vi.hoisted(() => ({
+const { mockGetSyncCronSchedule } = vi.hoisted(() => ({
   mockGetSyncCronSchedule: vi.fn(),
-  mockSetSyncCronSchedule: vi.fn(),
+}))
+
+const { mockPoolConnect, mockClientQuery, mockClientRelease } = vi.hoisted(() => ({
+  mockPoolConnect: vi.fn(),
+  mockClientQuery: vi.fn(),
+  mockClientRelease: vi.fn(),
 }))
 
 const { mockAuditLogAdminAction } = vi.hoisted(() => ({
@@ -51,7 +56,13 @@ vi.mock('../services/sync/sync-history.service.js', () => ({
 
 vi.mock('../services/settings/app-settings.service.js', () => ({
   getSyncCronSchedule: mockGetSyncCronSchedule,
-  setSyncCronSchedule: mockSetSyncCronSchedule,
+  SETTING_KEYS: { SYNC_CRON_SCHEDULE: 'sync_cron_schedule' },
+}))
+
+vi.mock('../utils/database.js', () => ({
+  pool: {
+    connect: mockPoolConnect,
+  },
 }))
 
 vi.mock('../services/sync/sync-scheduler.service.js', () => ({
@@ -332,12 +343,16 @@ describe('admin.controller', () => {
       mockSchedulerRestart.mockResolvedValue(undefined)
       mockSchedulerIsRunning.mockReturnValue(true)
       mockSchedulerGetSchedule.mockReturnValue('*/5 * * * *')
+      mockClientQuery.mockResolvedValue({ rows: [] })
+      mockClientRelease.mockReturnValue(undefined)
+      mockPoolConnect.mockResolvedValue({
+        query: mockClientQuery,
+        release: mockClientRelease,
+      })
     })
 
-    it('should update schedule and write an admin audit log entry', async () => {
+    it('should update schedule and write an admin audit log entry within a transaction', async () => {
       mockGetSyncCronSchedule.mockResolvedValue('*/15 * * * *')
-      mockSetSyncCronSchedule.mockResolvedValue(undefined)
-      mockAuditLogAdminAction.mockResolvedValue(undefined)
 
       const { req, res, next } = createMockReqResNext({
         body: { schedule: '*/5 * * * *' },
@@ -345,35 +360,47 @@ describe('admin.controller', () => {
 
       await updateSyncSchedule(req, res, next)
 
-      expect(mockSetSyncCronSchedule).toHaveBeenCalledWith('*/5 * * * *')
-      expect(mockSchedulerRestart).toHaveBeenCalled()
-      expect(mockAuditLogAdminAction).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 1,
-          action: 'SYNC_SCHEDULE_UPDATED',
-          resource: 'admin',
-          resourceId: 'sync_cron_schedule',
-          isAdminAction: true,
-          details: expect.objectContaining({
-            before: { schedule: '*/15 * * * *' },
-            after: { schedule: '*/5 * * * *' },
-            validated: true,
-          }),
-        }),
+      // Verify transaction BEGIN, audit log INSERT, settings INSERT, and COMMIT
+      expect(mockClientQuery).toHaveBeenCalledWith('BEGIN')
+      expect(mockClientQuery).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO audit_logs'),
+        expect.arrayContaining([
+          1, // adminId
+          'SYNC_SCHEDULE_UPDATED',
+          'admin',
+          'sync_cron_schedule',
+          expect.stringContaining('"before":{"schedule":"*/15 * * * *"}'),
+          '127.0.0.1',
+          true,
+        ]),
       )
+      expect(mockClientQuery).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO app_settings'),
+        expect.arrayContaining([
+          'sync_cron_schedule',
+          '*/5 * * * *',
+          'Cron expression controlling how often the Linear sync runs.',
+        ]),
+      )
+      expect(mockClientQuery).toHaveBeenCalledWith('COMMIT')
+      expect(mockClientRelease).toHaveBeenCalled()
+      expect(mockSchedulerRestart).toHaveBeenCalled()
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({ schedule: '*/5 * * * *', isRunning: true }),
       )
     })
 
-    it('should write audit log BEFORE persisting the schedule change', async () => {
+    it('should write audit log and persist within the same transaction', async () => {
       mockGetSyncCronSchedule.mockResolvedValue('*/15 * * * *')
-      mockSetSyncCronSchedule.mockResolvedValue(undefined)
-      mockAuditLogAdminAction.mockResolvedValue(undefined)
 
       const callOrder: string[] = []
-      mockAuditLogAdminAction.mockImplementation(async () => { callOrder.push('audit') })
-      mockSetSyncCronSchedule.mockImplementation(async () => { callOrder.push('persist') })
+      mockClientQuery.mockImplementation(async (sql: string) => {
+        if (sql === 'BEGIN') callOrder.push('begin')
+        else if (sql.includes('INSERT INTO audit_logs')) callOrder.push('audit')
+        else if (sql.includes('INSERT INTO app_settings')) callOrder.push('persist')
+        else if (sql === 'COMMIT') callOrder.push('commit')
+        return { rows: [] }
+      })
       mockSchedulerRestart.mockImplementation(async () => { callOrder.push('restart') })
 
       const { req, res, next } = createMockReqResNext({
@@ -382,12 +409,26 @@ describe('admin.controller', () => {
 
       await updateSyncSchedule(req, res, next)
 
-      expect(callOrder).toEqual(['audit', 'persist', 'restart'])
+      expect(callOrder).toEqual(['begin', 'audit', 'persist', 'commit', 'restart'])
     })
 
-    it('should not persist schedule if audit log fails', async () => {
+    it('should rollback transaction and not persist if audit log insert fails', async () => {
       mockGetSyncCronSchedule.mockResolvedValue('*/15 * * * *')
-      mockAuditLogAdminAction.mockRejectedValue(new Error('Audit DB down'))
+
+      let auditInsertCalled = false
+      let settingsInsertCalled = false
+      mockClientQuery.mockImplementation(async (sql: string) => {
+        if (sql === 'BEGIN') return { rows: [] }
+        if (sql.includes('INSERT INTO audit_logs')) {
+          auditInsertCalled = true
+          throw new Error('Audit DB down')
+        }
+        if (sql.includes('INSERT INTO app_settings')) {
+          settingsInsertCalled = true
+          return { rows: [] }
+        }
+        return { rows: [] }
+      })
 
       const { req, res, next } = createMockReqResNext({
         body: { schedule: '*/5 * * * *' },
@@ -396,7 +437,10 @@ describe('admin.controller', () => {
       await updateSyncSchedule(req, res, next)
 
       expect(next).toHaveBeenCalledWith(expect.any(Error))
-      expect(mockSetSyncCronSchedule).not.toHaveBeenCalled()
+      expect(auditInsertCalled).toBe(true)
+      expect(settingsInsertCalled).toBe(false)
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClientRelease).toHaveBeenCalled()
       expect(mockSchedulerRestart).not.toHaveBeenCalled()
     })
   })
