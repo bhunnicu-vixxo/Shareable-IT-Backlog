@@ -1,14 +1,4 @@
-import {
-  Badge,
-  Box,
-  Dialog,
-  Flex,
-  HStack,
-  Link,
-  Skeleton,
-  Text,
-  VStack,
-} from '@chakra-ui/react'
+import { Badge, Box, Dialog, Flex, HStack, Link, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import { ApiError } from '@/utils/api-error'
 import { SHOW_OPEN_IN_LINEAR } from '@/utils/constants'
@@ -40,6 +30,17 @@ export function ItemDetailBodySkeleton() {
         </VStack>
       </Box>
 
+      {/* Activity section */}
+      <Box>
+        <Skeleton height="5" width="80px" mb="3" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <HStack key={i} gap="2" mb="2">
+            <Skeleton boxSize="3" borderRadius="full" flexShrink={0} />
+            <Skeleton height="4" width="70%" />
+          </HStack>
+        ))}
+      </Box>
+
       {/* Comments section */}
       <Box>
         <Skeleton height="5" width="100px" mb="3" />
@@ -54,17 +55,6 @@ export function ItemDetailBodySkeleton() {
               <Skeleton height="4" width="90%" />
               <Skeleton height="4" width="70%" />
             </VStack>
-          </HStack>
-        ))}
-      </Box>
-
-      {/* Activity section */}
-      <Box>
-        <Skeleton height="5" width="80px" mb="3" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <HStack key={i} gap="2" mb="2">
-            <Skeleton boxSize="3" borderRadius="full" flexShrink={0} />
-            <Skeleton height="4" width="70%" />
           </HStack>
         ))}
       </Box>
@@ -90,16 +80,10 @@ export interface ItemDetailModalProps {
  * - Fetches detail when itemId is set (lazy load)
  * - Handles loading and error (404) states
  */
-export function ItemDetailModal({
-  isOpen,
-  itemId,
-  onClose,
-  triggerRef,
-}: ItemDetailModalProps) {
+export function ItemDetailModal({ isOpen, itemId, onClose, triggerRef }: ItemDetailModalProps) {
   const { data, isLoading, isError, error, refetch } = useBacklogItemDetail(itemId)
 
-  const isNotFoundError =
-    isError && error instanceof ApiError && error.isNotFound
+  const isNotFoundError = isError && error instanceof ApiError && error.isNotFound
 
   const handleOpenChange = (details: { open: boolean }) => {
     if (!details.open) onClose()
@@ -122,12 +106,7 @@ export function ItemDetailModal({
       <Dialog.Positioner>
         <Dialog.Content aria-label="Backlog item details">
           {!isError && (
-            <Dialog.CloseTrigger
-              position="absolute"
-              top="2"
-              right="2"
-              aria-label="Close"
-            />
+            <Dialog.CloseTrigger position="absolute" top="2" right="2" aria-label="Close" />
           )}
           <Dialog.Header pt="6" pr="10" pb="2">
             {isLoading && (
@@ -188,15 +167,10 @@ export function ItemDetailModal({
               />
             )}
 
-            {!isLoading && isError && isNotFoundError && (
-              <ItemNotFoundState onClose={onClose} />
-            )}
+            {!isLoading && isError && isNotFoundError && <ItemNotFoundState onClose={onClose} />}
 
             {!isLoading && isError && !isNotFoundError && (
-              <ItemErrorState
-                onRetry={() => refetch()}
-                onClose={onClose}
-              />
+              <ItemErrorState onRetry={() => refetch()} onClose={onClose} />
             )}
           </Dialog.Body>
 
@@ -232,11 +206,7 @@ function ItemDetailContent({
   return (
     <VStack align="stretch" gap="4">
       {/* Metadata grid */}
-      <Box
-        display="grid"
-        gridTemplateColumns="repeat(auto-fill, minmax(140px, 1fr))"
-        gap="3"
-      >
+      <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(140px, 1fr))" gap="3">
         <DetailField label="Priority" value={item.priorityLabel} />
         <DetailField label="Assignee" value={item.assigneeName} />
         <DetailField label="Due date" value={item.dueDate ? formatDateOnly(item.dueDate) : null} />
@@ -292,13 +262,7 @@ function ItemDetailContent({
   )
 }
 
-function DetailField({
-  label,
-  value,
-}: {
-  label: string
-  value: string | null
-}) {
+function DetailField({ label, value }: { label: string; value: string | null }) {
   return (
     <Box>
       <Text fontSize="xs" color="gray.500" fontWeight="medium">
