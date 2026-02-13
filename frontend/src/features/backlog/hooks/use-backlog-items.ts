@@ -4,15 +4,48 @@ import { apiFetchJson } from '@/utils/api-fetch'
 import type { BacklogListResponse } from '../types/backlog.types'
 
 /**
+ * Fields requested from the API for the list view.
+ *
+ * Omits detail-only fields (url, assigneeId, projectId, projectName,
+ * teamId, completedAt, dueDate) to reduce payload size.
+ * The `id` field is always included by the server even if not listed.
+ */
+const LIST_VIEW_FIELDS = [
+  'id',
+  'identifier',
+  'title',
+  'description',
+  'priority',
+  'priorityLabel',
+  'status',
+  'statusType',
+  'labels',
+  'isNew',
+  'sortOrder',
+  'prioritySortOrder',
+  'assigneeName',
+  'teamName',
+  'createdAt',
+  'updatedAt',
+].join(',')
+
+/**
  * Fetch backlog items from the backend API.
+ *
+ * Requests only the fields needed for the list view to reduce
+ * response payload size.
  *
  * Throws with a specific error message extracted from the API error response,
  * or falls back to a generic message if parsing fails.
  */
 async function fetchBacklogItems(): Promise<BacklogListResponse> {
-  return apiFetchJson<BacklogListResponse>(`${API_URL}/backlog-items`, undefined, {
-    fallbackMessage: 'Failed to load backlog items. Please try again.',
-  })
+  return apiFetchJson<BacklogListResponse>(
+    `${API_URL}/backlog-items?fields=${encodeURIComponent(LIST_VIEW_FIELDS)}`,
+    undefined,
+    {
+      fallbackMessage: 'Failed to load backlog items. Please try again.',
+    },
+  )
 }
 
 /**

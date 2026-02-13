@@ -25,28 +25,34 @@ vi.mock('../utils/logger.js', () => ({
 import type { CommentDto } from '../types/linear-entities.types.js'
 import { backlogService } from '../services/backlog/backlog.service.js'
 import { getBacklogItems, getBacklogItemById } from '../controllers/backlog.controller.js'
+import { generateETag } from '../middleware/cache-control.middleware.js'
 
 const mockGetBacklogItems = vi.mocked(backlogService.getBacklogItems)
 const mockGetBacklogItemById = vi.mocked(backlogService.getBacklogItemById)
 
 function createMockRequest(
-  overrides: { query?: Record<string, string>; params?: Record<string, string> } | Record<string, string> = {},
+  overrides: { query?: Record<string, string>; params?: Record<string, string>; headers?: Record<string, string> } | Record<string, string> = {},
 ): Request {
   const hasQuery = overrides && typeof overrides === 'object' && 'query' in overrides
   const hasParams = overrides && typeof overrides === 'object' && 'params' in overrides
+  const hasHeaders = overrides && typeof overrides === 'object' && 'headers' in overrides
   const query = hasQuery ? (overrides as { query?: Record<string, string> }).query : undefined
   const params = hasParams ? (overrides as { params?: Record<string, string> }).params : undefined
-  const rest = hasQuery || hasParams ? {} : (overrides as Record<string, string>)
+  const headers = hasHeaders ? (overrides as { headers?: Record<string, string> }).headers : undefined
+  const rest = hasQuery || hasParams || hasHeaders ? {} : (overrides as Record<string, string>)
   return {
     query: query ?? rest,
     params: params ?? {},
+    headers: headers ?? {},
   } as unknown as Request
 }
 
-function createMockResponse(): Response & { statusCode: number; body: unknown } {
+function createMockResponse(): Response & { statusCode: number; body: unknown; _headers: Map<string, string | number> } {
+  const headersMap = new Map<string, string | number>()
   const res = {
     statusCode: 200,
     body: null as unknown,
+    _headers: headersMap,
     status(code: number) {
       this.statusCode = code
       return this
@@ -55,8 +61,22 @@ function createMockResponse(): Response & { statusCode: number; body: unknown } 
       this.body = data
       return this
     },
+    send(data: unknown) {
+      this.body = typeof data === 'string' ? JSON.parse(data as string) : data
+      return this
+    },
+    end() {
+      return this
+    },
+    setHeader(name: string, value: string | number) {
+      headersMap.set(name, value)
+      return this
+    },
+    getHeader(name: string) {
+      return headersMap.get(name)
+    },
   }
-  return res as unknown as Response & { statusCode: number; body: unknown }
+  return res as unknown as Response & { statusCode: number; body: unknown; _headers: Map<string, string | number> }
 }
 
 function createMockBacklogItem(overrides: Partial<BacklogItemDto> = {}): BacklogItemDto {
@@ -233,6 +253,90 @@ describe('BacklogController.getBacklogItems', () => {
     await getBacklogItems(req, res as unknown as Response, mockNext)
 
     expect(res.body).toEqual(emptyResponse)
+  })
+
+  it('should return 400 when fields includes unknown field', async () => {
+    const req = createMockRequest({ query: { fields: 'id,title,notARealField' } })
+    const res = createMockResponse()
+
+    await getBacklogItems(req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(400)
+    expect(res.body).toMatchObject({
+      error: {
+        code: 'INVALID_PARAMETER',
+      },
+    })
+    expect((res.body as { error?: { message?: string } }).error?.message).toContain('Unknown field(s): notARealField')
+    expect(mockGetBacklogItems).not.toHaveBeenCalled()
+  })
+
+  it('should return only requested fields (and always include id) when fields is provided', async () => {
+    const item = createMockBacklogItem({ title: 'Hello', priority: 2 })
+    mockGetBacklogItems.mockResolvedValue({
+      items: [item],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 1,
+    })
+
+    const req = createMockRequest({ query: { fields: 'title' } })
+    const res = createMockResponse()
+
+    await getBacklogItems(req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toEqual({
+      items: [{ id: item.id, title: 'Hello' }],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 1,
+    })
+  })
+
+  it('should set Cache-Control and ETag headers when served from cache', async () => {
+    const item = createMockBacklogItem({ id: 'issue-1', title: 'Cached' })
+    const cachedResponse = {
+      items: [item],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 1,
+      _servedFromCache: true,
+    }
+    mockGetBacklogItems.mockResolvedValue(cachedResponse)
+
+    const req = createMockRequest()
+    const res = createMockResponse()
+
+    await getBacklogItems(req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.getHeader('Cache-Control')).toBe('private, max-age=60, stale-while-revalidate=300')
+    expect(res.getHeader('ETag')).toMatch(/^"[a-f0-9]{32}"$/)
+  })
+
+  it('should return 304 when If-None-Match matches current ETag (served from cache)', async () => {
+    const item = createMockBacklogItem({ id: 'issue-1', title: 'Cached' })
+    const cachedResponse = {
+      items: [item],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 1,
+      _servedFromCache: true,
+    }
+    mockGetBacklogItems.mockResolvedValue(cachedResponse)
+
+    // Compute expected ETag exactly how the controller does.
+    const expectedBody = JSON.stringify({
+      items: cachedResponse.items,
+      pageInfo: cachedResponse.pageInfo,
+      totalCount: cachedResponse.totalCount,
+    })
+    const expectedEtag = generateETag(expectedBody)
+
+    const req = createMockRequest({ headers: { 'if-none-match': expectedEtag } })
+    const res = createMockResponse()
+
+    await getBacklogItems(req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(304)
+    expect(res.body).toBeNull()
   })
 })
 

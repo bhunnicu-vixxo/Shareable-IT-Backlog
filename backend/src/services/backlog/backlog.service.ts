@@ -10,6 +10,7 @@ import {
 } from '../sync/linear-transformers.js'
 import { LinearConfigError } from '../../utils/linear-errors.js'
 import { logger } from '../../utils/logger.js'
+import { TtlCache } from '../../utils/ttl-cache.js'
 
 export interface GetBacklogItemsOptions {
   /** Override the default project ID from env. */
@@ -19,6 +20,15 @@ export interface GetBacklogItemsOptions {
   /** Cursor for pagination (from previous response's endCursor). */
   after?: string
 }
+
+/** Extended paginated response that indicates whether data came from the sync cache. */
+export interface BacklogListResult extends PaginatedResponse<BacklogItemDto> {
+  /** Set to true when data was served from the in-memory sync cache. */
+  _servedFromCache?: boolean
+}
+
+/** Detail response type including item, comments, and activities. */
+export type DetailResult = { item: BacklogItemDto; comments: CommentDto[]; activities: IssueActivityDto[] }
 
 /**
  * Sort backlog items by priority ascending, with priority 0 (None) last.
@@ -43,6 +53,9 @@ export function sortBacklogItems(items: BacklogItemDto[]): BacklogItemDto[] {
  * (SDK-to-DTO transformation) and applies business sorting rules.
  */
 export class BacklogService {
+  /** Short-lived in-memory cache for detail responses (30 second TTL). */
+  private detailCache = new TtlCache<DetailResult>(30_000)
+
   /**
    * Fetch backlog items, preferring the sync cache when populated.
    *
@@ -59,7 +72,7 @@ export class BacklogService {
    */
   async getBacklogItems(
     options?: GetBacklogItemsOptions,
-  ): Promise<PaginatedResponse<BacklogItemDto>> {
+  ): Promise<BacklogListResult> {
     const configuredProjectId = process.env.LINEAR_PROJECT_ID
     const projectId = options?.projectId ?? configuredProjectId
     const first = options?.first ?? 50
@@ -96,6 +109,7 @@ export class BacklogService {
           items: page,
           pageInfo: { hasNextPage, endCursor },
           totalCount: cached.length,
+          _servedFromCache: true,
         }
       }
 
@@ -139,6 +153,7 @@ export class BacklogService {
           items: [],
           pageInfo: { hasNextPage: false, endCursor: null },
           totalCount: 0,
+          _servedFromCache: false,
         }
       }
       // Cache bypass path (different projectId): propagate the error
@@ -164,19 +179,35 @@ export class BacklogService {
         endCursor: null,
       },
       totalCount: sorted.length,
+      _servedFromCache: false,
     }
   }
 
   /**
    * Fetch a single backlog item by ID with its comments and activity history.
    *
+   * Uses a short-lived in-memory cache (30 second TTL) to avoid redundant
+   * Linear API calls for recently-fetched items.
+   *
    * Returns null when the issue does not exist (Linear returns null for non-existent issues).
    * Comments and history degrade gracefully — if either fetch fails, the detail
    * view still works with empty arrays rather than an error.
+   *
+   * Does NOT cache 404 responses — item-not-found always re-checks.
    */
   async getBacklogItemById(
     issueId: string,
-  ): Promise<{ item: BacklogItemDto; comments: CommentDto[]; activities: IssueActivityDto[] } | null> {
+  ): Promise<DetailResult | null> {
+    // Check detail cache first
+    const cachedDetail = this.detailCache.get(issueId)
+    if (cachedDetail) {
+      logger.debug(
+        { service: 'backlog', operation: 'getBacklogItemById', issueId, source: 'detail-cache' },
+        'Serving item detail from in-memory cache',
+      )
+      return cachedDetail
+    }
+
     // Fetch issue, comments, and history in parallel using Promise.allSettled
     // so that failures in comments or history don't break the detail view
     const [issueResult, commentsResult, historyResult] = await Promise.allSettled([
@@ -198,7 +229,10 @@ export class BacklogService {
           { service: 'backlog', operation: 'getBacklogItemById', issueId, source: 'cache-fallback' },
           'Live fetch failed — serving item from sync cache (no comments/activities)',
         )
-        return { item: cachedItem, comments: [], activities: [] }
+        const fallbackResult: DetailResult = { item: cachedItem, comments: [], activities: [] }
+        // Cache fallback result too
+        this.detailCache.set(issueId, fallbackResult)
+        return fallbackResult
       }
 
       // Not in cache either — throw original error
@@ -208,6 +242,7 @@ export class BacklogService {
       )
       throw issueResult.reason
     }
+    // Do NOT cache 404 responses
     if (!issueResult.value.data) return null
 
     const item = await toBacklogItemDto(issueResult.value.data)
@@ -247,7 +282,20 @@ export class BacklogService {
       'Backlog item detail fetched',
     )
 
-    return { item, comments, activities }
+    const detailResult: DetailResult = { item, comments, activities }
+
+    // Cache successful result with default TTL (30s)
+    this.detailCache.set(issueId, detailResult)
+
+    return detailResult
+  }
+
+  /**
+   * Clear the detail cache. Called by sync service after a successful sync
+   * to ensure stale detail data is evicted.
+   */
+  clearDetailCache(): void {
+    this.detailCache.clear()
   }
 }
 

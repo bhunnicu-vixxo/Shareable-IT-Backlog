@@ -14,11 +14,13 @@ vi.mock('./linear-transformers.js', () => ({
   toBacklogItemDtosResilient: vi.fn(),
 }))
 
-// Mock the backlog service sort function
+// Mock the backlog service sort function and clearDetailCache
 vi.mock('../backlog/backlog.service.js', () => ({
   sortBacklogItems: vi.fn((items: BacklogItemDto[]) => items),
   BacklogService: vi.fn(),
-  backlogService: {},
+  backlogService: {
+    clearDetailCache: vi.fn(),
+  },
 }))
 
 // Mock the sync-history service

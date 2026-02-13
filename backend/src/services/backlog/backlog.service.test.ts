@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import type { BacklogItemDto } from '../../types/linear-entities.types.js'
-import type { PaginatedResponse } from '../../types/api.types.js'
 import { LinearConfigError } from '../../utils/linear-errors.js'
 
 // Use vi.hoisted for sync service mock
@@ -196,9 +195,9 @@ describe('BacklogService', () => {
       mockGetIssuesByProject.mockResolvedValue({ data: [] as never[], rateLimit: null })
       mockToBacklogItemDtos.mockResolvedValue(items)
 
-      const result: PaginatedResponse<BacklogItemDto> = await service.getBacklogItems({ projectId: 'custom-project-id' })
+      const result = await service.getBacklogItems({ projectId: 'custom-project-id' })
 
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         items: expect.any(Array),
         pageInfo: {
           hasNextPage: false,
@@ -207,6 +206,7 @@ describe('BacklogService', () => {
         totalCount: 2,
       })
       expect(result.items).toHaveLength(2)
+      expect(result._servedFromCache).toBe(false)
     })
 
     it('should not mutate the original items array', async () => {
@@ -275,11 +275,12 @@ describe('BacklogService', () => {
         // Default path (no projectId override) → canUseCache = true
         const result = await service.getBacklogItems()
 
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           items: [],
           pageInfo: { hasNextPage: false, endCursor: null },
           totalCount: 0,
         })
+        expect(result._servedFromCache).toBe(false)
       })
 
       it('should still trigger background sync before graceful degradation', async () => {

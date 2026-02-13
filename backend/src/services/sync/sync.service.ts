@@ -9,6 +9,7 @@ import { sortBacklogItems } from '../backlog/backlog.service.js'
 import { logger } from '../../utils/logger.js'
 import { classifySyncError, SYNC_ERROR_CODES } from './sync-error-classifier.js'
 import { createSyncHistoryEntry, completeSyncHistoryEntry } from './sync-history.service.js'
+import { backlogService } from '../backlog/backlog.service.js'
 
 /**
  * Orchestrates scheduled sync of Linear issues into an in-memory cache.
@@ -161,6 +162,9 @@ class SyncService {
       // 4. Sort and replace cache (partial fresh data > fully stale data)
       const sorted = sortBacklogItems(dtos)
       this.cachedItems = sorted
+
+      // Invalidate detail cache so stale detail data is not served
+      backlogService.clearDetailCache()
 
       if (failures.length > 0) {
         // 5a. Partial success — some items succeeded, some failed

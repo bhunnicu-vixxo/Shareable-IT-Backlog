@@ -3,6 +3,7 @@ import './config/env.js'
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
+import compression from 'compression'
 import healthRoutes from './routes/health.routes.js'
 import routes from './routes/index.js'
 import {
@@ -10,6 +11,7 @@ import {
   networkVerificationMiddleware,
 } from './middleware/network.middleware.js'
 import { errorMiddleware } from './middleware/error.middleware.js'
+import { responseTimeMiddleware } from './middleware/response-time.middleware.js'
 import { createSessionMiddleware } from './config/session.config.js'
 
 const app = express()
@@ -38,9 +40,18 @@ app.use(
   }),
 )
 
+// Response compression — gzip/brotli for responses >1KB
+// MUST be after cors() and BEFORE body parsers so outgoing responses are compressed.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.use(compression({ threshold: 1024 }) as any)
+
 // Body parsers
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+
+// Response time logging — records duration of every request via Pino and X-Response-Time header.
+// Placed after body parsers but before routes so all API requests are measured.
+app.use(responseTimeMiddleware)
 
 // Session middleware (after body parsers, before routes)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
