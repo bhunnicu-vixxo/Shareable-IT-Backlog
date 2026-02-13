@@ -17,7 +17,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypt
 const ALGORITHM = 'aes-256-gcm'
 const PREFIX = 'enc:'
 const KEY_LENGTH = 32 // 256 bits
-const IV_LENGTH = 16
+const IV_LENGTH = 12 // 96 bits as recommended by NIST SP 800-38D for AES-GCM
 const SALT_LENGTH = 16
 const AUTH_TAG_LENGTH = 16
 
