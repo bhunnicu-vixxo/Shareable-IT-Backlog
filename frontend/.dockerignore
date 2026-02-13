@@ -2,10 +2,10 @@ node_modules
 dist
 .git
 .gitignore
-*.test.tsx
-*.test.ts
-*.spec.tsx
-*.spec.ts
+**/*.test.tsx
+**/*.test.ts
+**/*.spec.tsx
+**/*.spec.ts
 .env
 .env.*
 !.env.example
@@ -13,4 +13,3 @@ README.md
 vitest.setup.ts
 eslint.config.js
 .prettierrc
-tsconfig.node.json

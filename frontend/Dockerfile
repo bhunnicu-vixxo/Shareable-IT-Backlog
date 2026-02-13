@@ -21,6 +21,10 @@ RUN npm install
 # Copy source files
 COPY . .
 
+# Default API URL for production build (nginx proxies /api to backend)
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=${VITE_API_URL}
+
 # Build the production bundle (tsc -b && vite build)
 RUN npm run build
 
