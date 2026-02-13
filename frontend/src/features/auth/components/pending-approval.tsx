@@ -13,6 +13,8 @@ interface PendingApprovalProps {
 export function PendingApproval({ onCheckStatus, email }: PendingApprovalProps) {
   return (
     <Box
+      as="main"
+      id="main-content"
       display="flex"
       alignItems="center"
       justifyContent="center"
@@ -44,7 +46,6 @@ export function PendingApproval({ onCheckStatus, email }: PendingApprovalProps) 
           onClick={onCheckStatus}
           colorPalette="blue"
           variant="outline"
-          aria-label="Check approval status"
         >
           Check Status
         </Button>

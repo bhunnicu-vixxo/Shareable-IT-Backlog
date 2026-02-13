@@ -240,7 +240,10 @@ development_status:
     status: review
     linear_id: "VIX-386"
     linear_url: "https://linear.app/vixxo/issue/VIX-386/ensure-color-contrast-compliance"
-  11-4-conduct-accessibility-testing: backlog
+  11-4-conduct-accessibility-testing:
+    status: in-progress
+    linear_id: "VIX-387"
+    linear_url: "https://linear.app/vixxo/issue/VIX-387/conduct-accessibility-testing"
   epic-11-retrospective: optional
 
   # Epic 12: Deployment & Operations

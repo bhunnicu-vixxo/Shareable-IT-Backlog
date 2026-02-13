@@ -1,4 +1,9 @@
 import '@testing-library/jest-dom'
+import { expect } from 'vitest'
+import { toHaveNoViolations } from 'vitest-axe/matchers'
+
+// Register vitest-axe custom matcher for accessibility testing
+expect.extend({ toHaveNoViolations })
 
 // Polyfill ResizeObserver for jsdom (required by Chakra UI v3 / floating-ui)
 if (typeof globalThis.ResizeObserver === 'undefined') {
