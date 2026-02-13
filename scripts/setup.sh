@@ -126,12 +126,18 @@ compose up -d db
 info "Waiting for database to become healthy..."
 RETRIES=30
 DELAY=2
-for _ in $(seq 1 "$RETRIES"); do
+for i in $(seq 1 "$RETRIES"); do
   DB_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' slb-db 2>/dev/null || echo "unknown")
   if [[ "$DB_HEALTH" == "healthy" ]]; then
     info "Database is healthy!"
     break
   fi
+
+  if [[ "$i" -eq "$RETRIES" ]]; then
+    error "Database did not become healthy within $(( RETRIES * DELAY ))s"
+    exit 1
+  fi
+
   sleep "$DELAY"
 done
 

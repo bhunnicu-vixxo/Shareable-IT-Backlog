@@ -71,6 +71,13 @@ info "Seeding database..."
 SEED_ADMIN_EMAIL="${SEED_ADMIN_EMAIL:-}"
 SEED_ADMIN_DISPLAY_NAME="${SEED_ADMIN_DISPLAY_NAME:-}"
 
+# Escape single quotes for safe SQL interpolation (prevents SQL injection)
+escape_sql() {
+  echo "${1//\'/\'\'}"
+}
+SAFE_ADMIN_EMAIL=$(escape_sql "$SEED_ADMIN_EMAIL")
+SAFE_ADMIN_DISPLAY_NAME=$(escape_sql "$SEED_ADMIN_DISPLAY_NAME")
+
 # Seed default application settings (sync schedule, etc.) and optionally bootstrap
 # the first admin user for initial access.
 #
@@ -87,9 +94,9 @@ ON CONFLICT (key) DO NOTHING;
 --   SEED_ADMIN_EMAIL=you@vixxo.com SEED_ADMIN_DISPLAY_NAME="Your Name" ./scripts/seed.sh
 DO \$\$
 BEGIN
-  IF '$SEED_ADMIN_EMAIL' <> '' THEN
+  IF '$SAFE_ADMIN_EMAIL' <> '' THEN
     INSERT INTO users (email, display_name, is_admin, is_approved, is_disabled, approved_at, created_at, updated_at)
-    VALUES ('$SEED_ADMIN_EMAIL', NULLIF('$SEED_ADMIN_DISPLAY_NAME', ''), TRUE, TRUE, FALSE, NOW(), NOW(), NOW())
+    VALUES ('$SAFE_ADMIN_EMAIL', NULLIF('$SAFE_ADMIN_DISPLAY_NAME', ''), TRUE, TRUE, FALSE, NOW(), NOW(), NOW())
     ON CONFLICT (email) DO UPDATE
       SET is_admin = TRUE,
           is_approved = TRUE,
@@ -101,10 +108,10 @@ BEGIN
 END \$\$;
 
 -- Log the seed
-DO $$
+DO \$\$
 BEGIN
   RAISE NOTICE 'Database seeded successfully at %', now();
-END $$;
+END \$\$;
 SQL
 
 info "Database seeded successfully!"

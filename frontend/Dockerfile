@@ -12,10 +12,11 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Copy package files for dependency caching
-COPY package.json package-lock.json ./
+COPY package.json ./
 
 # Install ALL dependencies (devDependencies needed for build tooling)
-RUN npm ci
+# Note: Using npm install because package-lock.json is at workspace root (npm workspaces)
+RUN npm install
 
 # Copy source files
 COPY . .

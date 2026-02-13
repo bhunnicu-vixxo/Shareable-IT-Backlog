@@ -35,7 +35,10 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
 fi
 
 info "Running database migrations..."
-info "Database: ${DATABASE_URL%%@*}@***"
+# Mask credentials in DATABASE_URL for logging (show protocol and host only)
+# Format: postgresql://user:password@host:port/db -> postgresql://***@host:port/db
+MASKED_URL=$(echo "$DATABASE_URL" | sed -E 's#(://)[^@]+@#\1***@#')
+info "Database: $MASKED_URL"
 
 if [[ "${1:-}" == "--status" ]]; then
   info "Checking migration status..."

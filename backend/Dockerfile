@@ -12,10 +12,11 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Copy package files for dependency caching
-COPY package.json package-lock.json ./
+COPY package.json ./
 
 # Install ALL dependencies (devDependencies needed for TypeScript compilation)
-RUN npm ci
+# Note: Using npm install because package-lock.json is at workspace root (npm workspaces)
+RUN npm install
 
 # Copy source files
 COPY . .
@@ -34,8 +35,8 @@ RUN apk add --no-cache dumb-init
 WORKDIR /app
 
 # Copy package files and install production-only dependencies
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+COPY package.json ./
+RUN npm install --omit=dev && npm cache clean --force
 
 # Copy compiled JavaScript from build stage
 COPY --from=build /app/dist ./dist
