@@ -2,6 +2,30 @@
 
 Common deployment issues and their solutions.
 
+**Related guides:**
+- [Deployment Guide](./deployment-guide.md) — Setup and configuration
+- [Environment Variables](./environment-variables.md) — Variable reference
+- [Monitoring Runbook](./monitoring-runbook.md) — Health check details and alert configuration
+- [Database Guide](./database-guide.md) — Database administration and migrations
+
+---
+
+## Quick Reference
+
+Most common issues and one-liner fixes:
+
+| Symptom | Likely Cause | Quick Fix |
+|---|---|---|
+| Containers in `Restarting` loop | Missing/invalid `.env.production` | Verify `.env.production` exists and required keys are present (**avoid printing secrets**): `test -f .env.production && echo "found" || echo "missing"`; `grep -q '^DATABASE_URL=' .env.production && echo "DATABASE_URL set" || echo "DATABASE_URL missing"` |
+| Backend `unhealthy` | Database not ready | Wait 30s or check: `docker exec slb-db pg_isready -U slb_user` |
+| `/api/health` returns `degraded` | Linear API unavailable | Check: `curl -s http://localhost/api/health/linear \| jq` |
+| `/api/health` returns `unhealthy` | Database unreachable | Check: `docker compose -f docker-compose.prod.yml ps db` |
+| CORS errors in browser | `ALLOWED_ORIGINS` mismatch | Set to exact origin including protocol |
+| Blank page after deploy | Frontend build failed | Rebuild: `docker compose -f docker-compose.prod.yml build frontend` |
+| Migration fails | DB not running or wrong URL | Verify: `psql "$DATABASE_URL" -c "SELECT 1;"` |
+| Users blocked by network check | IP not in `ALLOWED_NETWORKS` | Add CIDR range or set `NETWORK_CHECK_ENABLED=false` |
+| Session/auth failures | Invalid `SESSION_SECRET` | Regenerate: `openssl rand -base64 48` and restart |
+
 ## Container Issues
 
 ### Containers won't start
@@ -257,10 +281,281 @@ HTTPS is typically handled by a reverse proxy (nginx, Azure App Gateway) in fron
 - `X-Forwarded-Proto` header is set to `https`
 - `trust proxy` is configured in Express (already set to `1`)
 
+## SSL/TLS Issues
+
+### HTTPS not working
+
+**Symptoms:** Browser shows "Not Secure" or connection refused on port 443.
+
+**Diagnosis:**
+
+1. Verify the reverse proxy is running and configured
+2. Check certificate validity: `openssl s_client -connect backlog.vixxo.internal:443 -brief`
+3. Check certificate expiration: `openssl x509 -enddate -noout -in /path/to/cert.crt`
+
+**Common causes:**
+- Reverse proxy not configured — see [SSL/TLS Configuration](./deployment-guide.md#ssltls-configuration)
+- Certificate expired — renew and restart the reverse proxy
+- Certificate doesn't match domain — regenerate with correct Subject Alternative Names
+
+**Prevention:** Set up automatic certificate renewal and add expiration monitoring to your [Operational Runbook](./operational-runbook.md).
+
+### Mixed content warnings
+
+**Symptoms:** Browser console shows "Mixed Content" errors; some resources loaded over HTTP.
+
+**Fix:** Ensure `ALLOWED_ORIGINS` uses `https://` protocol and the `X-Forwarded-Proto` header is set by the reverse proxy. Express reads this header when `trust proxy` is enabled (already configured).
+
+## Session & Authentication Issues
+
+### Users cannot log in / session not persisting
+
+**Symptoms:** Users are redirected back to login, session cookies not being set or accepted.
+
+**Diagnosis:**
+
+```bash
+# Check if sessions table exists
+docker exec slb-db psql -U slb_user -d shareable_linear_backlog \
+  -c "SELECT count(*) FROM session;"
+
+# Check for expired sessions
+docker exec slb-db psql -U slb_user -d shareable_linear_backlog \
+  -c "SELECT count(*) FROM session WHERE expire < NOW();"
+```
+
+**Common causes:**
+- `SESSION_SECRET` not set or using default value in production
+- `SESSION_SECRET` changed (invalidates all existing sessions) — users must re-authenticate
+- Cookies blocked by browser (third-party cookie settings)
+- Missing HTTPS — session cookies have `secure: true` in production, requiring HTTPS
+- Database connection issue — sessions are stored in PostgreSQL
+
+**Resolution:**
+1. Verify `SESSION_SECRET` is set to a strong value (32+ characters)
+2. Ensure HTTPS is configured (cookies require it in production)
+3. Restart the backend after changing `SESSION_SECRET`
+
+### User access denied despite being on allowed network
+
+**Symptoms:** 403 Forbidden responses even though the user's IP should be allowed.
+
+**Diagnosis:**
+
+```bash
+# Check backend logs for network verification details
+docker compose -f docker-compose.prod.yml logs backend | grep -i "network"
+
+# Verify ALLOWED_NETWORKS is correct
+grep ALLOWED_NETWORKS .env.production
+```
+
+**Common causes:**
+- User's actual IP not in `ALLOWED_NETWORKS` CIDR range — check if behind a VPN or NAT
+- `X-Forwarded-For` header not set by reverse proxy — backend sees the proxy IP, not the user's IP
+- `trust proxy` misconfigured — Express is set to trust 1 proxy hop by default
+
+**Resolution:**
+1. Add the user's network range to `ALLOWED_NETWORKS`
+2. Ensure the reverse proxy sets `X-Forwarded-For` header
+3. Temporarily set `NETWORK_CHECK_ENABLED=false` to diagnose (re-enable after)
+
+### Admin approval not working
+
+**Symptoms:** New users stuck in pending state; admin cannot approve users.
+
+**Diagnosis:**
+
+```bash
+# Check user records
+docker exec slb-db psql -U slb_user -d shareable_linear_backlog \
+  -c "SELECT email, is_admin, is_approved, is_disabled FROM users;"
+```
+
+**Common causes:**
+- No admin user exists — seed one with `./scripts/seed.sh`
+- Admin user is disabled — re-enable in database
+- Session expired — admin must re-authenticate
+
+## Sync Scheduling Issues
+
+### Scheduled sync not triggering
+
+**Symptoms:** No new sync history records; backlog data is stale.
+
+**Diagnosis:**
+
+```bash
+# Check sync status
+curl -s http://localhost/api/sync/status | jq
+
+# Check if sync is enabled
+grep SYNC_ENABLED .env.production
+
+# Check backend logs for sync-related messages
+docker compose -f docker-compose.prod.yml logs backend | grep -i "sync\|cron"
+
+# Check the cron schedule in app_settings
+docker exec slb-db psql -U slb_user -d shareable_linear_backlog \
+  -c "SELECT * FROM app_settings WHERE key = 'sync_cron_schedule';"
+```
+
+**Common causes:**
+- `SYNC_ENABLED=false` — set to `true` in `.env.production`
+- Invalid cron expression in `app_settings` table or `SYNC_CRON_SCHEDULE` env var
+- Backend container restarting (sync scheduler resets on restart)
+- `LINEAR_API_KEY` not configured — sync runs but fails silently
+
+**Resolution:**
+1. Verify `SYNC_ENABLED=true` in `.env.production`
+2. Check the cron schedule is valid (e.g., `0 8,16 * * 1-5` for 8 AM and 4 PM weekdays)
+3. Restart the backend to re-initialize the sync scheduler
+4. Trigger a manual sync to test: `curl -X POST http://localhost/api/sync/trigger`
+
+## Disk Space Issues
+
+### Database running out of disk space
+
+**Symptoms:** Write errors, "no space left on device" in PostgreSQL logs, container crashes.
+
+**Diagnosis:**
+
+```bash
+# Check Docker volume usage
+docker system df -v
+
+# Check database size
+docker exec slb-db psql -U slb_user -d shareable_linear_backlog \
+  -c "SELECT pg_size_pretty(pg_database_size('shareable_linear_backlog'));"
+
+# Check table sizes
+docker exec slb-db psql -U slb_user -d shareable_linear_backlog -c "
+SELECT
+  relname AS table,
+  pg_size_pretty(pg_total_relation_size(relid)) AS total_size
+FROM pg_catalog.pg_statio_user_tables
+ORDER BY pg_total_relation_size(relid) DESC;"
+```
+
+**Common causes:**
+- Audit logs growing without retention policy — see [Database Guide](./database-guide.md#data-retention)
+- Sync history accumulating — clean up old records
+- WAL logs accumulating — may indicate replication issues
+
+**Resolution:**
+1. Implement data retention policies (see [Database Guide](./database-guide.md#data-retention))
+2. Run `VACUUM FULL` on large tables to reclaim space
+3. Increase Docker volume size if needed
+4. Monitor disk usage as part of [weekly operations](./operational-runbook.md)
+
+### Log files consuming disk space
+
+**Symptoms:** Host disk filling up with Docker container logs.
+
+**Diagnosis:**
+
+```bash
+# Check Docker log sizes
+du -sh /var/lib/docker/containers/*/
+```
+
+**Resolution:**
+
+Configure Docker log rotation in `/etc/docker/daemon.json`:
+
+```json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "50m",
+    "max-file": "3"
+  }
+}
+```
+
+Restart Docker after changing: `sudo systemctl restart docker`
+
+## Upgrade Issues
+
+### Migration errors during upgrade
+
+**Symptoms:** `./scripts/deploy.sh` fails at the migration step.
+
+**Diagnosis:**
+
+```bash
+# Check migration status (dry run)
+./scripts/migrate.sh --status
+
+# Check which migrations have been applied
+docker exec slb-db psql -U slb_user -d shareable_linear_backlog \
+  -c "SELECT * FROM pgmigrations ORDER BY id;"
+```
+
+**Common causes:**
+- New migration has a syntax error — check migration file SQL
+- Database connection lost during migration — migration may be partially applied
+- Conflicting schema changes — manual intervention needed
+
+**Resolution:**
+1. Fix the migration SQL error
+2. If partially applied, manually complete or roll back the migration
+3. Re-run: `./scripts/migrate.sh`
+
+### Application fails to start after upgrade
+
+**Symptoms:** Backend container crashes after pulling new code and rebuilding.
+
+**Diagnosis:**
+
+```bash
+# Check backend logs for startup errors
+docker compose -f docker-compose.prod.yml logs backend --tail=100
+
+# Check if migrations were run
+./scripts/migrate.sh --status
+```
+
+**Common causes:**
+- Migrations not run — new code expects schema changes that haven't been applied
+- New environment variables required — check release notes for new required variables
+- Breaking dependency change — rebuild images from scratch
+
+**Resolution:**
+1. Run migrations: `./scripts/migrate.sh`
+2. Check `.env.production.example` for new variables and add them to `.env.production`
+3. Rebuild images: `docker compose -f docker-compose.prod.yml build --no-cache`
+
+### Rolling back an upgrade
+
+If an upgrade causes issues and you need to roll back:
+
+```bash
+# 1. Stop services
+docker compose -f docker-compose.prod.yml down
+
+# 2. Revert to previous code
+git checkout <previous-commit-or-tag>
+
+# 3. Roll back the last migration (if the new version added one)
+npm run migrate:down -w backend
+
+# 4. Rebuild and restart
+docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
+
+# 5. Verify
+curl -s http://localhost/api/health | jq
+```
+
+**Caution:** Rolling back migrations may cause data loss. Always back up before upgrading. See the [Database Guide](./database-guide.md#backup--restore) for backup procedures.
+
 ## Getting Help
 
 1. Check the logs first (see table above)
 2. Verify environment variables in `.env.production`
 3. Test the health endpoint: `curl http://localhost/api/health`
 4. Review this troubleshooting guide for your specific symptom
-5. Check the [deployment guide](./deployment-guide.md) for correct setup steps
+5. Check the [Deployment Guide](./deployment-guide.md) for correct setup steps
+6. Check the [Database Guide](./database-guide.md) for database-specific issues
+7. Check the [Monitoring Runbook](./monitoring-runbook.md) for health check details
+8. Check the [Operational Runbook](./operational-runbook.md) for operational procedures

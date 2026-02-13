@@ -256,6 +256,9 @@ development_status:
     status: done
     linear_id: "VIX-390"
     linear_url: "https://linear.app/vixxo/issue/VIX-390/implement-health-checks-and-monitoring"
-  12-3-create-deployment-documentation: backlog
+  12-3-create-deployment-documentation:
+    status: done
+    linear_id: "VIX-391"
+    linear_url: "https://linear.app/vixxo/issue/VIX-391/create-deployment-documentation"
   12-4-implement-error-recovery-mechanisms: backlog
   epic-12-retrospective: optional
