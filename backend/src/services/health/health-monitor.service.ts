@@ -92,9 +92,21 @@ export class HealthMonitorService {
       return
     }
 
-    const interval =
+    const parsedInterval =
       intervalMs ??
       parseInt(process.env.HEALTH_CHECK_INTERVAL_MS ?? String(DEFAULT_HEALTH_CHECK_INTERVAL), 10)
+
+    // Validate interval to prevent tight loop from NaN or invalid values
+    const interval = Number.isFinite(parsedInterval) && parsedInterval > 0
+      ? parsedInterval
+      : DEFAULT_HEALTH_CHECK_INTERVAL
+
+    if (parsedInterval !== interval) {
+      this.healthLogger.warn(
+        { requested: parsedInterval, actual: interval },
+        'Invalid HEALTH_CHECK_INTERVAL_MS, falling back to default',
+      )
+    }
 
     this.healthLogger.info({ intervalMs: interval }, 'Starting health monitor')
 
@@ -229,6 +241,13 @@ export class HealthMonitorService {
     return testConnection()
   }
 
+  /**
+   * Track in-flight Linear health check to prevent accumulating concurrent requests.
+   * When timeout wins the race, the underlying verifyAuth() keeps running. By reusing
+   * the same in-flight promise, we avoid spawning additional requests while one is pending.
+   */
+  private inFlightLinearCheck: Promise<{ status: 'ok' | 'error' | 'not_configured'; latencyMs?: number }> | null = null
+
   private async checkLinear(
     timeoutMs: number,
   ): Promise<{ status: 'ok' | 'error' | 'not_configured'; latencyMs?: number }> {
@@ -237,34 +256,46 @@ export class HealthMonitorService {
       return { status: 'not_configured' }
     }
 
-    const start = Date.now()
-    let timeoutId: ReturnType<typeof setTimeout> | undefined
-
-    try {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Linear health check timed out')), timeoutMs)
-      })
-
-      const result = await Promise.race([
-        linearClient.verifyAuth(),
-        timeoutPromise,
-      ])
-
-      if (result?.data) {
-        return { status: 'ok', latencyMs: Date.now() - start }
-      }
-      return { status: 'error', latencyMs: Date.now() - start }
-    } catch (err: unknown) {
-      if (
-        err instanceof Error &&
-        (err.name === 'LinearConfigError' || err.message.includes('LINEAR_API_KEY'))
-      ) {
-        return { status: 'not_configured' }
-      }
-      return { status: 'error', latencyMs: Date.now() - start }
-    } finally {
-      if (timeoutId) clearTimeout(timeoutId)
+    // Reuse in-flight check to prevent accumulating concurrent requests during Linear slowness
+    if (this.inFlightLinearCheck) {
+      return this.inFlightLinearCheck
     }
+
+    const start = Date.now()
+
+    const doCheck = async (): Promise<{ status: 'ok' | 'error' | 'not_configured'; latencyMs?: number }> => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Linear health check timed out')), timeoutMs)
+        })
+
+        const result = await Promise.race([
+          linearClient.verifyAuth(),
+          timeoutPromise,
+        ])
+
+        if (result?.data) {
+          return { status: 'ok', latencyMs: Date.now() - start }
+        }
+        return { status: 'error', latencyMs: Date.now() - start }
+      } catch (err: unknown) {
+        if (
+          err instanceof Error &&
+          (err.name === 'LinearConfigError' || err.message.includes('LINEAR_API_KEY'))
+        ) {
+          return { status: 'not_configured' }
+        }
+        return { status: 'error', latencyMs: Date.now() - start }
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId)
+        this.inFlightLinearCheck = null
+      }
+    }
+
+    this.inFlightLinearCheck = doCheck()
+    return this.inFlightLinearCheck
   }
 
   private determineStatus(

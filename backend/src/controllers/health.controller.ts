@@ -25,6 +25,13 @@ interface LinearCheckResult {
   latencyMs?: number
 }
 
+/**
+ * Track in-flight Linear health check to prevent accumulating concurrent requests.
+ * When timeout wins the race, the underlying verifyAuth() keeps running. By reusing
+ * the same in-flight promise, we avoid spawning additional requests while one is pending.
+ */
+let inFlightLinearCheck: Promise<LinearCheckResult> | null = null
+
 async function checkLinearHealth(timeoutMs: number): Promise<LinearCheckResult> {
   // If the API key is not configured, avoid calling the Linear client entirely.
   // This keeps health checks fast and avoids noise in logs.
@@ -32,42 +39,54 @@ async function checkLinearHealth(timeoutMs: number): Promise<LinearCheckResult> 
     return { status: 'not_configured', connected: false, reason: 'not_configured' }
   }
 
-  const start = Date.now()
-  let timeoutId: ReturnType<typeof setTimeout> | undefined
-
-  try {
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error('Linear health check timed out')), timeoutMs)
-    })
-
-    const result = await Promise.race([
-      linearClient.verifyAuth(),
-      timeoutPromise,
-    ])
-
-    // verifyAuth succeeded
-    if (result?.data) {
-      return {
-        status: 'ok',
-        connected: true,
-        latencyMs: Date.now() - start,
-      }
-    }
-
-    return { status: 'error', connected: false, latencyMs: Date.now() - start }
-  } catch (err: unknown) {
-    // Check if this is a config error (LINEAR_API_KEY not set)
-    if (
-      err instanceof Error &&
-      (err.name === 'LinearConfigError' || err.message.includes('LINEAR_API_KEY'))
-    ) {
-      return { status: 'not_configured', connected: false, reason: 'not_configured' }
-    }
-
-    return { status: 'error', connected: false, latencyMs: Date.now() - start }
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId)
+  // Reuse in-flight check to prevent accumulating concurrent requests during Linear slowness
+  if (inFlightLinearCheck) {
+    return inFlightLinearCheck
   }
+
+  const start = Date.now()
+
+  const doCheck = async (): Promise<LinearCheckResult> => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Linear health check timed out')), timeoutMs)
+      })
+
+      const result = await Promise.race([
+        linearClient.verifyAuth(),
+        timeoutPromise,
+      ])
+
+      // verifyAuth succeeded
+      if (result?.data) {
+        return {
+          status: 'ok',
+          connected: true,
+          latencyMs: Date.now() - start,
+        }
+      }
+
+      return { status: 'error', connected: false, latencyMs: Date.now() - start }
+    } catch (err: unknown) {
+      // Check if this is a config error (LINEAR_API_KEY not set)
+      if (
+        err instanceof Error &&
+        (err.name === 'LinearConfigError' || err.message.includes('LINEAR_API_KEY'))
+      ) {
+        return { status: 'not_configured', connected: false, reason: 'not_configured' }
+      }
+
+      return { status: 'error', connected: false, latencyMs: Date.now() - start }
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId)
+      inFlightLinearCheck = null
+    }
+  }
+
+  inFlightLinearCheck = doCheck()
+  return inFlightLinearCheck
 }
 
 /* ------------------------------------------------------------------ */
@@ -115,6 +134,8 @@ export const getHealth = async (_req: Request, res: Response): Promise<void> => 
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     version: APP_VERSION,
+    // Legacy field for backward compatibility — consumers may still read response.database
+    database,
     checks: {
       database: dbCheck,
       linear,
@@ -169,13 +190,10 @@ export const getLinearHealth = async (_req: Request, res: Response): Promise<voi
 /* ------------------------------------------------------------------ */
 
 export const getReady = async (_req: Request, res: Response): Promise<void> => {
-  const [database, linear] = await Promise.all([
-    testConnection(),
-    checkLinearHealth(getLinearHealthTimeoutMs()),
-  ])
+  // Only check critical dependencies (database) for readiness.
+  // Linear is optional and should not block or delay the readiness probe.
+  const database = await testConnection()
 
-  // Readiness requires critical dependencies (database). Linear is treated as optional
-  // to preserve graceful degradation (cached reads still possible when Linear is down).
   if (!database.connected) {
     res.status(503).json({ status: 'not_ready', reason: 'database_unavailable' })
     return
@@ -185,11 +203,10 @@ export const getReady = async (_req: Request, res: Response): Promise<void> => {
     status: 'ready',
     checks: {
       database: {
-        status: database.connected ? ('ok' as const) : ('error' as const),
+        status: 'ok' as const,
         connected: database.connected,
         latencyMs: database.latencyMs,
       },
-      linear,
     },
   })
 }
