@@ -210,8 +210,11 @@ development_status:
   epic-9-retrospective: optional
 
   # Epic 10: Security & Audit
-  epic-10: backlog
-  10-1-implement-https-and-data-encryption: backlog
+  epic-10: in-progress
+  10-1-implement-https-and-data-encryption:
+    status: done
+    linear_id: "VIX-379"
+    linear_url: "https://linear.app/vixxo/issue/VIX-379/implement-https-and-data-encryption"
   10-2-implement-audit-logging-for-user-access: backlog
   10-3-implement-audit-logging-for-admin-actions: backlog
   10-4-implement-secure-credential-storage: backlog
