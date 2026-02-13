@@ -24,14 +24,25 @@ vi.mock('../services/sync/sync.service.js', () => ({
 }))
 
 // Mock the logger to avoid noisy output in tests
-vi.mock('../utils/logger.js', () => ({
-  logger: {
+vi.mock('../utils/logger.js', () => {
+  const mockChild = {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-  },
-}))
+    child: vi.fn(),
+  }
+  mockChild.child.mockReturnValue(mockChild)
+  return {
+    logger: {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      child: vi.fn().mockReturnValue(mockChild),
+    },
+  }
+})
 
 describe('Sync Routes (route integration)', () => {
   let server: Server

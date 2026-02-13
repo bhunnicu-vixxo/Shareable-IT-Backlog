@@ -29,14 +29,25 @@ vi.mock('../services/audit/audit.service.js', () => ({
   },
 }))
 
-vi.mock('../utils/logger.js', () => ({
-  logger: {
+vi.mock('../utils/logger.js', () => {
+  const mockChild = {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-  },
-}))
+    child: vi.fn(),
+  }
+  mockChild.child.mockReturnValue(mockChild)
+  return {
+    logger: {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      child: vi.fn().mockReturnValue(mockChild),
+    },
+  }
+})
 
 // Mock database for session store + any incidental DB usage
 vi.mock('../utils/database.js', () => ({

@@ -3,14 +3,25 @@ import { createServer, type Server } from 'http'
 import type { AddressInfo } from 'net'
 
 // Mock the logger to avoid noisy output
-vi.mock('../utils/logger.js', () => ({
-  logger: {
+vi.mock('../utils/logger.js', () => {
+  const mockChild = {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-  },
-}))
+    child: vi.fn(),
+  }
+  mockChild.child.mockReturnValue(mockChild)
+  return {
+    logger: {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      child: vi.fn().mockReturnValue(mockChild),
+    },
+  }
+})
 
 // Mock DB health probe so /api/health doesn't hang on real DB connectivity
 vi.mock('../utils/database.js', async () => {
@@ -19,9 +30,19 @@ vi.mock('../utils/database.js', async () => {
   )
   return {
     ...actual,
-    testConnection: vi.fn().mockResolvedValue({ connected: false, latencyMs: 0 }),
+    testConnection: vi.fn().mockResolvedValue({ connected: true, latencyMs: 1 }),
   }
 })
+
+// Mock Linear client to prevent actual API calls during health checks
+vi.mock('../services/sync/linear-client.service.js', () => ({
+  linearClient: {
+    verifyAuth: vi.fn().mockResolvedValue({
+      data: { id: '1', name: 'Test', email: 'test@test.com' },
+      rateLimit: null,
+    }),
+  },
+}))
 
 // Mock sync service to prevent actual sync operations
 vi.mock('../services/sync/sync.service.js', () => ({

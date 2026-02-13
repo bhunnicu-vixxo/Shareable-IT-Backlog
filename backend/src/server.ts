@@ -11,7 +11,7 @@ validateCredentials()
 const portFromEnv = process.env.PORT ? Number(process.env.PORT) : 3000
 const PORT = Number.isFinite(portFromEnv) ? portFromEnv : 3000
 
-const { default: app } = await import('./app.js')
+const { default: app, startHealthMonitor } = await import('./app.js')
 const { syncScheduler } = await import('./services/sync/sync-scheduler.service.js')
 
 app.listen(PORT, () => {
@@ -19,4 +19,5 @@ app.listen(PORT, () => {
   syncScheduler.start().catch((error) => {
     logger.error({ error }, 'Failed to start sync scheduler')
   })
+  startHealthMonitor()
 })
