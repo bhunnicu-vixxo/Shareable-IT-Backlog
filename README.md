@@ -115,6 +115,15 @@ See [`.env.example`](.env.example) for all required environment variables. Each 
 
 > **Note:** For Azure PostgreSQL, the `DATABASE_URL` must include `?sslmode=require&uselibpqcompat=true`.
 
+### Credential Security
+
+Credentials can be stored encrypted using the `enc:` prefix (AES-256-GCM). See [`docs/credential-management.md`](docs/credential-management.md) for:
+
+- Credential inventory and encryption guide
+- Per-credential rotation procedures
+- Emergency response procedures
+- Production deployment checklist
+
 ## Tech Stack
 
 - **Frontend:** Vite, React 19, TypeScript, Chakra UI, TanStack Query, React Router v7

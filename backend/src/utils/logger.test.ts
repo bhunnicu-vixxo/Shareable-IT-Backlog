@@ -12,16 +12,28 @@ import { Writable } from 'node:stream'
 
 const REDACT_CONFIG = {
   paths: [
+    // Request headers
     'req.headers.authorization',
     'req.headers.cookie',
+    // Common credential field names (top-level)
     'password',
     'apiKey',
     'secret',
     'token',
+    // Specific environment variable names (top-level)
     'LINEAR_API_KEY',
     'SESSION_SECRET',
     'CREDENTIAL_ENCRYPTION_KEY',
     'DB_ENCRYPTION_KEY',
+    'DATABASE_URL',
+    'SYNC_TRIGGER_TOKEN',
+    // Wildcard patterns for nested objects with credential-like fields
+    '*.password',
+    '*.apiKey',
+    '*.secret',
+    '*.token',
+    '*.credential',
+    '*.credentials',
   ],
   censor: '[REDACTED]',
 }
@@ -129,5 +141,54 @@ describe('logger redaction', () => {
     const output = getLines().join('')
     expect(output).toContain('[REDACTED]')
     expect(output).not.toContain('cred-key-value')
+  })
+
+  it('should redact DATABASE_URL field', () => {
+    const { logger, getLines } = createTestLogger()
+    logger.info({ DATABASE_URL: 'postgresql://user:p@ss@localhost:5432/db' }, 'db config')
+    const output = getLines().join('')
+    expect(output).toContain('[REDACTED]')
+    expect(output).not.toContain('postgresql://user:p@ss@localhost:5432/db')
+  })
+
+  it('should redact SYNC_TRIGGER_TOKEN field', () => {
+    const { logger, getLines } = createTestLogger()
+    logger.info({ SYNC_TRIGGER_TOKEN: 'my-trigger-token-secret' }, 'sync config')
+    const output = getLines().join('')
+    expect(output).toContain('[REDACTED]')
+    expect(output).not.toContain('my-trigger-token-secret')
+  })
+
+  it('should redact nested password field via wildcard', () => {
+    const { logger, getLines } = createTestLogger()
+    logger.info(
+      { dbConfig: { password: 'nested-db-password' } },
+      'nested credential',
+    )
+    const output = getLines().join('')
+    expect(output).toContain('[REDACTED]')
+    expect(output).not.toContain('nested-db-password')
+  })
+
+  it('should redact nested token field via wildcard', () => {
+    const { logger, getLines } = createTestLogger()
+    logger.info(
+      { auth: { token: 'nested-auth-token' } },
+      'nested token',
+    )
+    const output = getLines().join('')
+    expect(output).toContain('[REDACTED]')
+    expect(output).not.toContain('nested-auth-token')
+  })
+
+  it('should redact nested secret field via wildcard', () => {
+    const { logger, getLines } = createTestLogger()
+    logger.info(
+      { config: { secret: 'nested-secret-value' } },
+      'nested secret',
+    )
+    const output = getLines().join('')
+    expect(output).toContain('[REDACTED]')
+    expect(output).not.toContain('nested-secret-value')
   })
 })

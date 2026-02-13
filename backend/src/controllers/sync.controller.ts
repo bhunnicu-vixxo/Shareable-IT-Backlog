@@ -1,7 +1,19 @@
 import type { Request, Response, NextFunction } from 'express'
+import { timingSafeEqual } from 'node:crypto'
 
 import { syncService } from '../services/sync/sync.service.js'
+import { decryptCredential } from '../utils/credentials.js'
 import { logger } from '../utils/logger.js'
+
+/**
+ * Resolve the configured SYNC_TRIGGER_TOKEN, supporting `enc:` prefix.
+ * Returns trimmed token or undefined if not configured.
+ */
+function getResolvedSyncTriggerToken(): string | undefined {
+  const raw = process.env.SYNC_TRIGGER_TOKEN?.trim()
+  if (!raw) return undefined
+  return decryptCredential(raw).trim()
+}
 
 function extractSyncTriggerToken(req: Request): string | null {
   const authHeader = req.header('authorization')
@@ -11,6 +23,13 @@ function extractSyncTriggerToken(req: Request): string | null {
 
   const headerToken = req.header('x-sync-trigger-token')
   return headerToken?.trim() || null
+}
+
+function safeTokenEquals(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a)
+  const bBuf = Buffer.from(b)
+  if (aBuf.length !== bBuf.length) return false
+  return timingSafeEqual(aBuf, bBuf)
 }
 
 /**
@@ -25,19 +44,21 @@ export const getSyncStatus = async (
 ): Promise<void> => {
   try {
     const status = syncService.getStatus()
+    let responseStatus = status
 
     // Optional hardening: when a sync trigger token is configured, suppress
     // technical error details unless the caller provides the same token.
-    const requiredToken = process.env.SYNC_TRIGGER_TOKEN?.trim()
+    const requiredToken = getResolvedSyncTriggerToken()
     if (requiredToken) {
       const providedToken = extractSyncTriggerToken(req)
-      const isAuthorized = !!providedToken && providedToken === requiredToken
+      const isAuthorized =
+        !!providedToken && safeTokenEquals(providedToken, requiredToken)
       if (!isAuthorized) {
-        status.errorMessage = null
+        responseStatus = { ...status, errorMessage: null }
       }
     }
 
-    res.json(status)
+    res.json(responseStatus)
   } catch (error) {
     next(error)
   }
@@ -61,10 +82,10 @@ export const triggerSync = async (
   try {
     // Optional protection: if configured, require a token to trigger sync.
     // (Auth/RBAC is planned for Epic 7.x; this provides a non-breaking hardening option.)
-    const requiredToken = process.env.SYNC_TRIGGER_TOKEN?.trim()
+    const requiredToken = getResolvedSyncTriggerToken()
     if (requiredToken) {
       const providedToken = extractSyncTriggerToken(req)
-      if (!providedToken || providedToken !== requiredToken) {
+      if (!providedToken || !safeTokenEquals(providedToken, requiredToken)) {
         res.status(403).json({
           error: {
             message: 'Forbidden',

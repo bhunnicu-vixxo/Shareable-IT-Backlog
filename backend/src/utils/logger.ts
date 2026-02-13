@@ -15,16 +15,28 @@ export const logger = pino({
   level,
   redact: {
     paths: [
+      // Request headers
       'req.headers.authorization',
       'req.headers.cookie',
+      // Common credential field names (top-level)
       'password',
       'apiKey',
       'secret',
       'token',
+      // Specific environment variable names (top-level)
       'LINEAR_API_KEY',
       'SESSION_SECRET',
       'CREDENTIAL_ENCRYPTION_KEY',
       'DB_ENCRYPTION_KEY',
+      'DATABASE_URL',
+      'SYNC_TRIGGER_TOKEN',
+      // Wildcard patterns for nested objects with credential-like fields
+      '*.password',
+      '*.apiKey',
+      '*.secret',
+      '*.token',
+      '*.credential',
+      '*.credentials',
     ],
     censor: '[REDACTED]',
   },

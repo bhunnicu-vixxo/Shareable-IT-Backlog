@@ -223,7 +223,10 @@ development_status:
     status: done
     linear_id: "VIX-381"
     linear_url: "https://linear.app/vixxo/issue/VIX-381/implement-audit-logging-for-admin-actions"
-  10-4-implement-secure-credential-storage: backlog
+  10-4-implement-secure-credential-storage:
+    status: done
+    linear_id: "VIX-382"
+    linear_url: "https://linear.app/vixxo/issue/VIX-382/implement-secure-credential-storage"
   epic-10-retrospective: optional
 
   # Epic 11: Accessibility & Testing
