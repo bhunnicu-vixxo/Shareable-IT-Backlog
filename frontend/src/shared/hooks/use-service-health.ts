@@ -28,6 +28,10 @@ export function useServiceHealth() {
     const cache = queryClient.getQueryCache()
 
     const unsubscribe = cache.subscribe((event) => {
+      // Only process 'updated' events to avoid double-counting when observers are present.
+      // TanStack Query v5 emits multiple events per state transition (e.g., 'updated' and
+      // 'observerResultsUpdated'), but only 'updated' represents the actual state change.
+      if (event.type !== 'updated') return
       if (!event?.query) return
 
       const state = event.query.state
@@ -49,8 +53,7 @@ export function useServiceHealth() {
         // messages: "Failed to fetch" (Chrome), "Load failed" (Safari),
         // "NetworkError when attempting to fetch resource" (Firefox).
         // Check for TypeError generically rather than matching a specific message.
-        const isNetworkError =
-          error instanceof TypeError && error.name === 'TypeError'
+        const isNetworkError = error instanceof TypeError && error.name === 'TypeError'
 
         if (is503 || isNetworkError) {
           consecutiveFailuresRef.current += 1
