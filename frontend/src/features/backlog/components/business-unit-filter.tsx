@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef } from 'react'
 import { Box, Select, Text, createListCollection } from '@chakra-ui/react'
 import type { BacklogItem } from '../types/backlog.types'
 
@@ -47,20 +47,20 @@ export const BusinessUnitFilter = memo(function BusinessUnitFilter({
     [businessUnits],
   )
 
-  // ARIA live region announcement text (Task 3)
-  // Skip announcement on initial mount — only announce user-initiated changes
+  // ARIA live region announcement (Task 3)
+  // - No announcement on initial mount
+  // - When value changes, write directly to the live region (no setState-in-effect)
   const isInitialMount = useRef(true)
-  const [announceText, setAnnounceText] = useState('')
+  const liveRegionRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
       return
     }
-    if (value) {
-      setAnnounceText(`Filtered to ${value}`)
-    } else {
-      setAnnounceText('Filter cleared, showing all business units')
+    const text = value ? `Filtered to ${value}` : 'Filter cleared, showing all business units'
+    if (liveRegionRef.current) {
+      liveRegionRef.current.textContent = text
     }
   }, [value])
 
@@ -75,7 +75,8 @@ export const BusinessUnitFilter = memo(function BusinessUnitFilter({
         value={value ? [value] : []}
         onValueChange={(details) => {
           const selected = details.value[0]
-          onChange(selected === ALL_VALUE || !selected ? null : selected)
+          const nextValue = selected === ALL_VALUE || !selected ? null : selected
+          onChange(nextValue)
         }}
         size={selectSize}
         data-testid="business-unit-filter"
@@ -144,6 +145,7 @@ export const BusinessUnitFilter = memo(function BusinessUnitFilter({
 
       {/* ARIA live region for screen reader announcements (Task 3) */}
       <Box
+        ref={liveRegionRef}
         role="status"
         aria-live="polite"
         aria-atomic="true"
@@ -154,7 +156,6 @@ export const BusinessUnitFilter = memo(function BusinessUnitFilter({
         clipPath="inset(50%)"
         whiteSpace="nowrap"
       >
-        {announceText}
       </Box>
     </Box>
   )

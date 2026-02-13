@@ -227,8 +227,11 @@ development_status:
   epic-10-retrospective: optional
 
   # Epic 11: Accessibility & Testing
-  epic-11: backlog
-  11-1-implement-keyboard-navigation: backlog
+  epic-11: in-progress
+  11-1-implement-keyboard-navigation:
+    status: done
+    linear_id: "VIX-384"
+    linear_url: "https://linear.app/vixxo/issue/VIX-384/implement-keyboard-navigation"
   11-2-implement-screen-reader-support: backlog
   11-3-ensure-color-contrast-compliance: backlog
   11-4-conduct-accessibility-testing: backlog
