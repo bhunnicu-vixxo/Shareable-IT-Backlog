@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { Box, Button, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { useBacklogItems } from '../hooks/use-backlog-items'
 import { useDebouncedValue } from '../hooks/use-debounced-value'
@@ -117,6 +118,8 @@ export function BacklogList() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const lastClickedCardRef = useRef<HTMLDivElement | null>(null)
+  const lastClickedItemId = useRef<string | null>(null)
+  const parentRef = useRef<HTMLDivElement>(null)
 
   // Debounce the keyword query so filtering doesn't run on every keystroke
   const debouncedQuery = useDebouncedValue(keywordQuery, 300)
@@ -189,6 +192,27 @@ export function BacklogList() {
     return sorted
   }, [items, selectedBusinessUnit, showNewOnly, searchTokens, sortBy, sortDirection])
 
+  // Virtual scrolling — only renders visible items in the DOM
+  const virtualizer = useVirtualizer({
+    count: displayedItems.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 140,
+    overscan: 5,
+  })
+
+  // Keep refs to stable values for use in callbacks without extra deps
+  const displayedItemsRef = useRef(displayedItems)
+  displayedItemsRef.current = displayedItems
+
+  // Reset scroll position when displayed items change (filter/sort)
+  const prevDisplayedItemsRef = useRef(displayedItems)
+  useEffect(() => {
+    if (prevDisplayedItemsRef.current !== displayedItems) {
+      prevDisplayedItemsRef.current = displayedItems
+      virtualizer.scrollToOffset(0)
+    }
+  }, [displayedItems, virtualizer])
+
   // Stabilize callback handlers with useCallback to maintain referential stability
   // for memoized child components (React.memo). State setters are stable references.
   const handleClearKeyword = useCallback(() => setKeywordQuery(''), [])
@@ -207,9 +231,34 @@ export function BacklogList() {
   // cost for typical backlog sizes (< 500 items) is negligible.
   const handleItemClick = useCallback((itemId: string) => {
     lastClickedCardRef.current = cardRefs.current[itemId] ?? null
+    lastClickedItemId.current = itemId
     setSelectedItemId(itemId)
   }, [])
-  const handleCloseDetail = useCallback(() => setSelectedItemId(null), [])
+  const handleCloseDetail = useCallback(() => {
+    // Scroll the previously clicked card into view before closing the modal
+    // so that it is rendered in the DOM for focus restoration.
+    if (lastClickedItemId.current) {
+      const idx = displayedItemsRef.current.findIndex(
+        (item) => item.id === lastClickedItemId.current,
+      )
+      if (idx >= 0) {
+        virtualizer.scrollToIndex(idx, { align: 'center' })
+      }
+    }
+    setSelectedItemId(null)
+    // After scroll + render, manually focus the card as a reliable fallback
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (lastClickedItemId.current) {
+          const cardEl = cardRefs.current[lastClickedItemId.current]
+          if (cardEl) {
+            lastClickedCardRef.current = cardEl
+            cardEl.focus()
+          }
+        }
+      })
+    })
+  }, [virtualizer])
 
   if (isLoading) {
     return (
@@ -251,13 +300,17 @@ export function BacklogList() {
   /** Build a descriptive results count reflecting active filters. */
   const getResultCountText = () => {
     const count = displayedItems.length
+    const total = items.length
+    const isFiltered = count !== total
     const parts: string[] = []
     if (showNewOnly) parts.push('new')
-    const itemWord = count === 1 ? 'item' : 'items'
+    // When showing "X of Y", Y >= 2 so always plural; otherwise pluralize on count
+    const itemWord = isFiltered ? 'items' : count === 1 ? 'item' : 'items'
     const filterParts = parts.length > 0 ? `${parts.join(' ')} ` : ''
+    const ofTotal = isFiltered ? ` of ${total}` : ''
     const matchPart = debouncedQuery.trim() ? ` matching "${debouncedQuery.trim()}"` : ''
     const buPart = selectedBusinessUnit ? ` for ${selectedBusinessUnit}` : ''
-    return `Showing ${count} ${filterParts}${itemWord}${matchPart}${buPart}`
+    return `Showing ${count}${ofTotal} ${filterParts}${itemWord}${matchPart}${buPart}`
   }
 
   /** Whether any filter is active (used for empty-state detection). */
@@ -314,22 +367,48 @@ export function BacklogList() {
         />
       ) : (
         <>
-          <VStack gap="4" align="stretch">
-            {displayedItems.map((item) => (
-              <Box
-                key={item.id}
-                ref={(el: HTMLDivElement | null) => {
-                  cardRefs.current[item.id] = el
-                }}
-              >
-                <BacklogItemCard
-                  item={item}
-                  highlightTokens={searchTokens}
-                  onClick={() => handleItemClick(item.id)}
-                />
-              </Box>
-            ))}
-          </VStack>
+          <Box
+            ref={parentRef}
+            height="calc(100vh - 220px)"
+            overflowY="auto"
+          >
+            <div
+              style={{
+                height: `${virtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {virtualizer.getVirtualItems().map((virtualItem) => {
+                const item = displayedItems[virtualItem.index]
+                return (
+                  <div
+                    key={item.id}
+                    data-index={virtualItem.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualItem.start}px)`,
+                    }}
+                  >
+                    <Box pb="4">
+                      <BacklogItemCard
+                        ref={(el: HTMLDivElement | null) => {
+                          cardRefs.current[item.id] = el
+                        }}
+                        item={item}
+                        highlightTokens={searchTokens}
+                        onClick={() => handleItemClick(item.id)}
+                      />
+                    </Box>
+                  </div>
+                )
+              })}
+            </div>
+          </Box>
           <ItemDetailModal
             isOpen={!!selectedItemId}
             itemId={selectedItemId}

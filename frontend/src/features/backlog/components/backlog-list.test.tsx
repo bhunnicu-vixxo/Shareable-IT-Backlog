@@ -8,6 +8,28 @@ import type {
   BacklogItemComment,
 } from '../types/backlog.types'
 
+// Mock @tanstack/react-virtual because jsdom has no real layout engine.
+// Most tests want the full list in the DOM; some tests set a "visible window"
+// to verify that BacklogList renders only a subset of items.
+let virtualItemsLimit: number | null = null
+const scrollToOffset = vi.fn()
+const scrollToIndex = vi.fn()
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getVirtualItems: () =>
+      Array.from({ length: virtualItemsLimit ?? count }, (_, i) => ({
+        index: i,
+        start: i * 140,
+        size: 140,
+        key: i,
+      })),
+    getTotalSize: () => count * 140,
+    scrollToOffset,
+    scrollToIndex,
+    measureElement: vi.fn(),
+  }),
+}))
+
 function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
   return {
     id: 'issue-1',
@@ -55,6 +77,9 @@ describe('BacklogList', () => {
   afterEach(() => {
     globalThis.fetch = originalFetch
     vi.restoreAllMocks()
+    virtualItemsLimit = null
+    scrollToOffset.mockReset()
+    scrollToIndex.mockReset()
   })
 
   it('shows loading skeleton while fetching', () => {
@@ -253,7 +278,7 @@ describe('BacklogList', () => {
     expect(screen.queryByText('Old item')).not.toBeInTheDocument()
     expect(screen.getByText('New item A')).toBeInTheDocument()
     expect(screen.getByText('New item B')).toBeInTheDocument()
-    expect(screen.getByText('Showing 2 new items')).toBeInTheDocument()
+    expect(screen.getByText('Showing 2 of 3 new items')).toBeInTheDocument()
   })
 
   it('toggles back to show all items', async () => {
@@ -301,7 +326,7 @@ describe('BacklogList', () => {
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
-    expect(screen.getByText('Showing 1 new item')).toBeInTheDocument()
+    expect(screen.getByText('Showing 1 of 2 new items')).toBeInTheDocument()
   })
 
   it('opens detail modal when item is clicked', async () => {
@@ -430,7 +455,7 @@ describe('BacklogList', () => {
     fireEvent.click(operationsOption)
 
     await waitFor(() => {
-      expect(screen.getByText('Showing 2 items for Operations')).toBeInTheDocument()
+      expect(screen.getByText('Showing 2 of 3 items for Operations')).toBeInTheDocument()
     })
   })
 
@@ -470,7 +495,7 @@ describe('BacklogList', () => {
       expect(screen.getByText('Ops new')).toBeInTheDocument()
     })
     expect(screen.queryByText('Ops old')).not.toBeInTheDocument()
-    expect(screen.getByText('Showing 1 new item for Operations')).toBeInTheDocument()
+    expect(screen.getByText('Showing 1 of 3 new items for Operations')).toBeInTheDocument()
   })
 
   it('shows empty filter state with "Clear business unit" when BU filter returns no results', async () => {
@@ -904,7 +929,7 @@ describe('BacklogList', () => {
     fireEvent.change(searchInput, { target: { value: 'vpn' } })
 
     await waitFor(() => {
-      expect(screen.getByText('Showing 2 items matching "vpn"')).toBeInTheDocument()
+      expect(screen.getByText('Showing 2 of 3 items matching "vpn"')).toBeInTheDocument()
     })
   })
 
@@ -1120,5 +1145,291 @@ describe('BacklogList', () => {
     const urgentIdx = cardLabels.findIndex((l) => l.includes('Ops urgent'))
     const lowIdx = cardLabels.findIndex((l) => l.includes('Ops low'))
     expect(urgentIdx).toBeLessThan(lowIdx)
+  })
+
+  // ─── Virtual Scrolling Tests ───
+
+  it('renders items inside a virtual scroll container', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Item A' }),
+        createMockItem({ id: '2', title: 'Item B' }),
+        createMockItem({ id: '3', title: 'Item C' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item A')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Item B')).toBeInTheDocument()
+    expect(screen.getByText('Item C')).toBeInTheDocument()
+
+    // Verify virtual scroll container exists (has overflowY auto)
+    const scrollContainer = screen.getByText('Item A').closest('[style]')
+    expect(scrollContainer).toBeInTheDocument()
+  })
+
+  it('renders only a visible subset of items when dataset is large (virtualization)', async () => {
+    virtualItemsLimit = 10
+    const items = Array.from({ length: 100 }, (_, i) =>
+      createMockItem({ id: `item-${i}`, title: `Item ${i}` }),
+    )
+    const response: BacklogListResponse = {
+      items,
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 100,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item 0')).toBeInTheDocument()
+    })
+
+    // Within the mocked visible window
+    expect(screen.getByText('Item 9')).toBeInTheDocument()
+
+    // Outside the mocked visible window — should NOT be in the DOM
+    expect(screen.queryByText('Item 50')).not.toBeInTheDocument()
+    expect(screen.queryByText('Item 99')).not.toBeInTheDocument()
+  })
+
+  it('virtual list renders items with absolute positioning (virtualization pattern)', async () => {
+    const items = Array.from({ length: 20 }, (_, i) =>
+      createMockItem({ id: `item-${i}`, title: `Item ${i}` }),
+    )
+    const response: BacklogListResponse = {
+      items,
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 20,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item 0')).toBeInTheDocument()
+    })
+
+    // Verify items are rendered with absolute positioning (virtual scrolling pattern)
+    const firstCard = screen.getByText('Item 0').closest('[data-index]')
+    expect(firstCard).toBeInTheDocument()
+    expect(firstCard).toHaveAttribute('data-index', '0')
+    expect(firstCard).toHaveStyle({ position: 'absolute' })
+
+    // Verify multiple items render
+    expect(screen.getByText('Item 5')).toBeInTheDocument()
+    expect(screen.getByText('Item 19')).toBeInTheDocument()
+  })
+
+  it('handles small dataset gracefully in virtual list', async () => {
+    const response: BacklogListResponse = {
+      items: [createMockItem({ id: '1', title: 'Single item' })],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 1,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Single item')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Showing 1 item')).toBeInTheDocument()
+  })
+
+  it('renders EmptyStateWithGuidance outside virtual scroller when filters yield no results', async () => {
+    // Items: one Ops (new), one Finance (not new). Filtering BU=Finance + NewOnly → empty
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Ops new', teamName: 'Operations', isNew: true }),
+        createMockItem({ id: '2', title: 'Fin old', teamName: 'Finance', isNew: false }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Ops new')).toBeInTheDocument()
+    })
+
+    // Select Finance BU
+    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    fireEvent.click(trigger)
+    const financeOption = await screen.findByRole('option', { name: 'Finance' })
+    fireEvent.click(financeOption)
+
+    await waitFor(() => {
+      expect(screen.getByText('Fin old')).toBeInTheDocument()
+    })
+
+    // Toggle "New only" — Finance has no new items → empty state
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+
+    await waitFor(() => {
+      // EmptyStateWithGuidance renders outside the virtual scroller
+      expect(screen.getByTestId('empty-state-with-guidance')).toBeInTheDocument()
+    })
+    // No backlog item cards should be visible
+    expect(screen.queryByText('Ops new')).not.toBeInTheDocument()
+    expect(screen.queryByText('Fin old')).not.toBeInTheDocument()
+  })
+
+  it('item click handler works on virtualized items', async () => {
+    const listResponse: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'v-1', title: 'Virtual item', identifier: 'VIX-V1' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 1,
+    }
+    const detailResponse: BacklogDetailResponse = {
+      item: createMockItem({
+        id: 'v-1',
+        title: 'Virtual item',
+        identifier: 'VIX-V1',
+        description: 'Virtual item detail',
+      }),
+      comments: [] as BacklogItemComment[],
+      activities: [],
+    }
+
+    globalThis.fetch = vi.fn().mockImplementation((url: string | URL) => {
+      const urlStr = typeof url === 'string' ? url : url.toString()
+      const isDetailRequest =
+        urlStr.includes('/backlog-items/') && urlStr.split('/').pop() !== 'backlog-items'
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(isDetailRequest ? detailResponse : listResponse),
+      })
+    })
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Virtual item')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('Virtual item'))
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Backlog item details')).toBeInTheDocument()
+    })
+
+    await waitFor(
+      () => {
+        expect(screen.getByText('Virtual item detail')).toBeInTheDocument()
+      },
+      { timeout: 3000 },
+    )
+  })
+
+  it('filter changes update the virtual list', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Alpha item', isNew: true }),
+        createMockItem({ id: '2', title: 'Beta item', isNew: false }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Alpha item')).toBeInTheDocument()
+      expect(screen.getByText('Beta item')).toBeInTheDocument()
+    })
+
+    // Toggle "New only"
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Alpha item')).toBeInTheDocument()
+      expect(screen.queryByText('Beta item')).not.toBeInTheDocument()
+    })
+  })
+
+  it('resets virtual scroll position to top when filters change', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Old item', isNew: false }),
+        createMockItem({ id: '2', title: 'New item', isNew: true }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Old item')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+
+    await waitFor(() => {
+      expect(scrollToOffset).toHaveBeenCalledWith(0)
+    })
+  })
+
+  it('shows "X of Y items" when filters are active', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Match A', isNew: true }),
+        createMockItem({ id: '2', title: 'Match B', isNew: false }),
+        createMockItem({ id: '3', title: 'No match', isNew: false }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      // No filters — shows simple count without "of Y"
+      expect(screen.getByText('Showing 3 items')).toBeInTheDocument()
+    })
+
+    // Toggle "New only" (no debounce, instant filter)
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+
+    await waitFor(() => {
+      // With filter — shows "X of Y" format
+      expect(screen.getByText('Showing 1 of 3 new items')).toBeInTheDocument()
+    })
+  })
+
+  it('does not show "of Y" when all items are displayed', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Item A' }),
+        createMockItem({ id: '2', title: 'Item B' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Showing 2 items')).toBeInTheDocument()
+    })
+    // Should NOT contain "of"
+    expect(screen.queryByText(/of \d+ items/)).not.toBeInTheDocument()
   })
 })

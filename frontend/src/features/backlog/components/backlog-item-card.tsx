@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, forwardRef } from 'react'
 import { Badge, Box, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { formatDistanceToNow } from 'date-fns'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
@@ -46,121 +46,131 @@ export interface BacklogItemCardProps {
  *
  * When onClick is provided, the card is clickable and keyboard-accessible (Enter/Space to activate).
  */
-export const BacklogItemCard = memo(function BacklogItemCard({ item, onClick, highlightTokens = [], variant }: BacklogItemCardProps) {
-  const isClickable = !!onClick
-  const hasExplicitVariant = variant !== undefined
-  const effectiveVariant = variant ?? 'default'
-  const isCompact = effectiveVariant === 'compact'
-  const descriptionPreview =
-    item.description ? descriptionPreviewFromMarkdown(item.description, 240) : null
+export const BacklogItemCard = memo(
+  forwardRef<HTMLDivElement, BacklogItemCardProps>(function BacklogItemCard(
+    { item, onClick, highlightTokens = [], variant }: BacklogItemCardProps,
+    ref,
+  ) {
+    const isClickable = !!onClick
+    const hasExplicitVariant = variant !== undefined
+    const effectiveVariant = variant ?? 'default'
+    const isCompact = effectiveVariant === 'compact'
+    const descriptionPreview =
+      item.description ? descriptionPreviewFromMarkdown(item.description, 240) : null
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!isClickable) return
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      onClick?.()
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (!isClickable) return
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        onClick?.()
+      }
     }
-  }
 
-  return (
-    <Flex
-      p={hasExplicitVariant ? (isCompact ? '2' : '4') : { base: '2', md: '4' }}
-      borderWidth="1px"
-      borderColor="gray.200"
-      borderRadius="md"
-      gap="4"
-      alignItems="flex-start"
-      _hover={{ bg: 'brand.grayBg' }}
-      _focusVisible={{
-        outline: '2px solid',
-        outlineColor: 'brand.green',
-        outlineOffset: '2px',
-        borderColor: 'brand.green',
-      }}
-      transition="background 0.15s"
-      aria-label={`${item.title}, Priority ${item.priorityLabel}${item.isNew ? ', New item' : ''}`}
-      role={isClickable ? 'button' : 'article'}
-      tabIndex={isClickable ? 0 : undefined}
-      cursor={isClickable ? 'pointer' : undefined}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      data-variant={effectiveVariant}
-    >
-      {/* Left: Priority badge */}
-      <StackRankBadge
-        priority={item.priority}
-        priorityLabel={item.priorityLabel}
-        {...(isCompact ? { size: 'sm' } : {})}
-      />
+    return (
+      <Flex
+        ref={ref}
+        p={hasExplicitVariant ? (isCompact ? '2' : '4') : { base: '2', md: '4' }}
+        borderWidth="1px"
+        borderColor="gray.200"
+        borderRadius="md"
+        gap="4"
+        alignItems="flex-start"
+        _hover={{ bg: 'brand.grayBg' }}
+        _focusVisible={{
+          outline: '2px solid',
+          outlineColor: 'brand.green',
+          outlineOffset: '2px',
+          borderColor: 'brand.green',
+        }}
+        transition="background 0.15s"
+        aria-label={`${item.title}, Priority ${item.priorityLabel}${item.isNew ? ', New item' : ''}`}
+        role={isClickable ? 'button' : 'article'}
+        tabIndex={isClickable ? 0 : undefined}
+        cursor={isClickable ? 'pointer' : undefined}
+        onClick={onClick}
+        onKeyDown={handleKeyDown}
+        data-variant={effectiveVariant}
+      >
+        {/* Left: Priority badge */}
+        <StackRankBadge
+          priority={item.priority}
+          priorityLabel={item.priorityLabel}
+          {...(isCompact ? { size: 'sm' } : {})}
+        />
 
-      {/* Center: Content */}
-      <Box flex="1" minWidth="0">
-        {/* Title */}
-        <Text fontWeight="bold" fontSize="md" truncate>
-          {highlightTokens.length > 0
-            ? highlightText(item.title, highlightTokens)
-            : item.title}
-        </Text>
-
-        {/* Description (truncated to 2 lines) — hidden in compact mode / mobile when no variant set */}
-        {descriptionPreview && (
-          <Text
-            fontSize="sm"
-            color="brand.grayLight"
-            lineClamp={2}
-            data-testid="card-description"
-            display={hasExplicitVariant ? (isCompact ? 'none' : 'block') : { base: 'none', md: 'block' }}
-          >
+        {/* Center: Content */}
+        <Box flex="1" minWidth="0">
+          {/* Title */}
+          <Text fontWeight="bold" fontSize="md" truncate>
             {highlightTokens.length > 0
-              ? highlightText(descriptionPreview, highlightTokens)
-              : descriptionPreview}
+              ? highlightText(item.title, highlightTokens)
+              : item.title}
           </Text>
-        )}
 
-        {/* Metadata row */}
-        <HStack gap="2" mt="1" flexWrap="wrap">
-          <StatusBadge status={item.status} statusType={item.statusType} />
-          {item.isNew && <NewItemBadge />}
-          <Text fontSize="sm" color="brand.grayLight">
-            {item.teamName}
-          </Text>
-          <Text fontSize="sm" color="brand.grayLight">
-            {item.identifier}
-          </Text>
-          <Text fontSize="xs" color="brand.grayLight">
-            {item.updatedAt === item.createdAt
-              ? `Created ${formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}`
-              : `Updated ${formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}`}
-          </Text>
-        </HStack>
+          {/* Description (truncated to 2 lines) — hidden in compact mode / mobile when no variant set */}
+          {descriptionPreview && (
+            <Text
+              fontSize="sm"
+              color="brand.grayLight"
+              lineClamp={2}
+              data-testid="card-description"
+              display={
+                hasExplicitVariant ? (isCompact ? 'none' : 'block') : { base: 'none', md: 'block' }
+              }
+            >
+              {highlightTokens.length > 0
+                ? highlightText(descriptionPreview, highlightTokens)
+                : descriptionPreview}
+            </Text>
+          )}
 
-        {/* Labels row — hidden in compact mode / mobile when no variant set */}
-        {item.labels.length > 0 && (
-          <HStack
-            gap="1"
-            mt="1"
-            flexWrap="wrap"
-            display={hasExplicitVariant ? (isCompact ? 'none' : 'flex') : { base: 'none', md: 'flex' }}
-          >
-            {item.labels.map((label) => (
-              <Box
-                key={label.id}
-                px="2"
-                py="0.5"
-                borderRadius="sm"
-                fontSize="xs"
-                bg="gray.100"
-                color="brand.gray"
-              >
-                {label.name}
-              </Box>
-            ))}
+          {/* Metadata row */}
+          <HStack gap="2" mt="1" flexWrap="wrap">
+            <StatusBadge status={item.status} statusType={item.statusType} />
+            {item.isNew && <NewItemBadge />}
+            <Text fontSize="sm" color="brand.grayLight">
+              {item.teamName}
+            </Text>
+            <Text fontSize="sm" color="brand.grayLight">
+              {item.identifier}
+            </Text>
+            <Text fontSize="xs" color="brand.grayLight">
+              {item.updatedAt === item.createdAt
+                ? `Created ${formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}`
+                : `Updated ${formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}`}
+            </Text>
           </HStack>
-        )}
-      </Box>
-    </Flex>
-  )
-})
+
+          {/* Labels row — hidden in compact mode / mobile when no variant set */}
+          {item.labels.length > 0 && (
+            <HStack
+              gap="1"
+              mt="1"
+              flexWrap="wrap"
+              display={
+                hasExplicitVariant ? (isCompact ? 'none' : 'flex') : { base: 'none', md: 'flex' }
+              }
+            >
+              {item.labels.map((label) => (
+                <Box
+                  key={label.id}
+                  px="2"
+                  py="0.5"
+                  borderRadius="sm"
+                  fontSize="xs"
+                  bg="gray.100"
+                  color="brand.gray"
+                >
+                  {label.name}
+                </Box>
+              ))}
+            </HStack>
+          )}
+        </Box>
+      </Flex>
+    )
+  }),
+)
 BacklogItemCard.displayName = 'BacklogItemCard'
 
 /**

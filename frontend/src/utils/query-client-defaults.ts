@@ -1,4 +1,4 @@
-import type { QueryObserverOptions } from '@tanstack/react-query'
+import type { DefaultOptions } from '@tanstack/react-query'
 import { ApiError } from '@/utils/api-error'
 
 /**
@@ -9,7 +9,7 @@ import { ApiError } from '@/utils/api-error'
  *
  * @see main.tsx — used when creating the global QueryClient
  */
-export const queryDefaults: QueryObserverOptions = {
+export const queryDefaults: NonNullable<DefaultOptions['queries']> = {
   staleTime: 5 * 60 * 1000, // 5 minutes
   gcTime: 10 * 60 * 1000, // 10 minutes — survive navigation/tab switches
   retry: (failureCount, error) => {
