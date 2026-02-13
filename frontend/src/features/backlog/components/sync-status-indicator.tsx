@@ -103,7 +103,10 @@ export const SyncStatusIndicator = memo(function SyncStatusIndicator({ compact =
           <Text fontSize="xs" color="fg.muted">
             Synced with warnings
             {syncStatus.itemsFailed != null && syncStatus.itemsFailed > 0 && (
-              <> — {syncStatus.itemsFailed} item{syncStatus.itemsFailed !== 1 ? 's' : ''} failed</>
+              <>
+                {' '}
+                — {syncStatus.itemsFailed} item{syncStatus.itemsFailed !== 1 ? 's' : ''} failed
+              </>
             )}
           </Text>
         </HStack>
@@ -148,8 +151,7 @@ export const SyncStatusIndicator = memo(function SyncStatusIndicator({ compact =
                 {errorDisplay.title}
               </Alert.Title>
               <Alert.Description fontSize="xs" color="fg.muted">
-                {errorDisplay.description}{' '}
-                {errorDisplay.guidance}
+                {errorDisplay.description} {errorDisplay.guidance}
                 {syncStatus.lastSyncedAt && (
                   <> Last successful sync: {formatRelativeTime(syncStatus.lastSyncedAt)}.</>
                 )}
