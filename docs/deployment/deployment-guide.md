@@ -79,12 +79,41 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up --build 
 # Check all services are running and healthy
 docker compose --env-file .env.production -f docker-compose.prod.yml ps
 
-# Check backend health endpoint
-curl http://localhost/api/health
+# Health checks (nginx proxies /api to backend)
+curl -s http://localhost/api/health | jq
+curl -s http://localhost/api/health/live | jq
+curl -s http://localhost/api/health/ready | jq
+curl -s http://localhost/api/health/db | jq
+curl -s http://localhost/api/health/linear | jq
 
 # View logs
 docker compose --env-file .env.production -f docker-compose.prod.yml logs -f
 ```
+
+## Monitoring Setup (Health Checks & Alerts)
+
+### Alert Webhook Configuration
+
+To receive alerts on health status transitions (`ok` ↔ `degraded` ↔ `unhealthy`):
+
+1. Configure a webhook endpoint (Slack, Teams, or generic HTTP receiver)
+2. Set in `.env.production`:
+
+```env
+ALERT_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+ALERT_COOLDOWN_MS=300000
+```
+
+3. Restart the backend container to pick up env changes.
+
+### Health check tuning
+
+```env
+HEALTH_CHECK_INTERVAL_MS=60000
+HEALTH_CHECK_LINEAR_TIMEOUT_MS=5000
+```
+
+For full details, see the [Monitoring Runbook](./monitoring-runbook.md).
 
 ## Deployment Methods
 
@@ -163,6 +192,11 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up --build 
 | `SYNC_CRON_SCHEDULE` | No | `*/15 * * * *` | Cron schedule for sync |
 | `LOG_LEVEL` | No | `info` | Pino log level |
 | `SERVE_STATIC` | No | `false` | Express serves frontend (non-Docker) |
+| `HEALTH_CHECK_INTERVAL_MS` | No | `60000` | Interval between automated health checks |
+| `HEALTH_CHECK_LINEAR_TIMEOUT_MS` | No | `5000` | Timeout for Linear health check |
+| `ALERT_WEBHOOK_URL` | No | — | Webhook URL to receive health alerts |
+| `ALERT_COOLDOWN_MS` | No | `300000` | Cooldown between alerts |
+| `APP_VERSION` | No | package.json | Version reported in `/api/health` |
 | `FRONTEND_PORT` | No | `80` | Docker nginx exposed port |
 
 ## Build Commands Reference

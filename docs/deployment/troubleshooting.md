@@ -38,6 +38,66 @@ docker compose -f docker-compose.prod.yml logs backend --tail=50
 - Missing `DATABASE_URL` → Verify `.env.production` has correct connection string
 - Missing `SESSION_SECRET` → Production requires 32+ character secret
 
+## Health Check & Monitoring Issues
+
+### `/api/health` returns `degraded`
+
+**Meaning:** Linear API is unavailable but the database is connected (non-critical).
+
+**Steps:**
+1. Check Linear health: `curl -s http://localhost/api/health/linear | jq`
+2. Verify `LINEAR_API_KEY` is set and valid
+3. Check [Linear Status Page](https://status.linear.app) for outages
+4. If API key expired, rotate and restart the backend
+
+### `/api/health` returns `unhealthy` (HTTP 503)
+
+**Meaning:** Database is unreachable (critical dependency).
+
+**Steps:**
+1. Check DB health: `curl -s http://localhost/api/health/db | jq`
+2. Check DB logs: `docker compose -f docker-compose.prod.yml logs db --tail=50`
+3. Verify database env vars / connection string
+4. Verify readiness: `curl -s http://localhost/api/health/ready | jq`
+
+### Readiness probe failing (`/api/health/ready` returns 503)
+
+**Meaning:** Critical dependencies aren’t ready (primarily database).
+
+**Steps:**
+1. Run full health check: `curl -s http://localhost/api/health | jq`
+2. Fix database availability first; readiness will recover automatically.
+
+### Liveness probe failing (`/api/health/live` non-200 or no response)
+
+**Meaning:** Backend process is not running or is hung.
+
+**Steps:**
+1. Check backend container: `docker compose -f docker-compose.prod.yml ps backend`
+2. Check logs: `docker compose -f docker-compose.prod.yml logs backend --tail=100`
+3. Restart backend: `docker compose -f docker-compose.prod.yml restart backend`
+
+### Linear shows `not_configured`
+
+**Meaning:** `LINEAR_API_KEY` is not set. This is not an error; app can run but can’t sync.
+
+**Steps:**
+1. Set `LINEAR_API_KEY` in `.env.production`
+2. Restart the backend container
+
+### No webhook alerts received
+
+**Steps:**
+1. Verify `ALERT_WEBHOOK_URL` is set
+2. Test manually:
+
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"text":"Test alert from SLB"}' "$ALERT_WEBHOOK_URL"
+```
+
+3. Check backend logs for `alert-service` messages
+4. Reduce cooldown during testing: `ALERT_COOLDOWN_MS=60000`
+
 ## Database Issues
 
 ### Cannot connect to database

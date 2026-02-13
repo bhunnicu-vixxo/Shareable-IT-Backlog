@@ -47,9 +47,9 @@ USER node
 # Expose the backend API port
 EXPOSE 3000
 
-# Health check — verify the API responds on /api/health
+# Health check — lightweight liveness probe (confirms process is running)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health/live || exit 1
 
 # Use dumb-init as PID 1 to properly forward signals to Node.js
 ENV NODE_ENV=production

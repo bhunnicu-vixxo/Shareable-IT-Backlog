@@ -8,6 +8,8 @@ import cors from 'cors'
 import compression from 'compression'
 import healthRoutes from './routes/health.routes.js'
 import routes from './routes/index.js'
+import { healthMonitor } from './services/health/health-monitor.service.js'
+import { alertService } from './services/health/alert.service.js'
 import {
   initializeNetworkConfig,
   networkVerificationMiddleware,
@@ -100,6 +102,21 @@ app.use(auditMiddleware)
 
 // Routes (health already mounted above, remaining routes are network-protected)
 app.use('/api', routes)
+
+// ---------------------------------------------------------------------------
+// Health monitoring — periodic health checks with alert integration
+// ---------------------------------------------------------------------------
+// Wire alert service to health monitor status transitions.
+// The monitor itself is started via startHealthMonitor() from server.ts
+// (not at import time, to avoid side-effects in test environments).
+healthMonitor.onStatusTransition((transition) => {
+  void alertService.handleTransition(transition)
+})
+
+/** Start the periodic health monitor. Call from server.ts after listen(). */
+export function startHealthMonitor(): void {
+  healthMonitor.start()
+}
 
 // API not-found handler — ensures unknown /api routes never fall through to SPA
 // static serving (when enabled) and always return consistent JSON error format.
