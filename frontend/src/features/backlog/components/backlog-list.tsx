@@ -474,7 +474,7 @@ export function BacklogList() {
             variant={showNewOnly ? 'solid' : 'outline'}
             onClick={handleToggleNewOnly}
             aria-pressed={showNewOnly}
-            aria-label={showNewOnly ? 'Show all items' : 'Show only new items'}
+            aria-label={showNewOnly ? 'Show only new items, currently on' : 'Show only new items, currently off'}
           >
             {showNewOnly
               ? 'Show all'
