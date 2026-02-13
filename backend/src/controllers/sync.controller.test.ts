@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { Request, Response, NextFunction } from 'express'
 
+import { encryptCredential } from '../utils/credentials.js'
 import type { SyncStatusResponse } from '../types/api.types.js'
 
 // Use vi.hoisted so mock fns are available in hoisted vi.mock factories
@@ -434,6 +435,71 @@ describe('SyncController.triggerSync', () => {
     await triggerSync(req, res as unknown as Response, mockNext)
 
     expect(mockNext).toHaveBeenCalledWith(error)
+  })
+
+  it('should accept enc: prefixed SYNC_TRIGGER_TOKEN and decrypt it for comparison', async () => {
+    process.env.CREDENTIAL_ENCRYPTION_KEY = 'test-passphrase-for-unit-tests!'
+    const plainToken = 'my-secret-trigger-token'
+    const encryptedToken = encryptCredential(plainToken)
+    process.env.SYNC_TRIGGER_TOKEN = encryptedToken
+
+    const idleStatus: SyncStatusResponse = {
+      lastSyncedAt: null,
+      status: 'idle',
+      itemCount: null,
+      errorMessage: null,
+      errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
+    }
+    const syncingStatus: SyncStatusResponse = {
+      lastSyncedAt: null,
+      status: 'syncing',
+      itemCount: null,
+      errorMessage: null,
+      errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
+    }
+    mockGetStatus.mockReturnValueOnce(idleStatus).mockReturnValueOnce(syncingStatus)
+
+    const req = createMockRequest({
+      authorization: `Bearer ${plainToken}`,
+    })
+    const res = createMockResponse()
+
+    await triggerSync(req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(202)
+    expect(mockRunSync).toHaveBeenCalled()
+  })
+
+  it('should reject wrong token when SYNC_TRIGGER_TOKEN is enc: encrypted', async () => {
+    process.env.CREDENTIAL_ENCRYPTION_KEY = 'test-passphrase-for-unit-tests!'
+    const plainToken = 'my-secret-trigger-token'
+    const encryptedToken = encryptCredential(plainToken)
+    process.env.SYNC_TRIGGER_TOKEN = encryptedToken
+
+    const idleStatus: SyncStatusResponse = {
+      lastSyncedAt: null,
+      status: 'idle',
+      itemCount: null,
+      errorMessage: null,
+      errorCode: null,
+      itemsSynced: null,
+      itemsFailed: null,
+    }
+    mockGetStatus.mockReturnValue(idleStatus)
+
+    const req = createMockRequest({
+      authorization: 'Bearer wrong-token-value',
+    })
+    const res = createMockResponse()
+
+    await triggerSync(req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(403)
+    expect(mockRunSync).not.toHaveBeenCalled()
   })
 })
 
