@@ -2,6 +2,17 @@
 
 This guide covers deploying the Shareable Linear Backlog application to the Vixxo network.
 
+## Documentation Index
+
+| Guide | Description |
+|---|---|
+| **Deployment Guide** (this file) | First-time setup, Docker and non-Docker deployment, environment configuration |
+| [Environment Variables](./environment-variables.md) | Comprehensive reference for every environment variable |
+| [Database Guide](./database-guide.md) | Schema overview, migrations, backup/restore, maintenance |
+| [Troubleshooting](./troubleshooting.md) | Common issues with symptoms, diagnosis, and resolution |
+| [Monitoring Runbook](./monitoring-runbook.md) | Health check endpoints, alerts, escalation procedures |
+| [Operational Runbook](./operational-runbook.md) | Day-to-day operations, backups, upgrades, emergency procedures |
+
 ## Prerequisites
 
 | Requirement | Version | Purpose |
@@ -9,7 +20,7 @@ This guide covers deploying the Shareable Linear Backlog application to the Vixx
 | Node.js | >= 20.19.0 | Build tooling and backend runtime |
 | Docker | >= 24.x | Container runtime |
 | Docker Compose | >= 2.x | Multi-container orchestration |
-| PostgreSQL | 16+ (via Docker or standalone) | Application database |
+| PostgreSQL | 14+ (16+ recommended; Docker Compose uses PostgreSQL 16) | Application database |
 | Git | >= 2.x | Source code management |
 | Vixxo network access | — | Internal network deployment |
 
@@ -65,15 +76,51 @@ ALLOWED_NETWORKS=10.0.0.0/8,172.16.0.0/12
 NETWORK_CHECK_ENABLED=true
 ```
 
-See `.env.production.example` for the full list of variables with descriptions.
+See `.env.production.example` for the full list of variables with descriptions. For the complete reference, see the [Environment Variables Guide](./environment-variables.md).
 
-### 4. Deploy with Docker Compose
+### 4. Database Setup
+
+**Docker deployment:** The PostgreSQL database is created automatically by Docker Compose. The `db` service uses `DB_USER`, `DB_PASSWORD`, and `DB_NAME` from `.env.production` to create the database and user on first start.
+
+**Non-Docker deployment:** Create the database manually:
+
+```bash
+# Create the database and user
+sudo -u postgres createuser slb_user
+sudo -u postgres createdb -O slb_user shareable_linear_backlog
+sudo -u postgres psql -c "ALTER USER slb_user WITH PASSWORD 'YOUR_STRONG_PASSWORD';"
+```
+
+**Run migrations** (required for both Docker and non-Docker):
+
+```bash
+# The migrate script sources .env.production for DATABASE_URL
+./scripts/migrate.sh
+
+# Or manually:
+DATABASE_URL=postgresql://slb_user:PASSWORD@localhost:5432/shareable_linear_backlog \
+  npm run migrate:up -w backend
+```
+
+**Seed initial data** (optional — creates default app settings and an initial admin user):
+
+```bash
+# Basic seed (app settings only):
+./scripts/seed.sh
+
+# With initial admin user:
+SEED_ADMIN_EMAIL=admin@vixxo.com SEED_ADMIN_DISPLAY_NAME="Admin User" ./scripts/seed.sh
+```
+
+For detailed database administration procedures, see the [Database Guide](./database-guide.md).
+
+### 5. Deploy with Docker Compose
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
 ```
 
-### 5. Verify Deployment
+### 6. Verify Deployment
 
 ```bash
 # Check all services are running and healthy
@@ -178,6 +225,8 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up --build 
 
 ## Environment Variable Reference
 
+> **Full reference:** See [Environment Variables Guide](./environment-variables.md) for the complete list with valid values, security notes, and which service uses each variable.
+
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `NODE_ENV` | Yes | `development` | Set to `production` for deployment |
@@ -185,7 +234,7 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up --build 
 | `DATABASE_URL` | Yes | — | PostgreSQL connection string |
 | `LINEAR_API_KEY` | Yes | — | Linear API key for data sync |
 | `SESSION_SECRET` | Yes (prod) | — | Session cookie signing (32+ chars) |
-| `ALLOWED_ORIGINS` | Recommended | `localhost:1576` | CORS allowed origins |
+| `ALLOWED_ORIGINS` | Recommended | `http://localhost:1576` | CORS allowed origins |
 | `ALLOWED_NETWORKS` | Recommended | — | CIDR ranges for network access control |
 | `NETWORK_CHECK_ENABLED` | No | `true` (prod) | Enable/disable IP-based access control |
 | `SYNC_ENABLED` | No | `true` | Enable scheduled Linear sync |
@@ -210,6 +259,60 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up --build 
 | `npm run migrate:up -w backend` | Run database migrations |
 | `npm run test:run -w frontend` | Run frontend tests |
 | `npm run test:run -w backend` | Run backend tests |
+
+## SSL/TLS Configuration
+
+HTTPS is required for production deployments to protect session cookies, API keys, and user data in transit.
+
+### HTTPS Termination Options
+
+| Method | Use Case | Notes |
+|---|---|---|
+| **Reverse proxy** (nginx, Apache) | Most common for on-prem | Place in front of Docker deployment |
+| **Load balancer** (Azure App Gateway, AWS ALB) | Cloud deployments | Offloads TLS to managed service |
+| **Direct** (Express HTTPS) | Not recommended | Adds complexity to backend; use `SERVE_STATIC=true` mode only |
+
+### Reverse Proxy Configuration
+
+The Docker containers serve HTTP internally. Place a reverse proxy in front that:
+
+1. Terminates TLS with a valid certificate
+2. Forwards requests to `http://localhost:${FRONTEND_PORT:-80}`
+3. Sets the `X-Forwarded-Proto` header to `https`
+
+Express is already configured with `trust proxy` set to `1`, so it correctly reads forwarded headers.
+
+**Example nginx reverse proxy snippet:**
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name backlog.vixxo.internal;
+
+    ssl_certificate     /etc/ssl/certs/backlog.vixxo.internal.crt;
+    ssl_certificate_key /etc/ssl/private/backlog.vixxo.internal.key;
+
+    location / {
+        proxy_pass http://localhost:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Related Settings
+
+- `ALLOWED_ORIGINS` — Must match the HTTPS origin exactly (e.g., `https://backlog.vixxo.internal`)
+- `NETWORK_CHECK_ENABLED` — Uses `X-Forwarded-For` when behind a proxy (`trust proxy` is enabled)
+- Session cookies use `secure: true` in production, requiring HTTPS
+
+### Certificate Management
+
+- Use your organization's certificate authority or Let's Encrypt
+- Set up automatic renewal (e.g., `certbot renew` cron job)
+- Monitor certificate expiration as part of [Operational Runbook](./operational-runbook.md) monthly checks
 
 ## Security Checklist
 

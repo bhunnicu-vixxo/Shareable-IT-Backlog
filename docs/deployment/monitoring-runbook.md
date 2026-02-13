@@ -1,5 +1,11 @@
 # Monitoring Runbook — Shareable Linear Backlog
 
+**Related guides:**
+- [Deployment Guide](./deployment-guide.md) — Setup and configuration
+- [Troubleshooting](./troubleshooting.md) — Issue diagnosis and resolution
+- [Operational Runbook](./operational-runbook.md) — Day-to-day operations and emergency procedures
+- [Database Guide](./database-guide.md) — Database administration
+
 ## Health Check Endpoints
 
 | Endpoint | Purpose | Expected Response |

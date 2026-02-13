@@ -5,7 +5,7 @@ A web application that enables business users to view and interact with the IT b
 ## Prerequisites
 
 - **Node.js** 20.19+ or 22.12+
-- **PostgreSQL** 14+ (or 18.1+ latest stable)
+- **PostgreSQL** 14+ (16+ recommended; `docker-compose.prod.yml` uses PostgreSQL 16)
 - **VS Code** (recommended) with recommended extensions
 
 ## Quick Start
@@ -168,8 +168,13 @@ curl http://localhost/api/health
 See [`.env.production.example`](.env.production.example) for all production variables.
 
 **Deployment documentation:**
+- [Deployment Documentation Index](docs/deployment/README.md) — Overview and reading guide for all deployment docs
 - [Deployment Guide](docs/deployment/deployment-guide.md) — Full setup and deployment instructions
+- [Environment Variables](docs/deployment/environment-variables.md) — Comprehensive variable reference
+- [Database Guide](docs/deployment/database-guide.md) — Schema, migrations, backup/restore
 - [Troubleshooting](docs/deployment/troubleshooting.md) — Common issues and solutions
+- [Monitoring Runbook](docs/deployment/monitoring-runbook.md) — Health checks and alerts
+- [Operational Runbook](docs/deployment/operational-runbook.md) — Operations, upgrades, emergency procedures
 
 ## Tech Stack
 
