@@ -234,6 +234,78 @@ export function BacklogList() {
     lastClickedItemId.current = itemId
     setSelectedItemId(itemId)
   }, [])
+  /**
+   * Focus a BacklogItemCard at a given index, scrolling the virtualizer if needed.
+   * After scrolling, waits for the next render frame to ensure the card DOM node
+   * exists before calling .focus().
+   */
+  const focusCardAtIndex = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= displayedItemsRef.current.length) return
+      virtualizer.scrollToIndex(index, { align: 'auto' })
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const item = displayedItemsRef.current[index]
+          if (item) {
+            const cardEl = cardRefs.current[item.id]
+            if (cardEl) cardEl.focus()
+          }
+        })
+      })
+    },
+    [virtualizer],
+  )
+
+  /**
+   * Arrow key navigation handler for the backlog list (AC #8).
+   * ArrowDown/Up: move focus between items. Home/End: jump to first/last item.
+   * Works with virtual scrolling by scrolling the target into view first.
+   */
+  const handleListKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const items = displayedItemsRef.current
+      if (items.length === 0) return
+
+      // Determine which card currently has focus
+      const activeEl = document.activeElement as HTMLElement | null
+      let currentIndex = -1
+      if (activeEl) {
+        for (let i = 0; i < items.length; i++) {
+          if (cardRefs.current[items[i].id] === activeEl) {
+            currentIndex = i
+            break
+          }
+        }
+      }
+
+      let targetIndex: number | null = null
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          targetIndex = currentIndex < items.length - 1 ? currentIndex + 1 : null
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          targetIndex = currentIndex > 0 ? currentIndex - 1 : null
+          break
+        case 'Home':
+          e.preventDefault()
+          targetIndex = 0
+          break
+        case 'End':
+          e.preventDefault()
+          targetIndex = items.length - 1
+          break
+      }
+
+      if (targetIndex !== null) {
+        focusCardAtIndex(targetIndex)
+      }
+    },
+    [focusCardAtIndex],
+  )
+
   const handleCloseDetail = useCallback(() => {
     // Scroll the previously clicked card into view before closing the modal
     // so that it is rendered in the DOM for focus restoration.
@@ -318,17 +390,19 @@ export function BacklogList() {
 
   return (
     <Box>
-      {/* Filter bar: business unit dropdown, search input, "New only" toggle, results count */}
+      {/* Filter bar: business unit dropdown, sort, "New only" toggle, search, results count */}
+      {/* Tab order: BusinessUnitFilter → SortControl → "New only" toggle → KeywordSearch (AC #6) */}
       <Flex alignItems="center" mb="4" flexWrap="wrap" gap="3">
         <BusinessUnitFilter
           items={items}
           value={selectedBusinessUnit}
           onChange={setSelectedBusinessUnit}
         />
-        <KeywordSearch
-          value={keywordQuery}
-          onChange={setKeywordQuery}
-          onClear={handleClearKeyword}
+        <SortControl
+          sortBy={sortBy}
+          sortDirection={sortDirection}
+          onSortByChange={setSortBy}
+          onSortDirectionChange={setSortDirection}
         />
         {newItemCount > 0 && (
           <Button
@@ -343,11 +417,10 @@ export function BacklogList() {
               : `New only (${selectedBusinessUnit ? scopedNewItemCount : newItemCount})`}
           </Button>
         )}
-        <SortControl
-          sortBy={sortBy}
-          sortDirection={sortDirection}
-          onSortByChange={setSortBy}
-          onSortDirectionChange={setSortDirection}
+        <KeywordSearch
+          value={keywordQuery}
+          onChange={setKeywordQuery}
+          onClear={handleClearKeyword}
         />
         <Text fontSize="sm" color="gray.500" ml="auto">
           {getResultCountText()}
@@ -371,6 +444,11 @@ export function BacklogList() {
             ref={parentRef}
             height="calc(100vh - 220px)"
             overflowY="auto"
+            px="1"
+            mx="-1"
+            role="list"
+            aria-label="Backlog items"
+            onKeyDown={handleListKeyDown}
           >
             <div
               style={{

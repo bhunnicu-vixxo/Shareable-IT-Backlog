@@ -1,5 +1,7 @@
+import { useRef, useState } from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@/utils/test-utils'
+import userEvent from '@testing-library/user-event'
 import { ItemDetailModal } from './item-detail-modal'
 import type { BacklogDetailResponse, BacklogItem, BacklogItemComment } from '../types/backlog.types'
 
@@ -508,6 +510,154 @@ describe('ItemDetailModal', () => {
     await waitFor(() => {
       expect(mockOnClose).toHaveBeenCalled()
     })
+  })
+
+  // ──── Keyboard focus management (AC: #4, #5) ─────────────────────────────
+
+  it('closes modal when Escape key is pressed', async () => {
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Test backlog item')).toBeInTheDocument()
+    })
+
+    // Press Escape on the dialog content
+    const dialog = screen.getByLabelText('Backlog item details')
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(mockOnClose).toHaveBeenCalled()
+    })
+  })
+
+  it('dialog has role="dialog" for accessibility', async () => {
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Test backlog item')).toBeInTheDocument()
+    })
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('aria-label', 'Backlog item details')
+  })
+
+  it('restores focus to the triggering element when closed with Escape (AC #4)', async () => {
+    const user = userEvent.setup()
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    function Wrapper() {
+      const triggerRef = useRef<HTMLButtonElement | null>(null)
+      const [open, setOpen] = useState(false)
+
+      return (
+        <>
+          <button ref={triggerRef} onClick={() => setOpen(true)}>
+            Open item
+          </button>
+          <button>Outside</button>
+          <ItemDetailModal
+            isOpen={open}
+            itemId={open ? 'issue-1' : null}
+            onClose={() => setOpen(false)}
+            triggerRef={triggerRef}
+          />
+        </>
+      )
+    }
+
+    render(<Wrapper />)
+
+    const trigger = screen.getByRole('button', { name: 'Open item' })
+    trigger.focus()
+    expect(trigger).toHaveFocus()
+
+    await user.click(trigger)
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    // Ensure key event targets the dialog to trigger Chakra's closeOnEscape behavior
+    const dialog = screen.getByRole('dialog')
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    expect(trigger).toHaveFocus()
+  })
+
+  it('traps Tab focus within the modal (AC #5)', async () => {
+    const user = userEvent.setup()
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    function Wrapper() {
+      const triggerRef = useRef<HTMLButtonElement | null>(null)
+      const [open, setOpen] = useState(false)
+
+      return (
+        <>
+          <button ref={triggerRef} onClick={() => setOpen(true)}>
+            Open item
+          </button>
+          <button>Outside</button>
+          <ItemDetailModal
+            isOpen={open}
+            itemId={open ? 'issue-1' : null}
+            onClose={() => setOpen(false)}
+            triggerRef={triggerRef}
+          />
+        </>
+      )
+    }
+
+    render(<Wrapper />)
+
+    const trigger = screen.getByRole('button', { name: 'Open item' })
+    const outside = screen.getByRole('button', { name: 'Outside' })
+
+    await user.click(trigger)
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
+
+    // Force focus into the modal before tabbing
+    const closeButton = await screen.findByRole('button', { name: 'Close' })
+    closeButton.focus()
+
+    // Tab a few times; focus should not escape to outside controls.
+    await user.tab()
+    expect(outside).not.toHaveFocus()
+    await user.tab()
+    expect(outside).not.toHaveFocus()
   })
 
   // ──── Does not fetch when closed ──────────────────────────────────────────

@@ -115,7 +115,11 @@ See [`.env.example`](.env.example) for all required environment variables. Each 
 
 > **Note:** For Azure PostgreSQL, the `DATABASE_URL` must include `?sslmode=require&uselibpqcompat=true`.
 
-### Credential Security
+## Accessibility
+
+This application supports full keyboard navigation (WCAG 2.1 Level A). See [`docs/keyboard-shortcuts.md`](docs/keyboard-shortcuts.md) for a complete reference of available keyboard shortcuts.
+
+## Credential Security
 
 Credentials can be stored encrypted using the `enc:` prefix (AES-256-GCM). See [`docs/credential-management.md`](docs/credential-management.md) for:
 

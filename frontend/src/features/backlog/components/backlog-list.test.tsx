@@ -1413,6 +1413,226 @@ describe('BacklogList', () => {
     })
   })
 
+  // ─── Arrow Key Navigation Tests (AC #8) ───
+
+  it('ArrowDown moves focus to next item', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'a', title: 'Item A' }),
+        createMockItem({ id: 'b', title: 'Item B' }),
+        createMockItem({ id: 'c', title: 'Item C' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item A')).toBeInTheDocument()
+    })
+
+    // Focus the first card
+    const firstCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[0]
+    firstCard.focus()
+    expect(firstCard).toHaveFocus()
+
+    // Press ArrowDown on the list container
+    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
+    fireEvent.keyDown(listContainer, { key: 'ArrowDown' })
+
+    // Focus should move to second card after requestAnimationFrame
+    await waitFor(() => {
+      const secondCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[1]
+      expect(secondCard).toHaveFocus()
+    })
+  })
+
+  it('ArrowUp moves focus to previous item', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'a', title: 'Item A' }),
+        createMockItem({ id: 'b', title: 'Item B' }),
+        createMockItem({ id: 'c', title: 'Item C' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item A')).toBeInTheDocument()
+    })
+
+    // Focus the third card
+    const thirdCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[2]
+    thirdCard.focus()
+    expect(thirdCard).toHaveFocus()
+
+    // Press ArrowUp on the list container
+    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
+    fireEvent.keyDown(listContainer, { key: 'ArrowUp' })
+
+    // Focus should move to second card
+    await waitFor(() => {
+      const secondCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[1]
+      expect(secondCard).toHaveFocus()
+    })
+  })
+
+  it('Home key moves focus to first item', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'a', title: 'Item A' }),
+        createMockItem({ id: 'b', title: 'Item B' }),
+        createMockItem({ id: 'c', title: 'Item C' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item A')).toBeInTheDocument()
+    })
+
+    // Focus the third card
+    const thirdCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[2]
+    thirdCard.focus()
+
+    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
+    fireEvent.keyDown(listContainer, { key: 'Home' })
+
+    await waitFor(() => {
+      const firstCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[0]
+      expect(firstCard).toHaveFocus()
+    })
+  })
+
+  it('End key moves focus to last item', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'a', title: 'Item A' }),
+        createMockItem({ id: 'b', title: 'Item B' }),
+        createMockItem({ id: 'c', title: 'Item C' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item A')).toBeInTheDocument()
+    })
+
+    // Focus the first card
+    const firstCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[0]
+    firstCard.focus()
+
+    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
+    fireEvent.keyDown(listContainer, { key: 'End' })
+
+    await waitFor(() => {
+      const lastCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[2]
+      expect(lastCard).toHaveFocus()
+    })
+  })
+
+  it('scrolls virtualizer when arrow-nav targets a non-rendered item (virtualization edge case)', async () => {
+    virtualItemsLimit = 1
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'a', title: 'Item A' }),
+        createMockItem({ id: 'b', title: 'Item B' }),
+        createMockItem({ id: 'c', title: 'Item C' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item A')).toBeInTheDocument()
+    })
+
+    const firstCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[0]
+    firstCard.focus()
+
+    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
+    fireEvent.keyDown(listContainer, { key: 'End' })
+
+    await waitFor(() => {
+      expect(scrollToIndex).toHaveBeenCalledWith(2, { align: 'auto' })
+    })
+  })
+
+  it('ArrowDown at last item does not change focus', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'a', title: 'Item A' }),
+        createMockItem({ id: 'b', title: 'Item B' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item A')).toBeInTheDocument()
+    })
+
+    // Focus the last card
+    const lastCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[1]
+    lastCard.focus()
+    expect(lastCard).toHaveFocus()
+
+    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
+    fireEvent.keyDown(listContainer, { key: 'ArrowDown' })
+
+    // Last card should retain focus
+    expect(lastCard).toHaveFocus()
+  })
+
+  it('ArrowUp at first item does not change focus', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'a', title: 'Item A' }),
+        createMockItem({ id: 'b', title: 'Item B' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item A')).toBeInTheDocument()
+    })
+
+    // Focus the first card
+    const firstCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[0]
+    firstCard.focus()
+    expect(firstCard).toHaveFocus()
+
+    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
+    fireEvent.keyDown(listContainer, { key: 'ArrowUp' })
+
+    // First card should retain focus
+    expect(firstCard).toHaveFocus()
+  })
+
   it('does not show "of Y" when all items are displayed', async () => {
     const response: BacklogListResponse = {
       items: [
