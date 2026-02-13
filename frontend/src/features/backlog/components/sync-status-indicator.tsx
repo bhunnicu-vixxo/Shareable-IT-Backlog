@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react'
-import { Alert, Box, Button, HStack, Spinner, Text, VStack } from '@chakra-ui/react'
+import { Alert, Box, Button, HStack, Skeleton, Spinner, Text, VStack } from '@chakra-ui/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSyncStatus } from '../hooks/use-sync-status'
 import { formatRelativeTime } from '@/utils/formatters'
@@ -64,8 +64,12 @@ export const SyncStatusIndicator = memo(function SyncStatusIndicator({ compact =
     return () => clearInterval(interval)
   }, [])
 
-  // Don't show anything during initial load
-  if (isLoading) return null
+  // Show inline skeleton placeholder during initial load
+  if (isLoading) return (
+    <Box role="status" aria-live="polite" aria-atomic="true">
+      <Skeleton height="4" width="120px" data-testid="sync-status-skeleton" />
+    </Box>
+  )
 
   // Syncing state — animated spinner
   if (syncStatus?.status === 'syncing') {

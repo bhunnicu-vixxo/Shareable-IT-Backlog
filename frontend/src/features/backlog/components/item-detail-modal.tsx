@@ -3,9 +3,9 @@ import {
   Box,
   Dialog,
   Flex,
+  HStack,
   Link,
   Skeleton,
-  Stack,
   Text,
   VStack,
 } from '@chakra-ui/react'
@@ -21,6 +21,56 @@ import { ItemErrorState } from './item-error-state'
 import { ItemNotFoundState } from './item-not-found-state'
 import { MarkdownContent } from './markdown-content'
 import type { BacklogItem, BacklogItemComment, IssueActivity } from '../types/backlog.types'
+
+/**
+ * Layout-accurate skeleton for the item detail modal body.
+ * Shows description lines, comment card placeholders, and activity timeline placeholders.
+ */
+export function ItemDetailBodySkeleton() {
+  return (
+    <VStack align="stretch" gap="4" data-testid="item-detail-body-skeleton">
+      {/* Description section */}
+      <Box>
+        <Skeleton height="5" width="100px" mb="2" />
+        <VStack align="stretch" gap="2">
+          <Skeleton height="4" width="100%" />
+          <Skeleton height="4" width="95%" />
+          <Skeleton height="4" width="80%" />
+          <Skeleton height="4" width="60%" />
+        </VStack>
+      </Box>
+
+      {/* Comments section */}
+      <Box>
+        <Skeleton height="5" width="100px" mb="3" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <HStack key={i} gap="3" align="start" mb="3">
+            <Skeleton boxSize="8" borderRadius="full" flexShrink={0} />
+            <VStack align="stretch" gap="1" flex="1">
+              <HStack gap="2">
+                <Skeleton height="4" width="80px" />
+                <Skeleton height="3" width="60px" />
+              </HStack>
+              <Skeleton height="4" width="90%" />
+              <Skeleton height="4" width="70%" />
+            </VStack>
+          </HStack>
+        ))}
+      </Box>
+
+      {/* Activity section */}
+      <Box>
+        <Skeleton height="5" width="80px" mb="3" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <HStack key={i} gap="2" mb="2">
+            <Skeleton boxSize="3" borderRadius="full" flexShrink={0} />
+            <Skeleton height="4" width="70%" />
+          </HStack>
+        ))}
+      </Box>
+    </VStack>
+  )
+}
 
 export interface ItemDetailModalProps {
   /** Whether the modal is open. */
@@ -128,12 +178,7 @@ export function ItemDetailModal({
           </Dialog.Header>
 
           <Dialog.Body pb="6">
-            {isLoading && (
-              <Stack gap="4">
-                <Skeleton height="20" />
-                <Skeleton height="32" />
-              </Stack>
-            )}
+            {isLoading && <ItemDetailBodySkeleton />}
 
             {!isLoading && data && (
               <ItemDetailContent

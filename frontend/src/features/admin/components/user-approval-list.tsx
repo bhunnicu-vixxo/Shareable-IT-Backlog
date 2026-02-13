@@ -1,4 +1,4 @@
-import { Box, Button, Heading, Text, VStack, HStack, Badge } from '@chakra-ui/react'
+import { Box, Button, Heading, Skeleton, Text, VStack, HStack, Badge } from '@chakra-ui/react'
 import { usePendingUsers } from '../hooks/use-pending-users'
 import { useApproveUser } from '../hooks/use-approve-user'
 import { useState } from 'react'
@@ -11,6 +11,29 @@ function formatDate(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+/**
+ * Skeleton placeholder for the user approval list.
+ * Renders 3 card skeletons matching the approval card layout:
+ * name/email text + approve button area (no avatar — real cards have none).
+ */
+export function UserApprovalListSkeleton() {
+  return (
+    <VStack gap={3} align="stretch" data-testid="user-approval-skeleton">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Box key={i} p={4} borderWidth="1px" borderRadius="md" bg="bg.subtle">
+          <HStack justify="space-between" align="center">
+            <VStack gap={1} align="start" flex="1">
+              <Skeleton height="5" width="50%" />
+              <Skeleton height="4" width="65%" />
+            </VStack>
+            <Skeleton height="8" width="80px" borderRadius="md" />
+          </HStack>
+        </Box>
+      ))}
+    </VStack>
+  )
 }
 
 /**
@@ -50,7 +73,7 @@ export function UserApprovalList() {
           </Text>
         )}
 
-        {isLoading && <Text color="fg.muted">Loading pending users...</Text>}
+        {isLoading && <UserApprovalListSkeleton />}
 
         {error && (
           <Text color="fg.error" fontSize="sm">
@@ -84,10 +107,11 @@ export function UserApprovalList() {
                 size="sm"
                 colorPalette="green"
                 onClick={() => handleApprove(user.id, user.email)}
-                disabled={isApproving && approvingId === user.id}
+                loading={isApproving && approvingId === user.id}
+                disabled={isApproving}
                 aria-label={`Approve ${user.email}`}
               >
-                {isApproving && approvingId === user.id ? 'Approving...' : 'Approve'}
+                Approve
               </Button>
             </HStack>
           </Box>

@@ -203,7 +203,10 @@ development_status:
     status: done
     linear_id: "VIX-376"
     linear_url: "https://linear.app/vixxo/issue/VIX-376/optimize-api-response-times"
-  9-4-implement-loading-states-and-skeleton-screens: backlog
+  9-4-implement-loading-states-and-skeleton-screens:
+    status: done
+    linear_id: "VIX-377"
+    linear_url: "https://linear.app/vixxo/issue/VIX-377/implement-loading-states-and-skeleton-screens"
   epic-9-retrospective: optional
 
   # Epic 10: Security & Audit

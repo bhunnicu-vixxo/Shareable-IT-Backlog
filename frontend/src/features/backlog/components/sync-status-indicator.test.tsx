@@ -91,15 +91,15 @@ describe('SyncStatusIndicator', () => {
     Date.now = realNow
   })
 
-  it('should render nothing while loading (initial fetch)', () => {
+  it('should render skeleton placeholder during initial load', () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: null,
       isLoading: true,
       error: null,
     })
 
-    const { container } = render(<SyncStatusIndicator />)
-    expect(container.firstChild).toBeNull()
+    render(<SyncStatusIndicator />)
+    expect(screen.getByTestId('sync-status-skeleton')).toBeInTheDocument()
   })
 
   it('should render "Not yet synced" when lastSyncedAt is null', () => {

@@ -201,7 +201,7 @@ describe('UserManagementList', () => {
     expect(screen.getByText('No users found')).toBeInTheDocument()
   })
 
-  it('should show loading state', () => {
+  it('should show skeleton when loading', () => {
     mockUseAllUsers.mockReturnValue({
       users: [],
       isLoading: true,
@@ -210,7 +210,8 @@ describe('UserManagementList', () => {
 
     render(<UserManagementList />)
 
-    expect(screen.getByText(/loading users/i)).toBeInTheDocument()
+    expect(screen.getByTestId('user-management-skeleton')).toBeInTheDocument()
+    expect(screen.queryByText(/loading users/i)).not.toBeInTheDocument()
   })
 
   it('should show "no match" message when search has no results', async () => {
