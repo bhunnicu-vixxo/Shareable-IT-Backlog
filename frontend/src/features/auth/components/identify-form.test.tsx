@@ -60,4 +60,17 @@ describe('IdentifyForm', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Network error')
   })
+
+  // --- Screen Reader Support (Story 11.2) ---
+
+  it('renders heading as h1', () => {
+    render(<IdentifyForm {...defaultProps} />)
+    expect(screen.getByRole('heading', { name: /shareable it backlog/i, level: 1 })).toBeInTheDocument()
+  })
+
+  it('email input has associated label via htmlFor', () => {
+    render(<IdentifyForm {...defaultProps} />)
+    const input = screen.getByLabelText('Email address')
+    expect(input).toHaveAttribute('id', 'identify-email-input')
+  })
 })

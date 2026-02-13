@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Box, Button, Heading, Input, Text, VStack } from '@chakra-ui/react'
+import { Box, Button, Heading, Input, Text, VisuallyHidden, VStack } from '@chakra-ui/react'
 
 interface IdentifyFormProps {
   onIdentify: (email: string) => Promise<unknown>
@@ -58,7 +58,7 @@ export function IdentifyForm({ onIdentify, isIdentifying, error }: IdentifyFormP
         <form onSubmit={handleSubmit} noValidate>
           <VStack gap={6} align="stretch">
             <VStack gap={2}>
-              <Heading size="lg" textAlign="center">
+              <Heading as="h1" size="lg" textAlign="center">
                 Shareable IT Backlog
               </Heading>
               <Text color="fg.muted" textAlign="center" fontSize="sm">
@@ -67,7 +67,11 @@ export function IdentifyForm({ onIdentify, isIdentifying, error }: IdentifyFormP
             </VStack>
 
             <VStack gap={3} align="stretch">
+              <VisuallyHidden asChild>
+                <label htmlFor="identify-email-input">Email address</label>
+              </VisuallyHidden>
               <Input
+                id="identify-email-input"
                 type="email"
                 placeholder="your.name@vixxo.com"
                 value={email}
@@ -75,7 +79,6 @@ export function IdentifyForm({ onIdentify, isIdentifying, error }: IdentifyFormP
                   setEmail(e.target.value)
                   if (validationError) setValidationError(null)
                 }}
-                aria-label="Email address"
                 autoFocus
               />
               {displayError && (

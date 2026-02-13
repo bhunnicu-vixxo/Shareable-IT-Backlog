@@ -83,7 +83,7 @@ export const BacklogItemCard = memo(
           borderColor: 'brand.green',
         }}
         transition="background 0.15s"
-        aria-label={`${item.title}, Priority ${item.priorityLabel}${item.isNew ? ', New item' : ''}`}
+        aria-label={`${item.title}, Priority ${item.priorityLabel}, Status: ${item.status}, Business Unit: ${item.teamName}${item.isNew ? ', New item' : ''}`}
         role={isClickable ? 'button' : 'article'}
         tabIndex={isClickable ? 0 : undefined}
         cursor={isClickable ? 'pointer' : undefined}

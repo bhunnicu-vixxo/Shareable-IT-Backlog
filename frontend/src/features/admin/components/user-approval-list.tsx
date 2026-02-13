@@ -61,7 +61,7 @@ export function UserApprovalList() {
     <Box borderWidth="1px" borderRadius="lg" p={6}>
       <VStack gap={4} align="stretch">
         <HStack justify="space-between">
-          <Heading size="md">User Approval Requests</Heading>
+          <Heading as="h2" size="md">User Approval Requests</Heading>
           <Badge colorPalette={pendingUsers.length > 0 ? 'orange' : 'green'}>
             {pendingUsers.length} pending
           </Badge>

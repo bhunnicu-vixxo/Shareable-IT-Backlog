@@ -230,7 +230,7 @@ describe('BacklogList', () => {
     await waitFor(() => {
       expect(screen.getByText('Fresh item')).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: 'Show only new items' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show only new items, currently off' })).toBeInTheDocument()
     expect(screen.getByText('New only (1)')).toBeInTheDocument()
   })
 
@@ -272,7 +272,7 @@ describe('BacklogList', () => {
     })
 
     // Click the filter button
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     // Old item should be hidden, new items visible
     expect(screen.queryByText('Old item')).not.toBeInTheDocument()
@@ -299,11 +299,11 @@ describe('BacklogList', () => {
     })
 
     // Toggle on
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
     expect(screen.queryByText('Old item')).not.toBeInTheDocument()
 
     // Toggle off — "Show all" button appears when filter is active
-    fireEvent.click(screen.getByRole('button', { name: 'Show all items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently on' }))
     expect(screen.getByText('Old item')).toBeInTheDocument()
     expect(screen.getByText('New item')).toBeInTheDocument()
   })
@@ -325,7 +325,7 @@ describe('BacklogList', () => {
       expect(screen.getByText('Old item')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
     expect(screen.getByText('Showing 1 of 2 new items')).toBeInTheDocument()
   })
 
@@ -489,7 +489,7 @@ describe('BacklogList', () => {
     expect(screen.getByText('Ops new')).toBeInTheDocument()
 
     // Now toggle "New only"
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
       expect(screen.getByText('Ops new')).toBeInTheDocument()
@@ -525,7 +525,7 @@ describe('BacklogList', () => {
     })
 
     // Now toggle "New only" — Finance has no new items
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
       expect(screen.getByText('No new items for Finance')).toBeInTheDocument()
@@ -562,7 +562,7 @@ describe('BacklogList', () => {
     })
 
     // Toggle new only → empty state (Finance has no new items)
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
       expect(screen.getByText('No new items for Finance')).toBeInTheDocument()
@@ -605,7 +605,7 @@ describe('BacklogList', () => {
     })
 
     // Toggle new only → empty state (Finance has no new items)
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
       expect(screen.getByText('No new items for Finance')).toBeInTheDocument()
@@ -814,7 +814,7 @@ describe('BacklogList', () => {
     })
 
     // Toggle "New only" — should filter out "Ops vpn old" (isNew: false)
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
       expect(screen.getByLabelText(/Ops vpn task/)).toBeInTheDocument()
@@ -1273,7 +1273,7 @@ describe('BacklogList', () => {
     })
 
     // Toggle "New only" — Finance has no new items → empty state
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
       // EmptyStateWithGuidance renders outside the virtual scroller
@@ -1353,7 +1353,7 @@ describe('BacklogList', () => {
     })
 
     // Toggle "New only"
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
       expect(screen.getByText('Alpha item')).toBeInTheDocument()
@@ -1378,7 +1378,7 @@ describe('BacklogList', () => {
       expect(screen.getByText('Old item')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
       expect(scrollToOffset).toHaveBeenCalledWith(0)
@@ -1405,7 +1405,7 @@ describe('BacklogList', () => {
     })
 
     // Toggle "New only" (no debounce, instant filter)
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
       // With filter — shows "X of Y" format

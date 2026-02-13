@@ -97,7 +97,7 @@ export function UserManagementList() {
     <Box borderWidth="1px" borderRadius="lg" p={6}>
       <VStack gap={4} align="stretch">
         <HStack justify="space-between">
-          <Heading size="md">All Users</Heading>
+          <Heading as="h2" size="md">All Users</Heading>
           <Badge colorPalette="blue">{users.length} total</Badge>
         </HStack>
 
@@ -106,6 +106,7 @@ export function UserManagementList() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           size="sm"
+          aria-label="Search users by email or name"
           data-testid="user-search-input"
         />
 

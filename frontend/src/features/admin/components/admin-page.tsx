@@ -1,4 +1,4 @@
-import { Box, Heading, Tabs, Text, VStack } from '@chakra-ui/react'
+import { Box, Heading, Tabs, Text, VisuallyHidden, VStack } from '@chakra-ui/react'
 import { Settings } from 'lucide-react'
 import { SyncControl } from './sync-control'
 import { UserApprovalList } from './user-approval-list'
@@ -17,10 +17,12 @@ export function AdminPage() {
   return (
     <Box maxW="960px" mx="auto" p={6}>
       <VStack gap={6} align="stretch">
-        <Heading size="xl">Administration</Heading>
+        <Heading as="h1" size="xl">Administration</Heading>
+
+        <VisuallyHidden>Admin dashboard. Use tabs to switch between Users, Sync, Audit Log, and Settings sections.</VisuallyHidden>
 
         <Tabs.Root defaultValue="users" variant="line">
-          <Tabs.List flexWrap={{ base: 'wrap', md: 'nowrap' }} gap={{ base: 2, md: 0 }}>
+          <Tabs.List flexWrap={{ base: 'wrap', md: 'nowrap' }} gap={{ base: 2, md: 0 }} aria-label="Admin sections">
             <Tabs.Trigger value="users" data-testid="tab-users">
               Users
             </Tabs.Trigger>
@@ -59,7 +61,7 @@ export function AdminPage() {
           <Tabs.Content value="settings">
             <Box pt={4}>
               <VStack gap={4} py={12} color="fg.muted" align="center">
-                <Settings size={48} strokeWidth={1} />
+                <Settings size={48} strokeWidth={1} aria-hidden="true" />
                 <Text fontSize="lg" fontWeight="medium">
                   Settings
                 </Text>
