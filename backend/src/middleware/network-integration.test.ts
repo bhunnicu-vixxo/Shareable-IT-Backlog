@@ -12,6 +12,17 @@ vi.mock('../utils/logger.js', () => ({
   },
 }))
 
+// Mock DB health probe so /api/health doesn't hang on real DB connectivity
+vi.mock('../utils/database.js', async () => {
+  const actual = await vi.importActual<typeof import('../utils/database.js')>(
+    '../utils/database.js',
+  )
+  return {
+    ...actual,
+    testConnection: vi.fn().mockResolvedValue({ connected: false, latencyMs: 0 }),
+  }
+})
+
 // Mock sync service to prevent actual sync operations
 vi.mock('../services/sync/sync.service.js', () => ({
   syncService: {

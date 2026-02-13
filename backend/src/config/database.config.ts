@@ -1,12 +1,17 @@
 import '../config/env.js'
 
 import type { PoolConfig } from 'pg'
+import { decryptCredential } from '../utils/credentials.js'
 
 const isProduction = process.env.NODE_ENV === 'production'
 const sslEnabled = process.env.DB_SSL_ENABLED === 'true' || isProduction
 
 /**
  * PostgreSQL pool configuration parsed from DATABASE_URL.
+ *
+ * The connection string is passed through `decryptCredential()` so it can
+ * be stored encrypted (with `enc:` prefix) in environment variables.
+ * Plaintext values pass through unchanged for development environments.
  *
  * Pool settings:
  *  - max 20 connections (matches architecture spec)
@@ -18,8 +23,9 @@ const sslEnabled = process.env.DB_SSL_ENABLED === 'true' || isProduction
  *  - Optionally enabled in dev via `DB_SSL_ENABLED=true`
  *  - Disabled by default in development
  */
+const rawDatabaseUrl = process.env.DATABASE_URL ?? ''
 export const poolConfig: PoolConfig = {
-  connectionString: process.env.DATABASE_URL,
+  connectionString: rawDatabaseUrl ? decryptCredential(rawDatabaseUrl) : undefined,
   max: 20,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,

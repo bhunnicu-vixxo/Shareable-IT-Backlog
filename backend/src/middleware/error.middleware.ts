@@ -12,6 +12,78 @@ interface AppError extends Error {
 /** Default Retry-After value (in seconds) when rate-limited by Linear API. */
 const DEFAULT_RETRY_AFTER_SECONDS = 60
 
+/**
+ * Credential-like field names that must be stripped from error response details.
+ * Prevents accidental leakage of credential values in API error responses.
+ */
+const CREDENTIAL_FIELD_PATTERNS = new Set([
+  'password',
+  'apikey',
+  'secret',
+  'token',
+  'linear_api_key',
+  'session_secret',
+  'credential_encryption_key',
+  'db_encryption_key',
+  'database_url',
+  'sync_trigger_token',
+  'credential',
+  'credentials',
+  'authorization',
+])
+
+/**
+ * Best-effort redaction for credential-like substrings embedded in error strings.
+ * This is intentionally heuristic (we cannot perfectly detect arbitrary secrets),
+ * but it prevents common accidental leaks such as connection strings, enc: blobs,
+ * and Bearer tokens.
+ */
+function sanitizeErrorString(value: string): string {
+  return (
+    value
+      // Common key=value / key: value patterns
+      .replace(
+        /\b(password|apiKey|secret|token)\b\s*[:=]\s*([^\s,;]+)/gi,
+        (_m, key) => `${key}=[REDACTED]`,
+      )
+      .replace(
+        /\b(LINEAR_API_KEY|SESSION_SECRET|CREDENTIAL_ENCRYPTION_KEY|DB_ENCRYPTION_KEY|DATABASE_URL|SYNC_TRIGGER_TOKEN)\b\s*[:=]\s*([^\s,;]+)/g,
+        (_m, key) => `${key}=[REDACTED]`,
+      )
+      // enc:<base64...>
+      .replace(/enc:[A-Za-z0-9+/=]+/g, 'enc:[REDACTED]')
+      // postgres / postgresql URLs (may contain embedded credentials)
+      .replace(/postgres(?:ql)?:\/\/[^\s'"]+/gi, '[REDACTED]')
+      // Bearer tokens
+      .replace(/bearer\s+[A-Za-z0-9\-._~+/=]+/gi, 'Bearer [REDACTED]')
+      // Linear API keys (common prefix)
+      .replace(/lin_api_[A-Za-z0-9]+/gi, 'lin_api_[REDACTED]')
+  )
+}
+
+/**
+ * Recursively strip credential-like fields from an object before sending as error details.
+ * Returns a shallow clone with sensitive fields replaced by '[REDACTED]'.
+ */
+function sanitizeErrorDetails(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+  if (typeof value === 'string') return sanitizeErrorString(value)
+  if (typeof value !== 'object') return value
+  if (Array.isArray(value)) return value.map(sanitizeErrorDetails)
+
+  const sanitized: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+    if (CREDENTIAL_FIELD_PATTERNS.has(key.toLowerCase())) {
+      sanitized[key] = '[REDACTED]'
+    } else if (typeof val === 'object' && val !== null) {
+      sanitized[key] = sanitizeErrorDetails(val)
+    } else {
+      sanitized[key] = val
+    }
+  }
+  return sanitized
+}
+
 export const errorMiddleware = (
   err: AppError,
   _req: Request,
@@ -33,7 +105,7 @@ export const errorMiddleware = (
         error: {
           message: 'Service temporarily unavailable due to upstream rate limiting. Please retry later.',
           code: 'RATE_LIMITED',
-          ...(process.env.NODE_ENV !== 'production' && { details: err.message }),
+          ...(process.env.NODE_ENV !== 'production' && { details: sanitizeErrorDetails(err.message) }),
         },
       })
     return
@@ -61,9 +133,11 @@ export const errorMiddleware = (
       message:
         statusCode === 500
           ? 'Unexpected server error. Please try again. If the problem persists, contact IT and provide the error code.'
-          : err.message,
+          : sanitizeErrorString(err.message),
       code,
-      ...(process.env.NODE_ENV !== 'production' && { details: err.details ?? err.message }),
+      ...(process.env.NODE_ENV !== 'production' && {
+        details: sanitizeErrorDetails(err.details ?? err.message),
+      }),
     },
   })
 }
