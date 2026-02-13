@@ -60,6 +60,13 @@ export function useServiceHealth() {
           if (consecutiveFailuresRef.current >= FAILURE_THRESHOLD) {
             setIsServiceUnavailable(true)
           }
+        } else {
+          // Non-503/non-network errors (e.g., 400, 404, 500) prove the server is reachable,
+          // so reset the consecutive failure counter.
+          if (consecutiveFailuresRef.current > 0) {
+            consecutiveFailuresRef.current = 0
+            setIsServiceUnavailable(false)
+          }
         }
       }
     })
