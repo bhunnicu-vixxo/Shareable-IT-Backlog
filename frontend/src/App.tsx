@@ -8,6 +8,10 @@ import { useAuth } from '@/features/auth/hooks/use-auth'
 import { IdentifyForm } from '@/features/auth/components/identify-form'
 import { PendingApproval } from '@/features/auth/components/pending-approval'
 import { AppLayout } from '@/shared/components/layout/app-layout'
+import { ErrorBoundary } from '@/shared/components/error-boundary'
+import { ErrorFallback } from '@/shared/components/error-fallback'
+import { ServiceUnavailable } from '@/shared/components/service-unavailable'
+import { useServiceHealth } from '@/shared/hooks/use-service-health'
 
 function App() {
   const { isChecking, isNetworkDenied, retry } = useNetworkAccess()
@@ -22,6 +26,7 @@ function App() {
     identifyError,
     checkSession,
   } = useAuth()
+  const { isServiceUnavailable, retry: retryService } = useServiceHealth()
 
   // 0. While checking network access, show nothing (brief flash)
   if (isChecking) {
@@ -66,28 +71,39 @@ function App() {
     )
   }
 
+  // 3b. Service unavailable — API is completely unreachable
+  if (isServiceUnavailable) {
+    return <ServiceUnavailable onRetry={retryService} />
+  }
+
   // 4. Authenticated + approved — show app routes with shared header
   return (
-    <AppLayout>
-      <Routes>
-        <Route path="/" element={<BacklogPage />} />
-        <Route
-          path="/admin"
-          element={
-            isAdmin ? (
-              <AdminPage />
-            ) : (
-              <Box display="flex" alignItems="center" justifyContent="center" minH="80vh">
-                <VStack gap={4}>
-                  <Heading size="lg">Access Denied</Heading>
-                  <Text color="fg.muted">You do not have admin privileges to view this page.</Text>
-                </VStack>
-              </Box>
-            )
-          }
-        />
-      </Routes>
-    </AppLayout>
+    <ErrorBoundary
+      fallbackRender={({ error, resetErrorBoundary }) => (
+        <ErrorFallback error={error} resetError={resetErrorBoundary} />
+      )}
+    >
+      <AppLayout>
+        <Routes>
+          <Route path="/" element={<BacklogPage />} />
+          <Route
+            path="/admin"
+            element={
+              isAdmin ? (
+                <AdminPage />
+              ) : (
+                <Box display="flex" alignItems="center" justifyContent="center" minH="80vh">
+                  <VStack gap={4}>
+                    <Heading size="lg">Access Denied</Heading>
+                    <Text color="fg.muted">You do not have admin privileges to view this page.</Text>
+                  </VStack>
+                </Box>
+              )
+            }
+          />
+        </Routes>
+      </AppLayout>
+    </ErrorBoundary>
   )
 }
 

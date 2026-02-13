@@ -181,6 +181,8 @@ export const getBacklogItems = async (
       items: responseItems,
       pageInfo: result.pageInfo,
       totalCount: result.totalCount,
+      servedFromCache: result._servedFromCache === true,
+      lastSyncedAt: result.lastSyncedAt ?? null,
     }
 
     // Determine cache source: the service sets _servedFromCache on the result

@@ -84,12 +84,68 @@ function sanitizeErrorDetails(value: unknown): unknown {
   return sanitized
 }
 
+/**
+ * PostgreSQL error codes that indicate the database is unavailable.
+ * These map to transient connection/availability issues, not application bugs.
+ *
+ * See https://www.postgresql.org/docs/current/errcodes-appendix.html
+ */
+const PG_UNAVAILABLE_CODES = new Set([
+  '08001', // sqlclient_unable_to_establish_sqlconnection
+  '08006', // connection_failure
+  '57P01', // admin_shutdown
+  '57P03', // cannot_connect_now
+])
+
+/** System-level error codes from Node.js that indicate connection failure. */
+const SYSTEM_CONNECTION_ERRORS = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ENOTFOUND',
+  'ETIMEDOUT',
+])
+
+/**
+ * Check whether an error indicates database unavailability.
+ * Handles both PostgreSQL protocol-level errors (with `code` field)
+ * and system-level connection errors (ECONNREFUSED, etc.).
+ */
+function isDatabaseUnavailableError(err: AppError): boolean {
+  const code = err.code ?? ''
+  if (PG_UNAVAILABLE_CODES.has(code)) return true
+  if (SYSTEM_CONNECTION_ERRORS.has(code)) return true
+  // pg module sometimes sets code on the error directly
+  if ('errno' in err && typeof (err as Record<string, unknown>).errno === 'string') {
+    if (SYSTEM_CONNECTION_ERRORS.has((err as Record<string, unknown>).errno as string)) return true
+  }
+  return false
+}
+
+/** Default Retry-After for database unavailability (seconds). */
+const DB_RETRY_AFTER_SECONDS = 30
+
 export const errorMiddleware = (
   err: AppError,
   _req: Request,
   res: Response,
   _next: NextFunction,
 ): void => {
+  // Handle database unavailability with HTTP 503 + Retry-After header
+  if (isDatabaseUnavailableError(err)) {
+    logger.error({ err, code: err.code }, 'Database unavailable')
+    res
+      .status(503)
+      .set('Retry-After', String(DB_RETRY_AFTER_SECONDS))
+      .json({
+        error: {
+          message: 'Service temporarily unavailable. Please try again.',
+          code: 'DATABASE_UNAVAILABLE',
+          retryAfter: DB_RETRY_AFTER_SECONDS,
+        },
+      })
+    return
+  }
+
   // Handle Linear API rate limit errors with HTTP 503 + Retry-After header
   if (err instanceof LinearApiError && err.type === 'RATE_LIMITED') {
     const suggestedRetryMs = rateLimiter.getSuggestedRetryAfterMs()

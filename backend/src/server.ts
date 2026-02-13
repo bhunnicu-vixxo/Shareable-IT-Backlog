@@ -13,11 +13,14 @@ const PORT = Number.isFinite(portFromEnv) ? portFromEnv : 3000
 
 const { default: app, startHealthMonitor } = await import('./app.js')
 const { syncScheduler } = await import('./services/sync/sync-scheduler.service.js')
+const { pool } = await import('./utils/database.js')
+const { setupProcessErrorHandlers } = await import('./utils/process-error-handlers.js')
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info({ port: PORT }, 'Server started')
   syncScheduler.start().catch((error) => {
     logger.error({ error }, 'Failed to start sync scheduler')
   })
   startHealthMonitor()
+  setupProcessErrorHandlers(server, pool)
 })
