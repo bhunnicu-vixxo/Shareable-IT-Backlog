@@ -32,7 +32,7 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
               href={href ?? '#'}
               target="_blank"
               rel="noopener noreferrer"
-              color="brand.green"
+              color="brand.greenAccessible"
               textDecoration="underline"
               _hover={{ textDecoration: 'none' }}
             >

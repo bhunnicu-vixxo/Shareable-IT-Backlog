@@ -207,7 +207,7 @@ export function ItemDetailModal({
                 target="_blank"
                 rel="noopener noreferrer"
                 fontWeight="semibold"
-                color="brand.green"
+                color="brand.greenAccessible"
                 _hover={{ textDecoration: 'underline' }}
               >
                 Open in Linear →

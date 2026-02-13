@@ -10,22 +10,27 @@ import type { SyncStatus } from '../types/backlog.types'
  * Determine the color of the status dot based on sync status and staleness.
  *
  * Uses brand tokens from theme.ts:
- * - brand.teal: success and synced < 4 hours ago (info indicator)
- * - brand.yellow: success and synced 4–24 hours ago (warning)
- * - error.red: error OR synced > 24 hours ago
- * - brand.grayLight: never synced (lastSyncedAt is null)
+ * - brand.teal: success and synced < 4 hours ago (info indicator) — 4.8:1 on white ✓
+ * - brand.copper: success and synced 4–24 hours ago (warning) — 5.0:1 on white ✓
+ *   (brand.yellow #EDA200 has only 1.8:1 on white, fails WCAG SC 1.4.11 non-text contrast)
+ * - error.red: error OR synced > 24 hours ago — 4.13:1 on white ✓ (meets 3:1 non-text)
+ * - brand.grayLight: never synced (lastSyncedAt is null) — 4.62:1 on white ✓
  */
 function getStatusDotColor(syncStatus: SyncStatus | null): string {
   if (!syncStatus) return 'brand.grayLight'
   if (syncStatus.status === 'error') return 'error.red'
   if (syncStatus.lastSyncedAt === null) return 'brand.grayLight'
-  if (syncStatus.status === 'partial') return 'brand.yellow'
+  // WCAG SC 1.4.11: Non-text UI elements need ≥3:1 contrast.
+  // brand.copper (#956125, 5.0:1) replaces brand.yellow (#EDA200, 1.8:1) for the warning dot.
+  if (syncStatus.status === 'partial') return 'brand.copper'
 
   const lastSynced = new Date(syncStatus.lastSyncedAt)
+  // Defensive: malformed timestamps should not show an "error/stale" dot.
+  if (Number.isNaN(lastSynced.getTime())) return 'brand.grayLight'
   const hoursAgo = (Date.now() - lastSynced.getTime()) / 3_600_000
 
   if (hoursAgo < 4) return 'brand.teal'
-  if (hoursAgo < 24) return 'brand.yellow'
+  if (hoursAgo < 24) return 'brand.copper'
   return 'error.red'
 }
 
@@ -85,7 +90,8 @@ export const SyncStatusIndicator = memo(function SyncStatusIndicator({ compact =
     )
   }
 
-  // Partial sync — yellow dot with warning text
+  // Partial sync — copper dot with warning text
+  // WCAG: brand.copper (#956125, 5.0:1) replaces brand.yellow (#EDA200, 1.8:1) for non-text contrast
   if (syncStatus?.status === 'partial') {
     return (
       <Box role="status" aria-live="polite" aria-atomic="true" data-compact={compact || undefined}>
@@ -94,10 +100,10 @@ export const SyncStatusIndicator = memo(function SyncStatusIndicator({ compact =
             w={2}
             h={2}
             borderRadius="full"
-            bg="brand.yellow"
+            bg="brand.copper"
             flexShrink={0}
             data-testid="sync-status-dot"
-            data-color="brand.yellow"
+            data-color="brand.copper"
             aria-hidden="true"
           />
           <Text fontSize="xs" color="fg.muted">

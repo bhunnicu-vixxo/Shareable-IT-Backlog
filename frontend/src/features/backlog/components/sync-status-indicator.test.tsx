@@ -146,7 +146,7 @@ describe('SyncStatusIndicator', () => {
     expect(dot).toHaveAttribute('data-color', 'brand.teal')
   })
 
-  it('should render yellow dot when sync is stale (4-24h)', () => {
+  it('should render copper dot when sync is stale (4-24h)', () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: makeSyncStatus({
         lastSyncedAt: '2026-02-10T08:00:00.000Z',
@@ -162,7 +162,8 @@ describe('SyncStatusIndicator', () => {
     expect(screen.getByText(/Last synced:/)).toBeInTheDocument()
     const dot = screen.getByTestId('sync-status-dot')
     expect(dot).toBeInTheDocument()
-    expect(dot).toHaveAttribute('data-color', 'brand.yellow')
+    // WCAG SC 1.4.11: brand.copper (#956125, 5.0:1) replaces brand.yellow (#EDA200, 1.8:1)
+    expect(dot).toHaveAttribute('data-color', 'brand.copper')
   })
 
   it('should render red dot when sync is very stale (>24h)', () => {
@@ -182,6 +183,22 @@ describe('SyncStatusIndicator', () => {
     const dot = screen.getByTestId('sync-status-dot')
     expect(dot).toBeInTheDocument()
     expect(dot).toHaveAttribute('data-color', 'error.red')
+  })
+
+  it('should render gray dot when lastSyncedAt is malformed', () => {
+    mockUseSyncStatus.mockReturnValue({
+      syncStatus: makeSyncStatus({
+        lastSyncedAt: 'not-a-date',
+        status: 'success',
+      }),
+      isLoading: false,
+      error: null,
+    })
+
+    render(<SyncStatusIndicator />)
+    const dot = screen.getByTestId('sync-status-dot')
+    expect(dot).toBeInTheDocument()
+    expect(dot).toHaveAttribute('data-color', 'brand.grayLight')
   })
 
   it('should render alert banner with user-friendly message when status is error', () => {
@@ -305,7 +322,7 @@ describe('SyncStatusIndicator', () => {
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['backlog-items'] })
   })
 
-  it('should render yellow dot with "Synced with warnings" when status is partial', () => {
+  it('should render copper dot with "Synced with warnings" when status is partial', () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: makeSyncStatus({
         status: 'partial',
@@ -321,7 +338,8 @@ describe('SyncStatusIndicator', () => {
     render(<SyncStatusIndicator />)
     const dot = screen.getByTestId('sync-status-dot')
     expect(dot).toBeInTheDocument()
-    expect(dot).toHaveAttribute('data-color', 'brand.yellow')
+    // WCAG SC 1.4.11: brand.copper (#956125, 5.0:1) replaces brand.yellow (#EDA200, 1.8:1)
+    expect(dot).toHaveAttribute('data-color', 'brand.copper')
     expect(screen.getByText(/Synced with warnings/)).toBeInTheDocument()
   })
 

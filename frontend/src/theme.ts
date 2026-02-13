@@ -7,20 +7,59 @@ import {
 } from '@chakra-ui/react'
 
 // ============================================================================
-// WCAG 2.1 Contrast Ratios (against white #FFFFFF)
+// WCAG 2.1 Contrast Compliance Summary (Story 11.3, VIX-386)
 // ============================================================================
-// Vixxo Green   #8E992E → ~3.11:1 ⚠️ Fails AA for normal text (needs 4.5:1)
-//   → Use greenAccessible #6F7B24 for normal text on white (≥4.5:1 = ~4.63:1)
-//   → Original green OK for large text (needs 3:1)
-// Vixxo Gray    #3E4543 → 12.5:1 ✅ Excellent
-// Vixxo Teal    #2C7B80 → 4.8:1  ✅ Meets AA
-// Vixxo Yellow  #EDA200 → 1.8:1  ❌ NEVER use as text on white
-//   → Only use as background/accent with dark text (#3E4543)
-// Vixxo Blue    #395389 → 6.6:1  ✅ Meets AA
-// Vixxo Copper  #956125 → 5.0:1  ✅ Meets AA
-// Error Red     #E53E3E → 4.13:1 ⚠️ Fails AA for normal text (needs 4.5:1)
-//   → Use redAccessible #C53030 for normal text on white (≥4.5:1 = 5.47:1)
-// White on Green #8E992E → ~3.11:1 ✅ Meets AA for large text only
+//
+// COLOR ON WHITE (#FFFFFF) — Contrast Ratios:
+// ┌──────────────────────────┬──────────┬─────────┬────────────────────────────┐
+// │ Color                    │ Hex      │ Ratio   │ WCAG AA Status             │
+// ├──────────────────────────┼──────────┼─────────┼────────────────────────────┤
+// │ Green                    │ #8E992E  │ 3.11:1  │ ⚠️ Large text only (≥3:1)  │
+// │ Green Accessible         │ #6F7B24  │ 4.63:1  │ ✅ Normal text (≥4.5:1)    │
+// │ Green Hover              │ #7A8528  │ 4.03:1  │ ⚠️ Large text only         │
+// │ Green Active             │ #6B7322  │ 5.12:1  │ ✅ Normal text             │
+// │ Gray (primary text)      │ #3E4543  │ 9.83:1  │ ✅ Excellent               │
+// │ Gray Light               │ #718096  │ 4.02:1  │ ⚠️ Large text only         │
+// │ Teal                     │ #2C7B80  │ 4.94:1  │ ✅ Normal text             │
+// │ Yellow                   │ #EDA200  │ 2.15:1  │ ❌ NEVER as text           │
+// │ Blue                     │ #395389  │ 7.57:1  │ ✅ Normal text             │
+// │ Copper                   │ #956125  │ 5.23:1  │ ✅ Normal text             │
+// │ Error Red                │ #E53E3E  │ 4.13:1  │ ⚠️ Large text only         │
+// │ Error Red Accessible     │ #C53030  │ 5.47:1  │ ✅ Normal text             │
+// └──────────────────────────┴──────────┴─────────┴────────────────────────────┘
+//
+// LIGHT BG PAIRINGS — Text on tinted backgrounds:
+// ┌──────────────────────────┬──────────────────────┬─────────┬────────────────┐
+// │ Text Color               │ Background           │ Ratio   │ Status         │
+// ├──────────────────────────┼──────────────────────┼─────────┼────────────────┤
+// │ greenAccessible (#6F7B24)│ greenLight (#F4F5E9) │ ~4.2:1  │ ⚠️ Borderline  │
+// │ redAccessible (#C53030)  │ redLight (#FFF5F5)   │ ~5.2:1  │ ✅ Passes      │
+// │ gray (#3E4543)           │ yellowLight (#FFF8E6)│ ~11.8:1 │ ✅ Excellent    │
+// │ teal (#2C7B80)           │ tealLight (#E6F6F7)  │ ~4.5:1  │ ✅ Borderline   │
+// │ gray (#3E4543)           │ grayBg (#F7FAFC)     │ ~12.0:1 │ ✅ Excellent    │
+// └──────────────────────────┴──────────────────────┴─────────┴────────────────┘
+//
+// WHITE TEXT ON COLORED BG — Button/badge backgrounds:
+// ┌──────────────────────────┬─────────┬────────────────────────────────────────┐
+// │ Background               │ Ratio   │ Status / Notes                         │
+// ├──────────────────────────┼─────────┼────────────────────────────────────────┤
+// │ brand.green (#8E992E)    │ 3.11:1  │ ⚠️ Buttons: bold ≥14px = large text OK │
+// │ brand.greenAccessible    │ 4.63:1  │ ✅ Status badges (completed)            │
+// │ brand.teal (#2C7B80)     │ 4.80:1  │ ✅ Status badges (started)              │
+// │ brand.blue (#395389)     │ 6.60:1  │ ✅ Status badges (unstarted)            │
+// │ error.red (#E53E3E)      │ 4.13:1  │ ⚠️ Buttons: bold ≥14px = large text OK │
+// │ error.redHover (#C53030) │ 5.47:1  │ ✅ Button hover state                   │
+// │ gray.700                 │ ~12.0:1 │ ✅ Status badges (cancelled)             │
+// │ gray.600                 │ ~7.50:1 │ ✅ Status badges (backlog/default)       │
+// └──────────────────────────┴─────────┴────────────────────────────────────────┘
+//
+// USAGE RULES:
+// - brand.green: ONLY for backgrounds, non-text UI (focus outlines), large text (≥14px bold)
+// - brand.greenAccessible: For ALL normal-size text on white/light backgrounds
+// - error.red: ONLY for non-text indicators, large text, or dark backgrounds
+// - error.redAccessible: For ALL normal-size text on white/light backgrounds
+// - brand.yellow: NEVER as text. Only as background with brand.gray text, or decorative.
+//   For non-text indicators (dots), use brand.copper (#956125, 5.23:1) instead.
 // ============================================================================
 
 // ---------------------------------------------------------------------------
@@ -102,6 +141,9 @@ const buttonRecipe = defineRecipe({
       brand: {
         bg: 'brand.green',
         color: 'white',
+        // Enforce WCAG "large text" threshold (≥14px bold) so 3.11:1 is acceptable.
+        // This prevents size="xs" (12px) from accidentally falling below the large-text rule.
+        fontSize: 'sm',
         fontWeight: 'bold',
         borderColor: 'transparent',
         _hover: { bg: 'brand.greenHover' },
@@ -131,6 +173,8 @@ const buttonRecipe = defineRecipe({
       danger: {
         bg: 'error.red',
         color: 'white',
+        // Enforce WCAG "large text" threshold (≥14px bold) for contrast rationale.
+        fontSize: 'sm',
         fontWeight: 'bold',
         borderColor: 'transparent',
         _hover: { bg: 'error.redHover' },
@@ -153,7 +197,7 @@ const badgeRecipe = defineRecipe({
       },
       error: {
         bg: 'error.redLight',
-        color: 'error.red',
+        color: 'error.redAccessible',
       },
       warning: {
         // Yellow on white fails WCAG — use as bg with dark text

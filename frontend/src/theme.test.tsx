@@ -252,8 +252,15 @@ describe('Component Recipe Definitions', () => {
             variant?: {
               brand?: {
                 bg?: string
+                fontSize?: string
+                fontWeight?: string
                 _hover?: { bg?: string }
                 _active?: { bg?: string }
+              }
+              danger?: {
+                bg?: string
+                fontSize?: string
+                fontWeight?: string
               }
             }
           }
@@ -262,6 +269,7 @@ describe('Component Recipe Definitions', () => {
           variants?: {
             variant?: {
               warning?: { bg?: string; color?: string }
+              error?: { bg?: string; color?: string }
             }
           }
         }
@@ -295,6 +303,36 @@ describe('Component Recipe Definitions', () => {
     expect(badge).toBeDefined()
     expect(badge?.variants?.variant?.warning?.bg).toBe('brand.yellowLight')
     expect(badge?.variants?.variant?.warning?.color).toBe('brand.gray')
+  })
+
+  it('badge error variant uses accessible red for text (≥4.5:1 contrast on redLight)', () => {
+    const themeRecipes = (system as unknown as { _config?: SystemConfig })._config
+    const badge = themeRecipes?.theme?.recipes?.badge
+    expect(badge?.variants?.variant?.error?.color).toBe('error.redAccessible')
+  })
+
+  it('button brand variant has bold font weight for large text compliance', () => {
+    const themeRecipes = (system as unknown as { _config?: SystemConfig })._config
+    const button = themeRecipes?.theme?.recipes?.button
+    expect(button?.variants?.variant?.brand?.fontWeight).toBe('bold')
+  })
+
+  it('button brand variant enforces sm font size (≥14px) for large text compliance', () => {
+    const themeRecipes = (system as unknown as { _config?: SystemConfig })._config
+    const button = themeRecipes?.theme?.recipes?.button
+    expect(button?.variants?.variant?.brand?.fontSize).toBe('sm')
+  })
+
+  it('button danger variant has bold font weight for large text compliance', () => {
+    const themeRecipes = (system as unknown as { _config?: SystemConfig })._config
+    const button = themeRecipes?.theme?.recipes?.button
+    expect(button?.variants?.variant?.danger?.fontWeight).toBe('bold')
+  })
+
+  it('button danger variant enforces sm font size (≥14px) for large text compliance', () => {
+    const themeRecipes = (system as unknown as { _config?: SystemConfig })._config
+    const button = themeRecipes?.theme?.recipes?.button
+    expect(button?.variants?.variant?.danger?.fontSize).toBe('sm')
   })
 
   it('defines alert slot recipe with left border accents', () => {
