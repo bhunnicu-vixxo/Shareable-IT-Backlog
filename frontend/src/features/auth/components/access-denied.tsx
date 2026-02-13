@@ -16,6 +16,8 @@ export interface AccessDeniedProps {
 export function AccessDenied({ onRetry }: AccessDeniedProps) {
   return (
     <VStack
+      as="main"
+      id="main-content"
       minH="100vh"
       justify="center"
       align="center"
