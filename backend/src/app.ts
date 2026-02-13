@@ -13,6 +13,7 @@ import {
 import { errorMiddleware } from './middleware/error.middleware.js'
 import { responseTimeMiddleware } from './middleware/response-time.middleware.js'
 import { auditMiddleware } from './middleware/audit.middleware.js'
+import { httpsRedirectMiddleware } from './middleware/https-redirect.middleware.js'
 import { createSessionMiddleware } from './config/session.config.js'
 
 const app = express()
@@ -25,13 +26,38 @@ app.set('trust proxy', 1)
 // Force network config parsing/validation at startup (logs warnings early).
 initializeNetworkConfig()
 
+// HTTPS redirect — enforce HTTPS in production (relies on trust proxy above)
+app.use(httpsRedirectMiddleware)
+
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean)
 
-// Security headers
-app.use(helmet())
+// Security headers — explicit CSP for SPA frontend, HSTS for transport security
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"], // Chakra UI runtime styles
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    strictTransportSecurity: {
+      maxAge: 31_536_000, // 1 year
+      includeSubDomains: true,
+    },
+    referrerPolicy: {
+      policy: 'strict-origin-when-cross-origin',
+    },
+  }),
+)
 
 // CORS — allow Vixxo network origins (configurable via env)
 app.use(
