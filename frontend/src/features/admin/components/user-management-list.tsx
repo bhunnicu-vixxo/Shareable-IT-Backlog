@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Box, Badge, Button, Heading, HStack, Input, Text, VStack } from '@chakra-ui/react'
+import { Box, Badge, Button, Heading, HStack, Input, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { useAllUsers, type ManagedUser } from '../hooks/use-all-users'
 import { useToggleUserStatus } from '../hooks/use-toggle-user-status'
 import { useAuth } from '@/features/auth/hooks/use-auth'
@@ -16,6 +16,34 @@ function getRoleBadge(user: ManagedUser) {
     <Badge colorPalette="blue">Admin</Badge>
   ) : (
     <Badge colorPalette="gray">User</Badge>
+  )
+}
+
+/**
+ * Skeleton placeholder for the user management table.
+ * Renders a header row with 6 column skeletons and 5 data row skeletons
+ * matching the real table layout (name, email, role, status, last access, actions).
+ */
+export function UserManagementListSkeleton() {
+  return (
+    <VStack gap={3} align="stretch" data-testid="user-management-skeleton">
+      {/* Data row skeletons */}
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Box key={i} p={4} borderWidth="1px" borderRadius="md" bg="bg.subtle">
+          <HStack justify="space-between" align="center">
+            <VStack gap={1} align="start" flex="1">
+              <HStack gap={2}>
+                <Skeleton height="5" width="40%" />
+                <Skeleton height="5" width="60px" borderRadius="full" />
+                <Skeleton height="5" width="50px" borderRadius="full" />
+              </HStack>
+              <Skeleton height="3" width="80%" />
+            </VStack>
+            <Skeleton height="8" width="70px" borderRadius="md" />
+          </HStack>
+        </Box>
+      ))}
+    </VStack>
   )
 }
 
@@ -93,7 +121,7 @@ export function UserManagementList() {
           </Text>
         )}
 
-        {isLoading && <Text color="fg.muted">Loading users...</Text>}
+        {isLoading && <UserManagementListSkeleton />}
 
         {error && (
           <Text color="fg.error" fontSize="sm">
@@ -136,10 +164,11 @@ export function UserManagementList() {
                   colorPalette="red"
                   variant="outline"
                   onClick={() => handleToggle(user.id, user.email, 'disable')}
+                  loading={isToggling && togglingId === user.id}
                   disabled={isToggling}
                   aria-label={`Disable ${user.email}`}
                 >
-                  {isToggling && togglingId === user.id ? 'Disabling...' : 'Disable'}
+                  Disable
                 </Button>
               )}
 
@@ -150,10 +179,11 @@ export function UserManagementList() {
                   colorPalette="green"
                   variant="outline"
                   onClick={() => handleToggle(user.id, user.email, 'enable')}
+                  loading={isToggling && togglingId === user.id}
                   disabled={isToggling}
                   aria-label={`Enable ${user.email}`}
                 >
-                  {isToggling && togglingId === user.id ? 'Enabling...' : 'Enable'}
+                  Enable
                 </Button>
               )}
 

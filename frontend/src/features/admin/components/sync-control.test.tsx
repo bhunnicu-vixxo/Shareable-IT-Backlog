@@ -438,7 +438,7 @@ describe('SyncControl', () => {
       expect(screen.queryByText('Connection refused')).not.toBeInTheDocument()
     })
 
-    it('shows loading state for history', () => {
+    it('shows skeleton when history is loading', () => {
       mockUseSyncHistory.mockReturnValue({
         history: [],
         isLoading: true,
@@ -448,7 +448,8 @@ describe('SyncControl', () => {
 
       render(<SyncControl />)
 
-      expect(screen.getByText('Loading history...')).toBeInTheDocument()
+      expect(screen.getByTestId('sync-history-skeleton')).toBeInTheDocument()
+      expect(screen.queryByText('Loading history...')).not.toBeInTheDocument()
     })
 
     it('shows error state for history', () => {

@@ -93,6 +93,7 @@ describe('ItemDetailModal', () => {
     )
 
     expect(screen.getByLabelText('Backlog item details')).toBeInTheDocument()
+    expect(screen.getByTestId('item-detail-body-skeleton')).toBeInTheDocument()
   })
 
   it('renders item details when data loads successfully', async () => {

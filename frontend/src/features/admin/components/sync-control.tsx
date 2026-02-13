@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Badge, Box, Button, Heading, HStack, Spinner, Table, Text, VStack } from '@chakra-ui/react'
+import { Alert, Badge, Box, Button, Heading, HStack, Skeleton, Spinner, Table, Text, VStack } from '@chakra-ui/react'
 import { useSyncStatus } from '../hooks/use-sync-status'
 import { useSyncTrigger } from '../hooks/use-sync-trigger'
 import { useSyncHistory } from '../hooks/use-sync-history'
@@ -33,6 +33,42 @@ function formatItems(entry: SyncHistoryEntry): string {
     parts.push(`(${entry.itemsFailed} failed)`)
   }
   return parts.join(' ')
+}
+
+/**
+ * Skeleton placeholder for the sync history table.
+ * Uses the same Table.* layout components as the real history table
+ * to ensure column alignment matches the loaded content exactly.
+ */
+export function SyncHistorySkeleton() {
+  return (
+    <Box data-testid="sync-history-skeleton">
+      <Table.ScrollArea>
+        <Table.Root size="sm" variant="outline">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader><Skeleton height="4" width="80px" /></Table.ColumnHeader>
+              <Table.ColumnHeader><Skeleton height="4" width="50px" /></Table.ColumnHeader>
+              <Table.ColumnHeader><Skeleton height="4" width="60px" /></Table.ColumnHeader>
+              <Table.ColumnHeader><Skeleton height="4" width="40px" /></Table.ColumnHeader>
+              <Table.ColumnHeader><Skeleton height="4" width="40px" /></Table.ColumnHeader>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Table.Row key={i}>
+                <Table.Cell><Skeleton height="4" width="120px" /></Table.Cell>
+                <Table.Cell><Skeleton height="4" width="70px" borderRadius="full" /></Table.Cell>
+                <Table.Cell><Skeleton height="4" width="50px" /></Table.Cell>
+                <Table.Cell><Skeleton height="4" width="40px" /></Table.Cell>
+                <Table.Cell><Skeleton height="4" width="60%" /></Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Root>
+      </Table.ScrollArea>
+    </Box>
+  )
 }
 
 /**
@@ -223,9 +259,7 @@ export function SyncControl() {
             Sync History
           </Heading>
 
-          {isHistoryLoading && (
-            <Text color="fg.muted" fontSize="sm">Loading history...</Text>
-          )}
+          {isHistoryLoading && <SyncHistorySkeleton />}
 
           {historyError && (
             <Text color="fg.error" fontSize="sm">
