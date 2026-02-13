@@ -19,15 +19,22 @@ vi.mock('readline', () => ({
     question: vi.fn((_prompt: string, cb: (answer: string) => void) => {
       cb(mockStdinRead())
     }),
+    once: vi.fn((event: string, cb: (line: string) => void) => {
+      if (event === 'line') {
+        cb(mockStdinRead())
+      }
+    }),
     close: vi.fn(),
   })),
 }))
 
-// Mock the logger
+// Mock the logger - export reference for test assertions
+const mockLoggerInfo = vi.fn()
+const mockLoggerError = vi.fn()
 vi.mock('../utils/logger.js', () => ({
   logger: {
-    info: vi.fn(),
-    error: vi.fn(),
+    info: mockLoggerInfo,
+    error: mockLoggerError,
     warn: vi.fn(),
   },
 }))
@@ -45,6 +52,8 @@ describe('credential-cli', () => {
     mockStdoutWrite.mockClear()
     mockStderrWrite.mockClear()
     mockStdinRead.mockClear()
+    mockLoggerInfo.mockClear()
+    mockLoggerError.mockClear()
     process.env.CREDENTIAL_ENCRYPTION_KEY = 'test-passphrase-for-unit-tests!'
   })
 
@@ -84,9 +93,10 @@ describe('credential-cli', () => {
 
       await expect(async () => await runCli()).rejects.toThrow('process.exit called')
 
-      const stderrOutput = mockStderrWrite.mock.calls.map((c) => String(c[0])).join('')
-      expect(stderrOutput).toContain('DATABASE_URL')
-      expect(stderrOutput).toContain('LINEAR_API_KEY')
+      // validateCredentials() now logs via logger.error, not stderr
+      const loggerCalls = mockLoggerError.mock.calls.map((c) => JSON.stringify(c)).join('')
+      expect(loggerCalls).toContain('DATABASE_URL')
+      expect(loggerCalls).toContain('LINEAR_API_KEY')
     })
 
     it('should report success when all credentials present', async () => {
@@ -99,8 +109,9 @@ describe('credential-cli', () => {
       const { runCli } = await import('./credential-cli.js')
       await runCli()
 
-      const stdoutOutput = mockStdoutWrite.mock.calls.map((c) => String(c[0])).join('')
-      expect(stdoutOutput).toContain('All required credentials validated')
+      // validateCredentials() now logs via logger.info, not stdout
+      const loggerCalls = mockLoggerInfo.mock.calls.map((c) => JSON.stringify(c)).join('')
+      expect(loggerCalls).toContain('All required credentials validated')
     })
   })
 

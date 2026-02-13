@@ -77,6 +77,8 @@ function sanitizeErrorDetails(value: unknown): unknown {
       sanitized[key] = '[REDACTED]'
     } else if (typeof val === 'object' && val !== null) {
       sanitized[key] = sanitizeErrorDetails(val)
+    } else if (typeof val === 'string') {
+      sanitized[key] = sanitizeErrorString(val)
     } else {
       sanitized[key] = val
     }
@@ -103,9 +105,12 @@ export const errorMiddleware = (
       .set('Retry-After', String(retryAfterSeconds))
       .json({
         error: {
-          message: 'Service temporarily unavailable due to upstream rate limiting. Please retry later.',
+          message:
+            'Service temporarily unavailable due to upstream rate limiting. Please retry later.',
           code: 'RATE_LIMITED',
-          ...(process.env.NODE_ENV !== 'production' && { details: sanitizeErrorDetails(err.message) }),
+          ...(process.env.NODE_ENV !== 'production' && {
+            details: sanitizeErrorDetails(err.message),
+          }),
         },
       })
     return

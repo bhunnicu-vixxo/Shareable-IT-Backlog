@@ -20,22 +20,7 @@
 
 import { createInterface } from 'readline'
 import { encryptCredential, decryptCredential } from './credentials.js'
-
-/** Required environment variable credentials. */
-const REQUIRED_CREDENTIALS = [
-  'DATABASE_URL',
-  'LINEAR_API_KEY',
-  'SESSION_SECRET',
-  'DB_ENCRYPTION_KEY',
-] as const
-
-/** All credential env vars that support enc: prefix. */
-const ENCRYPTABLE_CREDENTIALS = [
-  'DATABASE_URL',
-  'LINEAR_API_KEY',
-  'SESSION_SECRET',
-  'SYNC_TRIGGER_TOKEN',
-] as const
+import { validateCredentials } from '../config/credential-validator.js'
 
 function printHelp(): void {
   process.stdout.write(`
@@ -72,15 +57,27 @@ Environment:
 
 /** Read a line from stdin (supports piped input and interactive prompts). */
 function readFromStdin(prompt: string): Promise<string> {
+  const isInteractive = process.stdin.isTTY
   return new Promise((resolve) => {
     const rl = createInterface({
       input: process.stdin,
-      output: process.stdout,
+      output: isInteractive ? process.stdout : undefined,
     })
-    rl.question(prompt, (answer: string) => {
-      rl.close()
-      resolve(answer.trim())
-    })
+    if (isInteractive) {
+      rl.question(prompt, (answer: string) => {
+        rl.close()
+        resolve(answer.trim())
+      })
+    } else {
+      // Non-interactive: read the first line without prompt
+      rl.once('line', (line: string) => {
+        rl.close()
+        resolve(line.trim())
+      })
+      rl.once('close', () => {
+        resolve('')
+      })
+    }
   })
 }
 
@@ -105,59 +102,9 @@ async function handleEncrypt(): Promise<void> {
 
 /** Validate subcommand: check all required credentials are present and decryptable. */
 async function handleValidate(): Promise<void> {
-  if (process.env.DB_ENCRYPTION_KEY?.trim().startsWith('enc:')) {
-    process.stderr.write('FAIL: DB_ENCRYPTION_KEY does not support enc: prefix\n')
-    process.exit(1)
-  }
-  if (process.env.CREDENTIAL_ENCRYPTION_KEY?.trim().startsWith('enc:')) {
-    process.stderr.write('FAIL: CREDENTIAL_ENCRYPTION_KEY must not be encrypted\n')
-    process.exit(1)
-  }
-
-  const missing: string[] = []
-  const encryptedVars: string[] = []
-  const decryptionErrors: Array<{ name: string; error: string }> = []
-
-  // Check required credentials
-  for (const name of REQUIRED_CREDENTIALS) {
-    const value = process.env[name]
-    if (!value || value.trim().length === 0) {
-      missing.push(name)
-    }
-  }
-
-  if (missing.length > 0) {
-    process.stderr.write(`FAIL: Missing required credentials: ${missing.join(', ')}\n`)
-    process.exit(1)
-  }
-
-  // Check enc: values can be decrypted
-  for (const name of ENCRYPTABLE_CREDENTIALS) {
-    const value = process.env[name]
-    if (value && value.startsWith('enc:')) {
-      encryptedVars.push(name)
-      try {
-        decryptCredential(value)
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        decryptionErrors.push({ name, error: message })
-      }
-    }
-  }
-
-  if (decryptionErrors.length > 0) {
-    process.stderr.write('FAIL: Decryption errors:\n')
-    for (const { name, error } of decryptionErrors) {
-      process.stderr.write(`  ${name}: ${error}\n`)
-    }
-    process.exit(1)
-  }
-
-  process.stdout.write(`All required credentials validated (${REQUIRED_CREDENTIALS.length} required`)
-  if (encryptedVars.length > 0) {
-    process.stdout.write(`, ${encryptedVars.length} encrypted`)
-  }
-  process.stdout.write(')\n')
+  // Use the same validation logic as server startup to ensure consistency.
+  // validateCredentials() calls process.exit(1) on failure and logs success.
+  validateCredentials()
 }
 
 /** Rotate-check subcommand: verify a new value can be encrypted and decrypted. */

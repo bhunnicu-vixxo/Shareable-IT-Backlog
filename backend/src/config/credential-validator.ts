@@ -73,14 +73,20 @@ function validateNoWhitespace(name: string, value: string): void {
 export function validateCredentials(): void {
   // Guardrails: these keys are NOT encryptable via enc:
   if (process.env.DB_ENCRYPTION_KEY?.trim().startsWith('enc:')) {
-    exitWithError('Startup credential validation failed: DB_ENCRYPTION_KEY does not support enc: prefix', {
-      name: 'DB_ENCRYPTION_KEY',
-    })
+    exitWithError(
+      'Startup credential validation failed: DB_ENCRYPTION_KEY does not support enc: prefix',
+      {
+        name: 'DB_ENCRYPTION_KEY',
+      },
+    )
   }
   if (process.env.CREDENTIAL_ENCRYPTION_KEY?.trim().startsWith('enc:')) {
-    exitWithError('Startup credential validation failed: CREDENTIAL_ENCRYPTION_KEY must not be encrypted', {
-      name: 'CREDENTIAL_ENCRYPTION_KEY',
-    })
+    exitWithError(
+      'Startup credential validation failed: CREDENTIAL_ENCRYPTION_KEY must not be encrypted',
+      {
+        name: 'CREDENTIAL_ENCRYPTION_KEY',
+      },
+    )
   }
 
   // Phase 1: Check for missing required credentials
@@ -105,7 +111,7 @@ export function validateCredentials(): void {
 
   for (const name of ENCRYPTABLE_CREDENTIALS) {
     const value = process.env[name]
-    if (value && value.startsWith('enc:')) {
+    if (value && value.trim().startsWith('enc:')) {
       encryptedVars.push(name)
     }
   }
@@ -120,16 +126,16 @@ export function validateCredentials(): void {
 
     // Ensure all enc: values are actually decryptable (malformed enc:, wrong key, etc.)
     for (const name of encryptedVars) {
-      const value = process.env[name]
+      const value = process.env[name]?.trim()
       if (!value) continue
       try {
         decryptCredential(value)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        exitWithError(
-          `Startup credential validation failed: ${name} is malformed`,
-          { name, error: message },
-        )
+        exitWithError(`Startup credential validation failed: ${name} is malformed`, {
+          name,
+          error: message,
+        })
       }
     }
   }
