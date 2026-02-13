@@ -12,6 +12,7 @@ import {
 } from './middleware/network.middleware.js'
 import { errorMiddleware } from './middleware/error.middleware.js'
 import { responseTimeMiddleware } from './middleware/response-time.middleware.js'
+import { auditMiddleware } from './middleware/audit.middleware.js'
 import { createSessionMiddleware } from './config/session.config.js'
 
 const app = express()
@@ -62,6 +63,11 @@ app.use('/api', healthRoutes)
 
 // Network verification — blocks requests from IPs outside allowed CIDR ranges
 app.use('/api', networkVerificationMiddleware)
+
+// Audit logging — records user access events AFTER response is sent (non-blocking).
+// Placed after session + network verification so only authenticated, network-verified
+// requests are audited. Health checks and OPTIONS are excluded internally.
+app.use(auditMiddleware)
 
 // Routes (health already mounted above, remaining routes are network-protected)
 app.use('/api', routes)
