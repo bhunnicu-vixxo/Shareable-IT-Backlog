@@ -12,6 +12,7 @@ const {
   mockDisableUser,
   mockEnableUser,
   mockListSyncHistory,
+  mockAuditLogAdminAction,
 } = vi.hoisted(() => ({
   mockLookupOrCreateUser: vi.fn(),
   mockGetUserById: vi.fn(),
@@ -22,6 +23,7 @@ const {
   mockDisableUser: vi.fn(),
   mockEnableUser: vi.fn(),
   mockListSyncHistory: vi.fn(),
+  mockAuditLogAdminAction: vi.fn(),
 }))
 
 vi.mock('../services/auth/auth.service.js', () => ({
@@ -36,6 +38,14 @@ vi.mock('../services/users/user.service.js', () => ({
   getAllUsers: mockGetAllUsers,
   disableUser: mockDisableUser,
   enableUser: mockEnableUser,
+}))
+
+vi.mock('../services/audit/audit.service.js', () => ({
+  auditService: {
+    logAdminAction: mockAuditLogAdminAction,
+    // audit middleware may call this; keep it as a harmless noop
+    logUserAccess: vi.fn().mockResolvedValue(undefined),
+  },
 }))
 
 vi.mock('../utils/logger.js', () => ({
@@ -115,6 +125,7 @@ describe('Admin Routes (integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUpdateLastAccess.mockResolvedValue(undefined)
+    mockAuditLogAdminAction.mockResolvedValue(undefined)
     // Re-establish sync mocks after clearAllMocks (vitest v4 clears factory implementations)
     mockSyncGetStatus.mockReturnValue({ status: 'idle', lastSyncedAt: null, itemCount: null, errorMessage: null, errorCode: null })
     mockSyncRunSync.mockResolvedValue(undefined)

@@ -15,6 +15,7 @@ import { auditService } from '../services/audit/audit.service.js'
  *   - userId    (number)  — filter by user ID
  *   - action    (string)  — filter by action type
  *   - resource  (string)  — filter by resource type
+ *   - isAdminAction (boolean) — filter by admin action logs
  *   - startDate (ISO string) — filter logs created on or after
  *   - endDate   (ISO string) — filter logs created on or before
  *   - page      (number, default 1)
@@ -30,6 +31,7 @@ export async function getAuditLogs(
     const userId = parseOptionalInt(req.query.userId)
     const action = parseOptionalString(req.query.action)
     const resource = parseOptionalString(req.query.resource)
+    const isAdminActionResult = parseOptionalBoolean(req.query.isAdminAction)
     const startDate = parseOptionalString(req.query.startDate)
     const endDate = parseOptionalString(req.query.endDate)
 
@@ -43,6 +45,18 @@ export async function getAuditLogs(
       })
       return
     }
+
+    if (isAdminActionResult.valid === false) {
+      res.status(400).json({
+        error: {
+          message: 'Invalid isAdminAction parameter — use true or false',
+          code: 'VALIDATION_ERROR',
+        },
+      })
+      return
+    }
+
+    const isAdminAction = isAdminActionResult.value
 
     if (isNaN(page)) {
       res.status(400).json({
@@ -81,6 +95,7 @@ export async function getAuditLogs(
       userId,
       action,
       resource,
+      isAdminAction,
       startDate,
       endDate,
       page,
@@ -114,4 +129,23 @@ function parseOptionalString(
 ): string | undefined {
   if (value === undefined || value === null || value === '') return undefined
   return String(value).trim()
+}
+
+/**
+ * Parse an optional query param as a boolean.
+ *
+ * Returns a result object:
+ * - `{ valid: true, value: boolean | undefined }` for absent, "true", or "false"
+ * - `{ valid: false }` when present but not a recognized boolean string
+ */
+function parseOptionalBoolean(
+  value: unknown,
+): { valid: true; value: boolean | undefined } | { valid: false } {
+  if (value === undefined || value === null || value === '') {
+    return { valid: true, value: undefined }
+  }
+  const normalized = String(value).trim().toLowerCase()
+  if (normalized === 'true') return { valid: true, value: true }
+  if (normalized === 'false') return { valid: true, value: false }
+  return { valid: false }
 }

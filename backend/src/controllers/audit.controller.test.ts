@@ -88,6 +88,7 @@ describe('GET /api/admin/audit-logs (controller)', () => {
       userId: '42',
       action: 'VIEW_ITEM',
       resource: 'backlog_item',
+      isAdminAction: 'true',
       startDate: '2026-02-01T00:00:00Z',
       endDate: '2026-02-12T23:59:59Z',
       page: '2',
@@ -102,6 +103,7 @@ describe('GET /api/admin/audit-logs (controller)', () => {
       userId: 42,
       action: 'VIEW_ITEM',
       resource: 'backlog_item',
+      isAdminAction: true,
       startDate: '2026-02-01T00:00:00Z',
       endDate: '2026-02-12T23:59:59Z',
       page: 2,
@@ -195,6 +197,23 @@ describe('GET /api/admin/audit-logs (controller)', () => {
         code: 'VALIDATION_ERROR',
       },
     })
+  })
+
+  it('returns 400 for invalid isAdminAction value', async () => {
+    const req = createReq({ isAdminAction: 'maybe' })
+    const res = createRes()
+    const next = vi.fn()
+
+    await getAuditLogs(req, res, next)
+
+    expect(res._statusCode).toBe(400)
+    expect(res._body).toEqual({
+      error: {
+        message: 'Invalid isAdminAction parameter — use true or false',
+        code: 'VALIDATION_ERROR',
+      },
+    })
+    expect(mockGetAuditLogs).not.toHaveBeenCalled()
   })
 
   it('calls next on service error', async () => {

@@ -219,7 +219,10 @@ development_status:
     status: done
     linear_id: "VIX-380"
     linear_url: "https://linear.app/vixxo/issue/VIX-380/implement-audit-logging-for-user-access"
-  10-3-implement-audit-logging-for-admin-actions: backlog
+  10-3-implement-audit-logging-for-admin-actions:
+    status: done
+    linear_id: "VIX-381"
+    linear_url: "https://linear.app/vixxo/issue/VIX-381/implement-audit-logging-for-admin-actions"
   10-4-implement-secure-credential-storage: backlog
   epic-10-retrospective: optional
 

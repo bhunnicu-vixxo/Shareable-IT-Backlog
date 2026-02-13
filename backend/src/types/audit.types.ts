@@ -5,7 +5,7 @@
  * compile-time safety for audit service, middleware, and route layers.
  */
 
-/** Actions captured by the audit logging middleware. */
+/** Actions captured by audit logging (middleware and admin operations). */
 export type AuditAction =
   | 'VIEW_BACKLOG'
   | 'VIEW_ITEM'
@@ -17,6 +17,10 @@ export type AuditAction =
   | 'VIEW_SYNC_STATUS'
   | 'VIEW_USERS'
   | 'TRIGGER_SYNC'
+  | 'SYNC_SCHEDULE_UPDATED'
+  | 'USER_APPROVED'
+  | 'USER_DISABLED'
+  | 'USER_ENABLED'
   | 'API_ACCESS'
 
 /** Resource categories targeted by audited actions. */
@@ -57,6 +61,7 @@ export interface AuditLogQueryParams {
   userId?: number
   action?: string
   resource?: string
+  isAdminAction?: boolean
   startDate?: string
   endDate?: string
   page?: number

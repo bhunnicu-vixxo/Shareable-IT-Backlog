@@ -94,6 +94,44 @@ describe('auditService.logUserAccess', () => {
   })
 })
 
+describe('auditService.logAdminAction', () => {
+  it('delegates to insertAuditLog (and does not swallow errors)', async () => {
+    mockInsert.mockResolvedValueOnce({
+      id: 2,
+      userId: 1,
+      action: 'TRIGGER_SYNC',
+      resource: 'sync',
+      resourceId: null,
+      details: null,
+      ipAddress: '10.0.0.1',
+      isAdminAction: true,
+      createdAt: '2026-02-12T10:30:00.000Z',
+    })
+
+    const adminEntry: CreateAuditLogInput = {
+      userId: 1,
+      action: 'TRIGGER_SYNC',
+      resource: 'sync',
+      resourceId: null,
+      ipAddress: '10.0.0.1',
+      isAdminAction: true,
+      details: { triggerType: 'manual', statusCode: 202 },
+    }
+
+    await auditService.logAdminAction(adminEntry)
+
+    expect(mockInsert).toHaveBeenCalledWith(adminEntry)
+    expect(mockLogger.error).not.toHaveBeenCalled()
+  })
+
+  it('throws when insertAuditLog fails', async () => {
+    const dbError = new Error('DB down')
+    mockInsert.mockRejectedValueOnce(dbError)
+
+    await expect(auditService.logAdminAction(sampleInput)).rejects.toThrow('DB down')
+  })
+})
+
 describe('auditService.getAuditLogs', () => {
   it('delegates to queryAuditLogs', async () => {
     const expected = { logs: [], total: 0 }

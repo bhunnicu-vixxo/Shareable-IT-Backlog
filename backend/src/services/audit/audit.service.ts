@@ -39,6 +39,17 @@ export const auditService = {
   },
 
   /**
+   * Log an admin action event.
+   *
+   * Unlike user access logging, admin action logging is treated as a required
+   * compliance record. Failures should be surfaced to the caller so the
+   * admin action can decide whether to proceed.
+   */
+  async logAdminAction(entry: CreateAuditLogInput): Promise<void> {
+    await insertAuditLog(entry)
+  },
+
+  /**
    * Query audit logs with optional filtering and pagination.
    */
   async getAuditLogs(

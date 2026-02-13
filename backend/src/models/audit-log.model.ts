@@ -69,6 +69,12 @@ export async function queryAuditLogs(
     paramIndex++
   }
 
+  if (params.isAdminAction !== undefined) {
+    conditions.push(`is_admin_action = $${paramIndex}`)
+    values.push(params.isAdminAction)
+    paramIndex++
+  }
+
   if (params.startDate !== undefined) {
     conditions.push(`created_at >= $${paramIndex}`)
     values.push(params.startDate)

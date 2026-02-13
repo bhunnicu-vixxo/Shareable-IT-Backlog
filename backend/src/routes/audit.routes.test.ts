@@ -166,7 +166,7 @@ describe('Audit Routes (integration)', () => {
       })
 
       const res = await fetch(
-        `${baseUrl}/api/admin/audit-logs?userId=42&page=2&limit=10`,
+        `${baseUrl}/api/admin/audit-logs?userId=42&isAdminAction=true&page=2&limit=10`,
         { headers: { Cookie: cookie } },
       )
 
@@ -178,7 +178,7 @@ describe('Audit Routes (integration)', () => {
       expect(body.logs).toHaveLength(1)
 
       expect(mockAuditGetAuditLogs).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 42, page: 2, limit: 10 }),
+        expect.objectContaining({ userId: 42, isAdminAction: true, page: 2, limit: 10 }),
       )
     })
 
