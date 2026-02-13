@@ -199,7 +199,10 @@ development_status:
   9-2-implement-virtual-scrolling-or-pagination:
     status: done
     linear_id: "VIX-375"
-  9-3-optimize-api-response-times: backlog
+  9-3-optimize-api-response-times:
+    status: done
+    linear_id: "VIX-376"
+    linear_url: "https://linear.app/vixxo/issue/VIX-376/optimize-api-response-times"
   9-4-implement-loading-states-and-skeleton-screens: backlog
   epic-9-retrospective: optional
 
