@@ -160,13 +160,29 @@ describe('user.service', () => {
       expect(mockClient.query.mock.calls[2][0]).toContain('UPDATE users')
       expect(mockClient.query.mock.calls[3][0]).toContain('INSERT INTO audit_logs')
       expect(mockClient.query.mock.calls[3][0]).toContain('USER_APPROVED')
-      // Verify IP address is passed as $4 parameter
-      expect(mockClient.query.mock.calls[3][1]).toEqual([
-        1,
-        '2',
-        expect.stringContaining('"approvedUserId":2'),
-        '192.168.1.1',
-      ])
+      // Verify audit details include target + before/after and IP address is passed
+      const auditParams = mockClient.query.mock.calls[3][1] as unknown[]
+      expect(auditParams[0]).toBe(1) // adminId
+      expect(auditParams[1]).toBe('2') // target user id
+      expect(auditParams[3]).toBe('192.168.1.1') // ip
+
+      const details = JSON.parse(String(auditParams[2])) as Record<string, unknown>
+      expect(details).toEqual(
+        expect.objectContaining({
+          target: { userId: 2, email: 'pending@vixxo.com' },
+          before: expect.objectContaining({
+            isApproved: false,
+            isDisabled: false,
+            approvedAt: null,
+            approvedBy: null,
+          }),
+          after: expect.objectContaining({
+            isApproved: true,
+            isDisabled: false,
+            approvedBy: 1,
+          }),
+        }),
+      )
       expect(mockClient.query.mock.calls[4][0]).toBe('COMMIT')
       expect(mockClient.release).toHaveBeenCalled()
     })
@@ -227,12 +243,18 @@ describe('user.service', () => {
       expect(mockClient.query.mock.calls[2][0]).toContain('UPDATE users SET is_disabled = true')
       expect(mockClient.query.mock.calls[3][0]).toContain('INSERT INTO audit_logs')
       expect(mockClient.query.mock.calls[3][0]).toContain('USER_DISABLED')
-      expect(mockClient.query.mock.calls[3][1]).toEqual([
-        1,
-        '2',
-        expect.stringContaining('"disabledUserId":2'),
-        '192.168.1.1',
-      ])
+      const disableAuditParams = mockClient.query.mock.calls[3][1] as unknown[]
+      expect(disableAuditParams[0]).toBe(1) // adminId
+      expect(disableAuditParams[1]).toBe('2') // target user id
+      expect(disableAuditParams[3]).toBe('192.168.1.1') // ip
+      const disableDetails = JSON.parse(String(disableAuditParams[2])) as Record<string, unknown>
+      expect(disableDetails).toEqual(
+        expect.objectContaining({
+          target: { userId: 2, email: 'pending@vixxo.com' },
+          before: expect.objectContaining({ isDisabled: false }),
+          after: expect.objectContaining({ isDisabled: true }),
+        }),
+      )
       expect(mockClient.query.mock.calls[4][0]).toBe('COMMIT')
       expect(mockClient.release).toHaveBeenCalled()
     })
@@ -317,12 +339,18 @@ describe('user.service', () => {
       expect(mockClient.query.mock.calls[0][0]).toBe('BEGIN')
       expect(mockClient.query.mock.calls[2][0]).toContain('UPDATE users SET is_disabled = false')
       expect(mockClient.query.mock.calls[3][0]).toContain('USER_ENABLED')
-      expect(mockClient.query.mock.calls[3][1]).toEqual([
-        1,
-        '3',
-        expect.stringContaining('"enabledUserId":3'),
-        '192.168.1.1',
-      ])
+      const enableAuditParams = mockClient.query.mock.calls[3][1] as unknown[]
+      expect(enableAuditParams[0]).toBe(1) // adminId
+      expect(enableAuditParams[1]).toBe('3') // target user id
+      expect(enableAuditParams[3]).toBe('192.168.1.1') // ip
+      const enableDetails = JSON.parse(String(enableAuditParams[2])) as Record<string, unknown>
+      expect(enableDetails).toEqual(
+        expect.objectContaining({
+          target: { userId: 3, email: 'pending@vixxo.com' },
+          before: expect.objectContaining({ isDisabled: true }),
+          after: expect.objectContaining({ isDisabled: false }),
+        }),
+      )
       expect(mockClient.query.mock.calls[4][0]).toBe('COMMIT')
       expect(mockClient.release).toHaveBeenCalled()
     })

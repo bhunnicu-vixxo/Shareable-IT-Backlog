@@ -3,6 +3,7 @@ import { Settings } from 'lucide-react'
 import { SyncControl } from './sync-control'
 import { UserApprovalList } from './user-approval-list'
 import { UserManagementList } from './user-management-list'
+import { AuditLogList } from './audit-log-list'
 
 /**
  * Admin dashboard with tabbed navigation.
@@ -26,6 +27,9 @@ export function AdminPage() {
             <Tabs.Trigger value="sync" data-testid="tab-sync">
               Sync
             </Tabs.Trigger>
+            <Tabs.Trigger value="audit" data-testid="tab-audit">
+              Audit Logs
+            </Tabs.Trigger>
             <Tabs.Trigger value="settings" data-testid="tab-settings">
               Settings
             </Tabs.Trigger>
@@ -43,6 +47,12 @@ export function AdminPage() {
           <Tabs.Content value="sync">
             <Box pt={4}>
               <SyncControl />
+            </Box>
+          </Tabs.Content>
+
+          <Tabs.Content value="audit">
+            <Box pt={4}>
+              <AuditLogList />
             </Box>
           </Tabs.Content>
 

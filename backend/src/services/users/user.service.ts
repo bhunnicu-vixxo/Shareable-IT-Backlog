@@ -92,13 +92,40 @@ export async function approveUser(userId: number, adminId: number, ipAddress: st
     const row = result.rows[0]
 
     // Create audit log entry (within same transaction)
+    const beforeApprovedAt =
+      existingUser.approved_at instanceof Date
+        ? existingUser.approved_at.toISOString()
+        : existingUser.approved_at
+          ? new Date(existingUser.approved_at as string).toISOString()
+          : null
+    const afterApprovedAt =
+      row.approved_at instanceof Date
+        ? (row.approved_at as Date).toISOString()
+        : row.approved_at
+          ? new Date(row.approved_at as string).toISOString()
+          : null
+
     await client.query(
       `INSERT INTO audit_logs (user_id, action, resource, resource_id, details, ip_address, is_admin_action)
        VALUES ($1, 'USER_APPROVED', 'user', $2, $3, $4, true)`,
       [
         adminId,
         String(userId),
-        JSON.stringify({ approvedUserId: userId, approvedUserEmail: existingUser.email }),
+        JSON.stringify({
+          target: { userId, email: existingUser.email as string },
+          before: {
+            isApproved: existingUser.is_approved as boolean,
+            isDisabled: existingUser.is_disabled as boolean,
+            approvedAt: beforeApprovedAt,
+            approvedBy: (existingUser.approved_by as number | null) ?? null,
+          },
+          after: {
+            isApproved: row.is_approved as boolean,
+            isDisabled: row.is_disabled as boolean,
+            approvedAt: afterApprovedAt,
+            approvedBy: (row.approved_by as number | null) ?? null,
+          },
+        }),
         ipAddress,
       ],
     )
@@ -178,7 +205,16 @@ export async function disableUser(userId: number, adminId: number, ipAddress: st
     await client.query(
       `INSERT INTO audit_logs (user_id, action, resource, resource_id, details, ip_address, is_admin_action)
        VALUES ($1, 'USER_DISABLED', 'user', $2, $3, $4, true)`,
-      [adminId, String(userId), JSON.stringify({ disabledUserId: userId, disabledUserEmail: user.email }), ipAddress],
+      [
+        adminId,
+        String(userId),
+        JSON.stringify({
+          target: { userId, email: user.email as string },
+          before: { isDisabled: user.is_disabled as boolean },
+          after: { isDisabled: true },
+        }),
+        ipAddress,
+      ],
     )
 
     await client.query('COMMIT')
@@ -241,7 +277,16 @@ export async function enableUser(userId: number, adminId: number, ipAddress: str
     await client.query(
       `INSERT INTO audit_logs (user_id, action, resource, resource_id, details, ip_address, is_admin_action)
        VALUES ($1, 'USER_ENABLED', 'user', $2, $3, $4, true)`,
-      [adminId, String(userId), JSON.stringify({ enabledUserId: userId, enabledUserEmail: user.email }), ipAddress],
+      [
+        adminId,
+        String(userId),
+        JSON.stringify({
+          target: { userId, email: user.email as string },
+          before: { isDisabled: user.is_disabled as boolean },
+          after: { isDisabled: false },
+        }),
+        ipAddress,
+      ],
     )
 
     await client.query('COMMIT')

@@ -15,6 +15,21 @@ const { mockGetStatus, mockRunSync, mockListSyncHistory } = vi.hoisted(() => ({
   mockListSyncHistory: vi.fn(),
 }))
 
+const { mockGetSyncCronSchedule, mockSetSyncCronSchedule } = vi.hoisted(() => ({
+  mockGetSyncCronSchedule: vi.fn(),
+  mockSetSyncCronSchedule: vi.fn(),
+}))
+
+const { mockAuditLogAdminAction } = vi.hoisted(() => ({
+  mockAuditLogAdminAction: vi.fn(),
+}))
+
+const { mockSchedulerRestart, mockSchedulerIsRunning, mockSchedulerGetSchedule } = vi.hoisted(() => ({
+  mockSchedulerRestart: vi.fn(),
+  mockSchedulerIsRunning: vi.fn(),
+  mockSchedulerGetSchedule: vi.fn(),
+}))
+
 vi.mock('../services/users/user.service.js', () => ({
   getPendingUsers: mockGetPendingUsers,
   approveUser: mockApproveUser,
@@ -34,6 +49,25 @@ vi.mock('../services/sync/sync-history.service.js', () => ({
   listSyncHistory: mockListSyncHistory,
 }))
 
+vi.mock('../services/settings/app-settings.service.js', () => ({
+  getSyncCronSchedule: mockGetSyncCronSchedule,
+  setSyncCronSchedule: mockSetSyncCronSchedule,
+}))
+
+vi.mock('../services/sync/sync-scheduler.service.js', () => ({
+  syncScheduler: {
+    restart: mockSchedulerRestart,
+    isRunning: mockSchedulerIsRunning,
+    getSchedule: mockSchedulerGetSchedule,
+  },
+}))
+
+vi.mock('../services/audit/audit.service.js', () => ({
+  auditService: {
+    logAdminAction: mockAuditLogAdminAction,
+  },
+}))
+
 vi.mock('../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),
@@ -43,10 +77,23 @@ vi.mock('../utils/logger.js', () => ({
   },
 }))
 
-import { listPendingUsers, approveUserHandler, listAllUsers, disableUserHandler, enableUserHandler, adminTriggerSync, getSyncHistory } from './admin.controller.js'
+import {
+  listPendingUsers,
+  approveUserHandler,
+  listAllUsers,
+  disableUserHandler,
+  enableUserHandler,
+  adminTriggerSync,
+  getSyncHistory,
+  updateSyncSchedule,
+} from './admin.controller.js'
 
 function createMockReqResNext(
-  overrides: { params?: Record<string, string>; session?: Record<string, unknown> } = {},
+  overrides: {
+    params?: Record<string, string>
+    session?: Record<string, unknown>
+    body?: Record<string, unknown>
+  } = {},
 ): {
   req: Request
   res: Response
@@ -56,6 +103,7 @@ function createMockReqResNext(
     params: overrides.params ?? {},
     ip: '127.0.0.1',
     session: { userId: '1', isAdmin: true, ...overrides.session },
+    body: overrides.body ?? {},
   } as unknown as Request
 
   const res = {
@@ -237,11 +285,21 @@ describe('admin.controller', () => {
     it('should return 202 and trigger sync with admin ID', async () => {
       mockGetStatus.mockReturnValue({ status: 'idle', lastSyncedAt: null, itemCount: null, errorMessage: null, errorCode: null })
       mockRunSync.mockResolvedValue(undefined)
+      mockAuditLogAdminAction.mockResolvedValue(undefined)
       const { req, res, next } = createMockReqResNext()
 
       await adminTriggerSync(req, res, next)
 
       expect(res.status).toHaveBeenCalledWith(202)
+      expect(mockAuditLogAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 1,
+          action: 'TRIGGER_SYNC',
+          resource: 'sync',
+          resourceId: null,
+          isAdminAction: true,
+        }),
+      )
       expect(mockRunSync).toHaveBeenCalledWith({ triggerType: 'manual', triggeredBy: 1 })
     })
 
@@ -254,6 +312,7 @@ describe('admin.controller', () => {
 
       expect(res.status).toHaveBeenCalledWith(409)
       expect(res.json).toHaveBeenCalledWith(syncingStatus)
+      expect(mockAuditLogAdminAction).not.toHaveBeenCalled()
       expect(mockRunSync).not.toHaveBeenCalled()
     })
 
@@ -265,6 +324,80 @@ describe('admin.controller', () => {
       await adminTriggerSync(req, res, next)
 
       expect(next).toHaveBeenCalledWith(error)
+    })
+  })
+
+  describe('updateSyncSchedule', () => {
+    beforeEach(() => {
+      mockSchedulerRestart.mockResolvedValue(undefined)
+      mockSchedulerIsRunning.mockReturnValue(true)
+      mockSchedulerGetSchedule.mockReturnValue('*/5 * * * *')
+    })
+
+    it('should update schedule and write an admin audit log entry', async () => {
+      mockGetSyncCronSchedule.mockResolvedValue('*/15 * * * *')
+      mockSetSyncCronSchedule.mockResolvedValue(undefined)
+      mockAuditLogAdminAction.mockResolvedValue(undefined)
+
+      const { req, res, next } = createMockReqResNext({
+        body: { schedule: '*/5 * * * *' },
+      })
+
+      await updateSyncSchedule(req, res, next)
+
+      expect(mockSetSyncCronSchedule).toHaveBeenCalledWith('*/5 * * * *')
+      expect(mockSchedulerRestart).toHaveBeenCalled()
+      expect(mockAuditLogAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 1,
+          action: 'SYNC_SCHEDULE_UPDATED',
+          resource: 'admin',
+          resourceId: 'sync_cron_schedule',
+          isAdminAction: true,
+          details: expect.objectContaining({
+            before: { schedule: '*/15 * * * *' },
+            after: { schedule: '*/5 * * * *' },
+            validated: true,
+          }),
+        }),
+      )
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ schedule: '*/5 * * * *', isRunning: true }),
+      )
+    })
+
+    it('should write audit log BEFORE persisting the schedule change', async () => {
+      mockGetSyncCronSchedule.mockResolvedValue('*/15 * * * *')
+      mockSetSyncCronSchedule.mockResolvedValue(undefined)
+      mockAuditLogAdminAction.mockResolvedValue(undefined)
+
+      const callOrder: string[] = []
+      mockAuditLogAdminAction.mockImplementation(async () => { callOrder.push('audit') })
+      mockSetSyncCronSchedule.mockImplementation(async () => { callOrder.push('persist') })
+      mockSchedulerRestart.mockImplementation(async () => { callOrder.push('restart') })
+
+      const { req, res, next } = createMockReqResNext({
+        body: { schedule: '*/5 * * * *' },
+      })
+
+      await updateSyncSchedule(req, res, next)
+
+      expect(callOrder).toEqual(['audit', 'persist', 'restart'])
+    })
+
+    it('should not persist schedule if audit log fails', async () => {
+      mockGetSyncCronSchedule.mockResolvedValue('*/15 * * * *')
+      mockAuditLogAdminAction.mockRejectedValue(new Error('Audit DB down'))
+
+      const { req, res, next } = createMockReqResNext({
+        body: { schedule: '*/5 * * * *' },
+      })
+
+      await updateSyncSchedule(req, res, next)
+
+      expect(next).toHaveBeenCalledWith(expect.any(Error))
+      expect(mockSetSyncCronSchedule).not.toHaveBeenCalled()
+      expect(mockSchedulerRestart).not.toHaveBeenCalled()
     })
   })
 

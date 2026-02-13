@@ -5,6 +5,7 @@ import { syncService } from '../services/sync/sync.service.js'
 import { syncScheduler } from '../services/sync/sync-scheduler.service.js'
 import { listSyncHistory } from '../services/sync/sync-history.service.js'
 import { getSyncCronSchedule, setSyncCronSchedule } from '../services/settings/app-settings.service.js'
+import { auditService } from '../services/audit/audit.service.js'
 import { logger } from '../utils/logger.js'
 
 /**
@@ -117,6 +118,22 @@ export async function adminTriggerSync(req: Request, res: Response, next: NextFu
 
     const adminId = Number(req.session.userId)
 
+    // Record admin action audit log (required compliance record).
+    // statusCode is the intended response code (202 Accepted); if this audit insert
+    // throws, the response won't be sent and the sync won't trigger.
+    await auditService.logAdminAction({
+      userId: adminId,
+      action: 'TRIGGER_SYNC',
+      resource: 'sync',
+      resourceId: null,
+      ipAddress: req.ip ?? '',
+      isAdminAction: true,
+      details: {
+        triggerType: 'manual',
+        statusCode: 202,
+      },
+    })
+
     // Fire-and-forget: start sync, don't await
     syncService.runSync({ triggerType: 'manual', triggeredBy: adminId }).catch((error) => {
       logger.error({ service: 'sync', error }, 'Admin manual sync trigger failed')
@@ -190,6 +207,16 @@ export async function updateSyncSchedule(req: Request, res: Response, next: Next
 
     const trimmed = schedule.trim()
 
+    if (trimmed.length > 200) {
+      res.status(400).json({
+        error: {
+          message: 'Cron expression is too long (max 200 characters)',
+          code: 'VALIDATION_ERROR',
+        },
+      })
+      return
+    }
+
     if (!cron.validate(trimmed)) {
       res.status(400).json({
         error: {
@@ -200,13 +227,32 @@ export async function updateSyncSchedule(req: Request, res: Response, next: Next
       return
     }
 
+    const beforeSchedule = await getSyncCronSchedule()
+    const adminId = Number(req.session.userId)
+
+    // Write audit log BEFORE persisting — if audit fails the change must not proceed.
+    // This satisfies the guardrail: "Admin action audit logs should be transactional
+    // for state-changing admin operations."
+    await auditService.logAdminAction({
+      userId: adminId,
+      action: 'SYNC_SCHEDULE_UPDATED',
+      resource: 'admin',
+      resourceId: 'sync_cron_schedule',
+      ipAddress: req.ip ?? '',
+      isAdminAction: true,
+      details: {
+        before: { schedule: beforeSchedule },
+        after: { schedule: trimmed },
+        validated: true,
+      },
+    })
+
     // Persist to database
     await setSyncCronSchedule(trimmed)
 
     // Restart the scheduler to pick up the new schedule
     await syncScheduler.restart()
 
-    const adminId = Number(req.session.userId)
     logger.info({ adminId, schedule: trimmed }, 'Admin updated sync schedule')
 
     res.json({
