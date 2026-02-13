@@ -1,5 +1,7 @@
 import './config/env.js'
 
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
@@ -15,6 +17,7 @@ import { responseTimeMiddleware } from './middleware/response-time.middleware.js
 import { auditMiddleware } from './middleware/audit.middleware.js'
 import { httpsRedirectMiddleware } from './middleware/https-redirect.middleware.js'
 import { createSessionMiddleware } from './config/session.config.js'
+import { logger } from './utils/logger.js'
 
 const app = express()
 
@@ -97,6 +100,52 @@ app.use(auditMiddleware)
 
 // Routes (health already mounted above, remaining routes are network-protected)
 app.use('/api', routes)
+
+// API not-found handler — ensures unknown /api routes never fall through to SPA
+// static serving (when enabled) and always return consistent JSON error format.
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } })
+})
+
+// ---------------------------------------------------------------------------
+// Production static file serving — serve frontend SPA from Express
+// ---------------------------------------------------------------------------
+// In production Docker deployment, nginx handles static files directly. However,
+// for non-Docker deployments (e.g., direct Node.js on Vixxo servers), Express
+// can serve the frontend build output. Enable by setting SERVE_STATIC=true.
+// ---------------------------------------------------------------------------
+if (process.env.SERVE_STATIC === 'true') {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url))
+  const frontendDistPath = process.env.FRONTEND_DIST_PATH ?? path.resolve(__dirname, '../../frontend/dist')
+
+  // Serve hashed assets with long-lived cache (1 year). Vite produces content-
+  // hashed filenames so stale cache is not a concern for these files.
+  app.use(
+    '/assets',
+    express.static(path.join(frontendDistPath, 'assets'), {
+      maxAge: '1y',
+      immutable: true,
+    }),
+  )
+
+  // Serve remaining static files (favicon, robots.txt, etc.) with no-cache.
+  app.use(express.static(frontendDistPath, { maxAge: 0 }))
+
+  // SPA fallback — serve index.html for all non-API routes so client-side
+  // routing works correctly. Set Cache-Control: no-cache so browsers always
+  // fetch the latest index.html to pick up new deployments.
+  app.get('*', (_req, res) => {
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate')
+    res.sendFile(path.join(frontendDistPath, 'index.html'), (err) => {
+      if (err) {
+        logger.error({ err }, 'Failed to serve index.html')
+        res.status(500).json({ error: { message: 'Failed to serve frontend', code: 'STATIC_SERVE_ERROR' } })
+      }
+    })
+  })
+
+  logger.info({ frontendDistPath }, 'Static file serving enabled')
+}
 
 // Error middleware (must be last)
 app.use(errorMiddleware)

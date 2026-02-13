@@ -71,6 +71,8 @@ shareable-linear-backlog/
 │   │   ├── features/     # Feature-based modules (backlog, admin, etc.)
 │   │   ├── shared/       # Shared utilities, hooks, types
 │   │   └── App.tsx       # Root component
+│   ├── Dockerfile        # Multi-stage build (nginx)
+│   ├── nginx.conf        # Production nginx config (SPA + API proxy)
 │   └── package.json
 ├── backend/              # Express + TypeScript (port 3000)
 │   ├── src/
@@ -80,10 +82,17 @@ shareable-linear-backlog/
 │   │   ├── routes/       # API route definitions
 │   │   ├── services/     # Business logic layer
 │   │   └── server.ts     # Entry point
+│   ├── Dockerfile        # Multi-stage build (Node.js)
 │   └── package.json
 ├── database/
 │   └── migrations/       # SQL migration files (node-pg-migrate)
-├── .env.example          # All environment variables documented
+├── docs/
+│   └── deployment/       # Deployment and troubleshooting guides
+├── scripts/              # Setup, deploy, migrate, and seed scripts
+├── docker-compose.yml    # Development (PostgreSQL only)
+├── docker-compose.prod.yml # Production (full stack)
+├── .env.example          # Development environment variables
+├── .env.production.example # Production environment template
 ├── package.json          # Root workspace config + dev scripts
 └── README.md
 ```
@@ -128,9 +137,44 @@ Credentials can be stored encrypted using the `enc:` prefix (AES-256-GCM). See [
 - Emergency response procedures
 - Production deployment checklist
 
+## Production Deployment
+
+For deploying to the Vixxo network, see the full [Deployment Guide](docs/deployment/deployment-guide.md).
+
+**Quick Docker deployment:**
+
+```bash
+# 1. Configure environment
+cp .env.production.example .env.production
+# Edit .env.production with your values
+
+# 2. Deploy
+docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
+
+# 3. Verify
+curl http://localhost/api/health
+```
+
+**Environment variable summary:**
+
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `LINEAR_API_KEY` | Yes | Linear API key for data sync |
+| `SESSION_SECRET` | Yes (prod) | Session cookie signing (32+ chars) |
+| `ALLOWED_ORIGINS` | Recommended | CORS allowed origins |
+| `ALLOWED_NETWORKS` | Recommended | CIDR ranges for network access |
+
+See [`.env.production.example`](.env.production.example) for all production variables.
+
+**Deployment documentation:**
+- [Deployment Guide](docs/deployment/deployment-guide.md) — Full setup and deployment instructions
+- [Troubleshooting](docs/deployment/troubleshooting.md) — Common issues and solutions
+
 ## Tech Stack
 
 - **Frontend:** Vite, React 19, TypeScript, Chakra UI, TanStack Query, React Router v7
 - **Backend:** Express, TypeScript, Pino (logging), Zod (validation), pg (PostgreSQL)
 - **Database:** PostgreSQL with node-pg-migrate
+- **Infrastructure:** Docker, Docker Compose, nginx
 - **Tooling:** ESLint 9, Prettier, Vitest, tsx

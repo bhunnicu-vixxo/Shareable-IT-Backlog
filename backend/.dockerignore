@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+**/*.test.ts
+**/*.spec.ts
+.env
+.env.*
+!.env.example
+README.md
+eslint.config.js
+.prettierrc

@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react'
+import './skip-link.css'
 
 /**
  * Skip navigation link for keyboard users.
@@ -33,32 +33,13 @@ export function SkipLink() {
   }
 
   return (
-    <Box
-      as="a"
+    <a
       href="#main-content"
-      position="fixed"
-      top="-100px"
-      left="50%"
-      transform="translateX(-50%)"
-      zIndex={9999}
-      bg="brand.green"
-      color="white"
-      fontWeight="bold"
-      fontSize="sm"
-      px="4"
-      py="2"
-      borderRadius="md"
-      textDecoration="none"
-      _focusVisible={{
-        top: '8px',
-        outline: '2px solid',
-        outlineColor: 'brand.green',
-        outlineOffset: '2px',
-      }}
+      className="skip-link"
       data-testid="skip-link"
       onClick={handleClick}
     >
       Skip to main content
-    </Box>
+    </a>
   )
 }

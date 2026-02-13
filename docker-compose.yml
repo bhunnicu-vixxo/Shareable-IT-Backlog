@@ -1,0 +1,35 @@
+# =============================================================================
+# Docker Compose — Development
+# =============================================================================
+# Provides a PostgreSQL database for local development.
+# Frontend and backend run natively via `npm run dev` (not containerized in dev).
+#
+# Usage:
+#   docker compose up -d          # Start PostgreSQL
+#   docker compose down            # Stop PostgreSQL
+#   docker compose down -v         # Stop and remove data volume
+# =============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: slb-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-slb_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-slb_dev_password}
+      POSTGRES_DB: ${DB_NAME:-shareable_linear_backlog}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-slb_user} -d ${DB_NAME:-shareable_linear_backlog}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  pgdata-dev:
+    driver: local

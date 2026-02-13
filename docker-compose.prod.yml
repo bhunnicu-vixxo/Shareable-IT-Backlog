@@ -1,0 +1,130 @@
+# =============================================================================
+# Docker Compose — Production
+# =============================================================================
+# Full stack deployment: frontend (nginx), backend (Express), database (PostgreSQL).
+#
+# Usage:
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
+#   docker compose -f docker-compose.prod.yml down
+#
+# Prerequisites:
+#   - Copy .env.production.example to .env.production and fill in all values
+#   - Run database migrations before first start (see scripts/migrate.sh)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Frontend — nginx serving static SPA files
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: slb-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - slb-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  # ---------------------------------------------------------------------------
+  # Backend — Express API server
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: slb-backend
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      # Override host-style DATABASE_URL from .env.production (localhost) with
+      # the Docker-internal hostname so the backend can reach Postgres.
+      # WARNING: DB_PASSWORD must not contain URI-reserved characters (@, :, /, ?, #, %)
+      # because they would break the connection string. See .env.production.example.
+      DATABASE_URL: postgresql://${DB_USER:-slb_user}:${DB_PASSWORD}@db:5432/${DB_NAME:-shareable_linear_backlog}
+    expose:
+      - "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - slb-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Database — PostgreSQL
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: slb-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-slb_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-shareable_linear_backlog}
+    # Bind to localhost only so host scripts (migrate/seed) can connect without
+    # exposing Postgres externally on the network.
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata-prod:/var/lib/postgresql/data
+    networks:
+      - slb-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-slb_user} -d ${DB_NAME:-shareable_linear_backlog}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # PostgreSQL performance tuning via environment
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "shared_buffers=64MB"
+      - "-c"
+      - "effective_cache_size=128MB"
+      - "-c"
+      - "work_mem=4MB"
+      - "-c"
+      - "log_statement=mod"
+
+# ---------------------------------------------------------------------------
+# Internal network — only frontend port is exposed externally
+# ---------------------------------------------------------------------------
+networks:
+  slb-network:
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# Persistent volume for database data
+# ---------------------------------------------------------------------------
+volumes:
+  pgdata-prod:
+    driver: local

@@ -247,8 +247,11 @@ development_status:
   epic-11-retrospective: optional
 
   # Epic 12: Deployment & Operations
-  epic-12: backlog
-  12-1-configure-production-build-and-deployment: backlog
+  epic-12: in-progress
+  12-1-configure-production-build-and-deployment:
+    status: done
+    linear_id: "VIX-389"
+    linear_url: "https://linear.app/vixxo/issue/VIX-389/configure-production-build-and-deployment"
   12-2-implement-health-checks-and-monitoring: backlog
   12-3-create-deployment-documentation: backlog
   12-4-implement-error-recovery-mechanisms: backlog
