@@ -12,7 +12,7 @@ export function BacklogPage() {
         <Heading as="h1" size="xl" color="brand.gray">
           Backlog
         </Heading>
-        <Box aria-label="Sync status">
+        <Box role="region" aria-label="Sync status">
           <SyncStatusIndicator />
         </Box>
       </HStack>

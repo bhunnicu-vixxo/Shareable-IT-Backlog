@@ -74,13 +74,7 @@ function BacklogEmptyState({ onRetry }: { onRetry: () => void }) {
 /**
  * Error state displayed when the API request fails.
  */
-function BacklogErrorState({
-  message,
-  onRetry,
-}: {
-  message: string
-  onRetry: () => void
-}) {
+function BacklogErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <Flex
       direction="column"
@@ -380,7 +374,12 @@ export function BacklogList() {
 
   if (isLoading) {
     return (
-      <Box data-testid="backlog-list-loading" role="status" aria-live="polite" aria-label="Loading backlog items">
+      <Box
+        data-testid="backlog-list-loading"
+        role="status"
+        aria-live="polite"
+        aria-label="Loading backlog items"
+      >
         <Skeleton height="5" width="120px" mb="4" />
         <BacklogListSkeleton />
       </Box>
@@ -410,9 +409,8 @@ export function BacklogList() {
   // Used for display only. When a business unit is selected, show a BU-scoped
   // count to avoid implying that the new-item count applies to the current BU
   // when it doesn't.
-  const scopedNewItemCount = (selectedBusinessUnit
-    ? items.filter((item) => item.teamName === selectedBusinessUnit)
-    : items
+  const scopedNewItemCount = (
+    selectedBusinessUnit ? items.filter((item) => item.teamName === selectedBusinessUnit) : items
   ).filter((item) => item.isNew).length
 
   /** Build a descriptive results count reflecting active filters. */
@@ -451,7 +449,14 @@ export function BacklogList() {
 
       {/* Filter bar: business unit dropdown, sort, "New only" toggle, search, results count */}
       {/* Tab order: BusinessUnitFilter → SortControl → "New only" toggle → KeywordSearch (AC #6) */}
-      <Flex alignItems="center" mb="4" flexWrap="wrap" gap="3" role="search" aria-label="Filter and sort backlog items">
+      <Flex
+        alignItems="center"
+        mb="4"
+        flexWrap="wrap"
+        gap="3"
+        role="search"
+        aria-label="Filter and sort backlog items"
+      >
         <BusinessUnitFilter
           items={items}
           value={selectedBusinessUnit}
@@ -469,7 +474,7 @@ export function BacklogList() {
             variant={showNewOnly ? 'solid' : 'outline'}
             onClick={handleToggleNewOnly}
             aria-pressed={showNewOnly}
-            aria-label={showNewOnly ? 'Show only new items, currently on' : 'Show only new items, currently off'}
+            aria-label={showNewOnly ? 'Show all items' : 'Show only new items'}
           >
             {showNewOnly
               ? 'Show all'
