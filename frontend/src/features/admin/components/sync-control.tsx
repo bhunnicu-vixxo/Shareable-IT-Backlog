@@ -134,9 +134,9 @@ export function SyncControl() {
     <Box borderWidth="1px" borderRadius="lg" p={6}>
       <VStack gap={4} align="stretch">
         <HStack justify="space-between">
-          <Text fontWeight="bold" fontSize="lg">
+          <Heading as="h2" size="md">
             Data Synchronization
-          </Text>
+          </Heading>
           <Button
             onClick={() => triggerSync()}
             disabled={isSyncing || isTriggering}
@@ -239,7 +239,7 @@ export function SyncControl() {
               variant="outline"
               colorPalette="red"
               onClick={() => triggerSync()}
-              aria-label="Retry"
+              aria-label="Retry sync"
             >
               Retry
             </Button>
@@ -255,7 +255,7 @@ export function SyncControl() {
 
         {/* Sync History Section */}
         <Box mt={4}>
-          <Heading size="sm" mb={3}>
+          <Heading as="h3" size="sm" mb={3}>
             Sync History
           </Heading>
 

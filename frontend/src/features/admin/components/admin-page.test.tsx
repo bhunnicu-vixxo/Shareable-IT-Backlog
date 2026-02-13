@@ -63,6 +63,33 @@ describe('AdminPage', () => {
     expect(screen.getByText('System settings will be available in a future update.')).toBeInTheDocument()
   })
 
+  // --- Screen Reader Support (Story 11.2) ---
+
+  it('renders "Administration" as h1 heading', async () => {
+    render(<AdminPage />)
+
+    await waitFor(() => {
+      const heading = screen.getByRole('heading', { name: /administration/i, level: 1 })
+      expect(heading).toBeInTheDocument()
+    })
+  })
+
+  it('tabs list has aria-label "Admin sections"', async () => {
+    render(<AdminPage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('tablist', { name: 'Admin sections' })).toBeInTheDocument()
+    })
+  })
+
+  it('renders screen reader-only instructions', async () => {
+    render(<AdminPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Admin dashboard\. Use tabs to switch/)).toBeInTheDocument()
+    })
+  })
+
   it('tab navigation works — clicking tab changes content', async () => {
     const user = userEvent.setup()
     render(<AdminPage />)

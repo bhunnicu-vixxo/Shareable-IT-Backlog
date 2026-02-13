@@ -12,6 +12,14 @@ import { SortControl } from './sort-control'
 import type { SortField, SortDirection } from './sort-control'
 import { ItemDetailModal } from './item-detail-modal'
 
+/** Human-readable labels for sort fields (used in screen reader announcements). */
+const SORT_LABELS: Record<SortField, string> = {
+  priority: 'priority',
+  dateCreated: 'date created',
+  dateUpdated: 'date updated',
+  status: 'status',
+}
+
 /**
  * Loading skeleton matching the BacklogItemCard layout.
  * Shows 5 skeleton cards during data fetching.
@@ -120,6 +128,7 @@ export function BacklogList() {
   const lastClickedCardRef = useRef<HTMLDivElement | null>(null)
   const lastClickedItemId = useRef<string | null>(null)
   const parentRef = useRef<HTMLDivElement>(null)
+  const liveRegionRef = useRef<HTMLDivElement | null>(null)
 
   // Debounce the keyword query so filtering doesn't run on every keystroke
   const debouncedQuery = useDebouncedValue(keywordQuery, 300)
@@ -212,6 +221,43 @@ export function BacklogList() {
       virtualizer.scrollToOffset(0)
     }
   }, [displayedItems, virtualizer])
+
+  // Live region announcement for filter/sort result changes (AC #5)
+  // Only announce after initial data load is complete — skip loading → first render.
+  const hasDataLoaded = useRef(false)
+  const prevCountRef = useRef(0)
+  const prevSortByRef = useRef(sortBy)
+  const prevSortDirRef = useRef(sortDirection)
+  useEffect(() => {
+    const el = liveRegionRef.current
+    if (!el) return
+
+    // Record baseline once after the live region exists (skip initial render announcement).
+    if (!hasDataLoaded.current) {
+      hasDataLoaded.current = true
+      prevCountRef.current = displayedItems.length
+      prevSortByRef.current = sortBy
+      prevSortDirRef.current = sortDirection
+      return
+    }
+
+    // Check if sort changed
+    if (prevSortByRef.current !== sortBy || prevSortDirRef.current !== sortDirection) {
+      const sortLabel = SORT_LABELS[sortBy] ?? sortBy
+      const dirLabel = sortDirection === 'asc' ? 'ascending' : 'descending'
+      el.textContent = `Items sorted by ${sortLabel}, ${dirLabel}`
+      prevSortByRef.current = sortBy
+      prevSortDirRef.current = sortDirection
+      prevCountRef.current = displayedItems.length
+      return
+    }
+
+    // Otherwise announce count change from filters
+    if (prevCountRef.current !== displayedItems.length) {
+      el.textContent = `Showing ${displayedItems.length} ${displayedItems.length === 1 ? 'item' : 'items'}`
+      prevCountRef.current = displayedItems.length
+    }
+  }, [displayedItems.length, sortBy, sortDirection])
 
   // Stabilize callback handlers with useCallback to maintain referential stability
   // for memoized child components (React.memo). State setters are stable references.
@@ -334,7 +380,7 @@ export function BacklogList() {
 
   if (isLoading) {
     return (
-      <Box data-testid="backlog-list-loading">
+      <Box data-testid="backlog-list-loading" role="status" aria-live="polite" aria-label="Loading backlog items">
         <Skeleton height="5" width="120px" mb="4" />
         <BacklogListSkeleton />
       </Box>
@@ -390,9 +436,22 @@ export function BacklogList() {
 
   return (
     <Box>
+      {/* Screen reader live region for dynamic announcements (AC #5) */}
+      <Box
+        ref={liveRegionRef}
+        aria-live="polite"
+        aria-atomic="true"
+        position="absolute"
+        width="1px"
+        height="1px"
+        overflow="hidden"
+        clipPath="inset(50%)"
+        whiteSpace="nowrap"
+      />
+
       {/* Filter bar: business unit dropdown, sort, "New only" toggle, search, results count */}
       {/* Tab order: BusinessUnitFilter → SortControl → "New only" toggle → KeywordSearch (AC #6) */}
-      <Flex alignItems="center" mb="4" flexWrap="wrap" gap="3">
+      <Flex alignItems="center" mb="4" flexWrap="wrap" gap="3" role="search" aria-label="Filter and sort backlog items">
         <BusinessUnitFilter
           items={items}
           value={selectedBusinessUnit}
@@ -410,7 +469,7 @@ export function BacklogList() {
             variant={showNewOnly ? 'solid' : 'outline'}
             onClick={handleToggleNewOnly}
             aria-pressed={showNewOnly}
-            aria-label={showNewOnly ? 'Show all items' : 'Show only new items'}
+            aria-label={showNewOnly ? 'Show only new items, currently on' : 'Show only new items, currently off'}
           >
             {showNewOnly
               ? 'Show all'

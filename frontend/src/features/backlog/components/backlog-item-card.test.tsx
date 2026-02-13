@@ -73,10 +73,10 @@ describe('BacklogItemCard', () => {
     expect(screen.queryByText('Backend')).not.toBeInTheDocument()
   })
 
-  it('has accessible aria-label with title and priority', () => {
+  it('has accessible aria-label with title, priority, status, and business unit', () => {
     render(<BacklogItemCard item={createMockItem()} />)
     const card = screen.getByRole('article', {
-      name: 'Implement login page, Priority High',
+      name: 'Implement login page, Priority High, Status: In Progress, Business Unit: Vixxo',
     })
     expect(card).toBeInTheDocument()
   })
@@ -94,7 +94,7 @@ describe('BacklogItemCard', () => {
   it('includes "New item" in aria-label when isNew is true', () => {
     render(<BacklogItemCard item={createMockItem({ isNew: true })} />)
     const card = screen.getByRole('article', {
-      name: 'Implement login page, Priority High, New item',
+      name: 'Implement login page, Priority High, Status: In Progress, Business Unit: Vixxo, New item',
     })
     expect(card).toBeInTheDocument()
   })
@@ -109,7 +109,7 @@ describe('BacklogItemCard', () => {
     render(<BacklogItemCard item={createMockItem()} onClick={onClick} />)
 
     const card = screen.getByRole('button', {
-      name: 'Implement login page, Priority High',
+      name: 'Implement login page, Priority High, Status: In Progress, Business Unit: Vixxo',
     })
     expect(card).toBeInTheDocument()
 
@@ -122,7 +122,7 @@ describe('BacklogItemCard', () => {
     render(<BacklogItemCard item={createMockItem()} onClick={onClick} />)
 
     const card = screen.getByRole('button', {
-      name: 'Implement login page, Priority High',
+      name: 'Implement login page, Priority High, Status: In Progress, Business Unit: Vixxo',
     })
     fireEvent.keyDown(card, { key: 'Enter' })
     expect(onClick).toHaveBeenCalledTimes(1)
@@ -133,7 +133,7 @@ describe('BacklogItemCard', () => {
     render(<BacklogItemCard item={createMockItem()} onClick={onClick} />)
 
     const card = screen.getByRole('button', {
-      name: 'Implement login page, Priority High',
+      name: 'Implement login page, Priority High, Status: In Progress, Business Unit: Vixxo',
     })
     fireEvent.keyDown(card, { key: ' ' })
     expect(onClick).toHaveBeenCalledTimes(1)
@@ -142,7 +142,7 @@ describe('BacklogItemCard', () => {
   it('renders as article when onClick is not provided', () => {
     render(<BacklogItemCard item={createMockItem()} />)
     expect(
-      screen.getByRole('article', { name: 'Implement login page, Priority High' }),
+      screen.getByRole('article', { name: 'Implement login page, Priority High, Status: In Progress, Business Unit: Vixxo' }),
     ).toBeInTheDocument()
   })
 
@@ -164,7 +164,7 @@ describe('BacklogItemCard', () => {
     const item = createMockItem({ description: '' })
     render(<BacklogItemCard item={item} />)
     // Verify no extra empty DOM nodes for description
-    const card = screen.getByRole('article', { name: 'Implement login page, Priority High' })
+    const card = screen.getByRole('article', { name: 'Implement login page, Priority High, Status: In Progress, Business Unit: Vixxo' })
     expect(card.querySelector('[data-testid="card-description"]')).not.toBeInTheDocument()
   })
 
@@ -261,6 +261,34 @@ describe('BacklogItemCard', () => {
     expect(screen.queryByText(/\*\*Submitter name:\*\*/)).not.toBeInTheDocument()
     expect(screen.getByText(/Item 1/)).toBeInTheDocument()
     expect(screen.getByText(/docs/)).toBeInTheDocument()
+  })
+
+  // --- Screen Reader Support (Story 11.2) ---
+
+  it('aria-label includes status and business unit for screen readers', () => {
+    const item = createMockItem({
+      title: 'Data sync feature',
+      priorityLabel: 'Normal',
+      status: 'Todo',
+      teamName: 'Operations',
+    })
+    render(<BacklogItemCard item={item} />)
+    expect(
+      screen.getByRole('article', {
+        name: 'Data sync feature, Priority Normal, Status: Todo, Business Unit: Operations',
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('StackRankBadge has role="img" and descriptive aria-label', () => {
+    render(<BacklogItemCard item={createMockItem({ priority: 1, priorityLabel: 'Urgent' })} />)
+    const badge = screen.getByRole('img', { name: 'Priority Urgent' })
+    expect(badge).toBeInTheDocument()
+  })
+
+  it('StatusBadge has aria-label with status text', () => {
+    render(<BacklogItemCard item={createMockItem({ status: 'In Progress' })} />)
+    expect(screen.getByLabelText('Status: In Progress')).toBeInTheDocument()
   })
 })
 

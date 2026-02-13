@@ -21,7 +21,7 @@ export function PendingApproval({ onCheckStatus, email }: PendingApprovalProps) 
     >
       <VStack gap={6} maxW="480px" textAlign="center" p={8}>
         <Box color="fg.muted">
-          <Clock size={64} />
+          <Clock size={64} aria-hidden="true" />
         </Box>
 
         <Heading as="h1" size="xl">
