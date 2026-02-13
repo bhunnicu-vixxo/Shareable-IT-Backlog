@@ -12,13 +12,18 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Copy package files for dependency caching
-COPY package.json package-lock.json ./
+COPY package.json ./
 
 # Install ALL dependencies (devDependencies needed for build tooling)
-RUN npm ci
+# Note: Using npm install because package-lock.json is at workspace root (npm workspaces)
+RUN npm install
 
 # Copy source files
 COPY . .
+
+# Default API URL for production build (nginx proxies /api to backend)
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=${VITE_API_URL}
 
 # Build the production bundle (tsc -b && vite build)
 RUN npm run build

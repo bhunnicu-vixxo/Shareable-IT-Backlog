@@ -49,6 +49,8 @@ services:
     environment:
       # Override host-style DATABASE_URL from .env.production (localhost) with
       # the Docker-internal hostname so the backend can reach Postgres.
+      # WARNING: DB_PASSWORD must not contain URI-reserved characters (@, :, /, ?, #, %)
+      # because they would break the connection string. See .env.production.example.
       DATABASE_URL: postgresql://${DB_USER:-slb_user}:${DB_PASSWORD}@db:5432/${DB_NAME:-shareable_linear_backlog}
     expose:
       - "3000"

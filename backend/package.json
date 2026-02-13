@@ -8,6 +8,8 @@
     "dev:debug": "tsx watch --inspect src/server.ts",
     "build": "tsc -b",
     "start": "node dist/server.js",
+    "start:prod": "NODE_ENV=production node dist/server.js",
+    "clean": "rm -rf dist",
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write src",
     "test": "vitest --pool=threads src",

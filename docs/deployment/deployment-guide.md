@@ -1,104 +1,225 @@
 # Deployment Guide — Shareable Linear Backlog
 
-## Overview
-
-This guide covers deploying the Shareable Linear Backlog application using Docker Compose.
+This guide covers deploying the Shareable Linear Backlog application to the Vixxo network.
 
 ## Prerequisites
 
-- Docker and Docker Compose installed
-- `.env.production` file created from `.env.production.example`
-- Database migrations ready
+| Requirement | Version | Purpose |
+|---|---|---|
+| Node.js | >= 20.19.0 | Build tooling and backend runtime |
+| Docker | >= 24.x | Container runtime |
+| Docker Compose | >= 2.x | Multi-container orchestration |
+| PostgreSQL | 16+ (via Docker or standalone) | Application database |
+| Git | >= 2.x | Source code management |
+| Vixxo network access | — | Internal network deployment |
 
-## Deployment Steps
+## Architecture Overview
 
-1. **Copy environment file:**
-   ```bash
-   cp .env.production.example .env.production
-   # Edit .env.production with production values
-   ```
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Frontend      │     │   Backend       │     │   Database      │
+│   (nginx)       │────▶│   (Express)     │────▶│   (PostgreSQL)  │
+│   Port 80       │     │   Port 3000     │     │   Port 5432     │
+│   Static SPA    │     │   API Server    │     │   Data Store    │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                       │
+        └── Docker Network ─────┘
+```
 
-2. **Build and start:**
-   ```bash
-   docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
-   ```
+- **Frontend** — nginx serves the Vite-built SPA and proxies `/api/*` requests to the backend
+- **Backend** — Express API server with Linear sync, session management, and audit logging
+- **Database** — PostgreSQL stores backlog data, sessions, user approvals, and audit logs
 
-3. **Run database migrations:**
-   ```bash
-   ./scripts/migrate.sh
-   ```
+## First-Time Setup
 
-4. **Verify deployment** (see Post-Deployment Verification below)
-
-## Post-Deployment Health Check Verification
-
-After deployment, verify the application is healthy:
+### 1. Clone the Repository
 
 ```bash
-# Full health check
-curl -s http://localhost:3000/api/health | jq
-
-# Quick liveness check
-curl -s http://localhost:3000/api/health/live
-
-# Readiness check (critical dependencies)
-curl -s http://localhost:3000/api/health/ready
-
-# Database connectivity
-curl -s http://localhost:3000/api/health/db
-
-# Linear API connectivity
-curl -s http://localhost:3000/api/health/linear
+git clone https://github.com/bhunnicu-vixxo/Shareable-IT-Backlog.git
+cd Shareable-IT-Backlog
 ```
 
-**Expected full health response:**
-```json
-{
-  "status": "ok",
-  "timestamp": "...",
-  "uptime": 30,
-  "version": "1.0.0",
-  "checks": {
-    "database": { "status": "ok", "connected": true, "latencyMs": 5 },
-    "linear": { "status": "ok", "connected": true, "latencyMs": 150 }
-  }
-}
+### 2. Run the Setup Script
+
+The setup script checks prerequisites, creates the environment file, installs dependencies, builds the application, and runs database migrations:
+
+```bash
+chmod +x scripts/setup.sh
+./scripts/setup.sh
 ```
 
-## Monitoring Setup
+### 3. Configure Environment Variables
+
+Edit `.env.production` and fill in all required values:
+
+```bash
+# Required — you MUST set these:
+DATABASE_URL=postgresql://slb_user:YOUR_STRONG_PASSWORD@localhost:5432/shareable_linear_backlog
+DB_PASSWORD=YOUR_STRONG_PASSWORD
+LINEAR_API_KEY=lin_api_YOUR_KEY
+SESSION_SECRET=$(openssl rand -base64 48)
+
+# Recommended — configure for your network:
+ALLOWED_ORIGINS=https://backlog.vixxo.internal
+ALLOWED_NETWORKS=10.0.0.0/8,172.16.0.0/12
+NETWORK_CHECK_ENABLED=true
+```
+
+See `.env.production.example` for the full list of variables with descriptions.
+
+### 4. Deploy with Docker Compose
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
+```
+
+### 5. Verify Deployment
+
+```bash
+# Check all services are running and healthy
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+
+# Health checks (nginx proxies /api to backend)
+curl -s http://localhost/api/health | jq
+curl -s http://localhost/api/health/live | jq
+curl -s http://localhost/api/health/ready | jq
+curl -s http://localhost/api/health/db | jq
+curl -s http://localhost/api/health/linear | jq
+
+# View logs
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f
+```
+
+## Monitoring Setup (Health Checks & Alerts)
 
 ### Alert Webhook Configuration
 
-To receive alerts when application health changes:
+To receive alerts on health status transitions (`ok` ↔ `degraded` ↔ `unhealthy`):
 
-1. **Set up a webhook endpoint** (Slack, Teams, or custom HTTP endpoint)
-2. **Add to `.env.production`:**
-   ```env
-   ALERT_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-   ALERT_COOLDOWN_MS=300000
-   ```
-3. **Restart the backend** to pick up new environment variables
-
-### Health Check Tuning
-
-Adjust monitoring intervals in `.env.production`:
+1. Configure a webhook endpoint (Slack, Teams, or generic HTTP receiver)
+2. Set in `.env.production`:
 
 ```env
-# Check every 60 seconds (default)
-HEALTH_CHECK_INTERVAL_MS=60000
+ALERT_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+ALERT_COOLDOWN_MS=300000
+```
 
-# Linear API check timeout (default 5s)
+3. Restart the backend container to pick up env changes.
+
+### Health check tuning
+
+```env
+HEALTH_CHECK_INTERVAL_MS=60000
 HEALTH_CHECK_LINEAR_TIMEOUT_MS=5000
 ```
 
-For complete monitoring documentation, see [Monitoring Runbook](./monitoring-runbook.md).
+For full details, see the [Monitoring Runbook](./monitoring-runbook.md).
 
-## Stopping the Application
+## Deployment Methods
+
+### Method A: Docker Compose (Recommended)
+
+Uses `docker-compose.prod.yml` to run frontend (nginx), backend (Express), and database (PostgreSQL) as Docker containers.
 
 ```bash
-docker compose -f docker-compose.prod.yml down
+# Deploy or update
+./scripts/deploy.sh
+
+# Or manually:
+docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
 ```
 
-## Troubleshooting
+### Method B: Direct Node.js (Non-Docker)
 
-See [Troubleshooting Guide](./troubleshooting.md) for common issues and solutions.
+For environments without Docker, run the backend directly with Node.js and serve the frontend from Express.
+
+```bash
+# 1. Install dependencies
+npm ci
+
+# 2. Build both packages
+npm run build -w frontend
+npm run build -w backend
+
+# 3. Run database migrations
+DATABASE_URL=postgresql://... npm run migrate:up -w backend
+
+# 4. Start the server (Express serves frontend static files)
+NODE_ENV=production SERVE_STATIC=true PORT=3000 node backend/dist/server.js
+```
+
+## Updating / Redeploying
+
+### Using the Deploy Script
+
+```bash
+./scripts/deploy.sh
+```
+
+This script:
+1. Pulls latest code from git
+2. Builds Docker images
+3. Runs database migrations
+4. Restarts services
+5. Verifies health checks
+
+### Manual Update
+
+```bash
+git pull
+docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
+```
+
+### Database Migrations Only
+
+```bash
+./scripts/migrate.sh
+```
+
+## Environment Variable Reference
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `NODE_ENV` | Yes | `development` | Set to `production` for deployment |
+| `PORT` | No | `3000` | Backend API port |
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
+| `LINEAR_API_KEY` | Yes | — | Linear API key for data sync |
+| `SESSION_SECRET` | Yes (prod) | — | Session cookie signing (32+ chars) |
+| `ALLOWED_ORIGINS` | Recommended | `localhost:1576` | CORS allowed origins |
+| `ALLOWED_NETWORKS` | Recommended | — | CIDR ranges for network access control |
+| `NETWORK_CHECK_ENABLED` | No | `true` (prod) | Enable/disable IP-based access control |
+| `SYNC_ENABLED` | No | `true` | Enable scheduled Linear sync |
+| `SYNC_CRON_SCHEDULE` | No | `*/15 * * * *` | Cron schedule for sync |
+| `LOG_LEVEL` | No | `info` | Pino log level |
+| `SERVE_STATIC` | No | `false` | Express serves frontend (non-Docker) |
+| `HEALTH_CHECK_INTERVAL_MS` | No | `60000` | Interval between automated health checks |
+| `HEALTH_CHECK_LINEAR_TIMEOUT_MS` | No | `5000` | Timeout for Linear health check |
+| `ALERT_WEBHOOK_URL` | No | — | Webhook URL to receive health alerts |
+| `ALERT_COOLDOWN_MS` | No | `300000` | Cooldown between alerts |
+| `APP_VERSION` | No | package.json | Version reported in `/api/health` |
+| `FRONTEND_PORT` | No | `80` | Docker nginx exposed port |
+
+## Build Commands Reference
+
+| Command | Description |
+|---|---|
+| `npm run build -w frontend` | Build frontend production bundle |
+| `npm run build -w backend` | Compile backend TypeScript |
+| `npm run start -w backend` | Start backend server |
+| `npm run start:prod -w backend` | Start with NODE_ENV=production |
+| `npm run migrate:up -w backend` | Run database migrations |
+| `npm run test:run -w frontend` | Run frontend tests |
+| `npm run test:run -w backend` | Run backend tests |
+
+## Security Checklist
+
+Before going to production, verify:
+
+- [ ] `SESSION_SECRET` is a strong random value (32+ characters)
+- [ ] `DATABASE_URL` uses a strong password
+- [ ] `LINEAR_API_KEY` is a production key with appropriate scopes
+- [ ] `NETWORK_CHECK_ENABLED=true` with correct `ALLOWED_NETWORKS`
+- [ ] `ALLOWED_ORIGINS` is set to the production domain
+- [ ] `.env.production` is NOT committed to git
+- [ ] PostgreSQL port is NOT exposed externally (Docker internal network only)
+- [ ] HTTPS is configured (via reverse proxy or load balancer)
