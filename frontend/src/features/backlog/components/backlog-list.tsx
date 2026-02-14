@@ -173,6 +173,23 @@ export function BacklogList() {
 
   const items = useMemo(() => data?.items ?? [], [data?.items])
 
+  // Clear selected labels that are no longer visible when visibility settings change
+  // This prevents users from being trapped by filters they can't see or clear
+  useEffect(() => {
+    if (visibleLabels.length === 0) {
+      // If no labels are visible, clear all selections
+      if (selectedLabels.length > 0) {
+        setSelectedLabels([])
+      }
+    } else {
+      // Remove any selected labels that are no longer visible
+      const stillVisible = selectedLabels.filter((label) => visibleLabelNames.has(label))
+      if (stillVisible.length !== selectedLabels.length) {
+        setSelectedLabels(stillVisible)
+      }
+    }
+  }, [visibleLabels, visibleLabelNames, selectedLabels])
+
   // Base items: applies the "hide done" default before other user-driven filters
   const baseItems = useMemo(() => {
     if (hideDone) {

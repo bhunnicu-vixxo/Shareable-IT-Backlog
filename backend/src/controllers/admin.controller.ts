@@ -366,25 +366,27 @@ export async function updateLabel(req: Request, res: Response, next: NextFunctio
     }
 
     const adminId = Number(req.session.userId)
-    const decodedLabelName = decodeURIComponent(labelName)
+
+    // NOTE: Express already decodes route params, so we use labelName directly
+    // (no need to call decodeURIComponent, which would break labels containing '%')
 
     // Audit log BEFORE state change (compliance — if audit fails, change must not proceed)
     await auditService.logAdminAction({
       userId: adminId,
       action: 'LABEL_VISIBILITY_UPDATED',
       resource: 'label_visibility',
-      resourceId: decodedLabelName,
+      resourceId: labelName,
       ipAddress: req.ip ?? '',
       isAdminAction: true,
       details: {
-        labelName: decodedLabelName,
+        labelName,
         isVisible,
       },
     })
 
-    const updatedEntry = await updateLabelVisibility(decodedLabelName, isVisible, adminId)
+    const updatedEntry = await updateLabelVisibility(labelName, isVisible, adminId)
 
-    logger.info({ adminId, labelName: decodedLabelName, isVisible }, 'Admin updated label visibility')
+    logger.info({ adminId, labelName, isVisible }, 'Admin updated label visibility')
 
     res.json(updatedEntry)
   } catch (err) {
