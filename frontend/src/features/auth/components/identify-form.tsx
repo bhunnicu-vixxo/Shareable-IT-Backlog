@@ -148,7 +148,11 @@ export function IdentifyForm({ onIdentify, isIdentifying, error }: IdentifyFormP
 
               <Button
                 type="submit"
-                variant="brand"
+                variant="solid"
+                bg="brand.green"
+                color="white"
+                _hover={{ bg: 'brand.greenHover' }}
+                _active={{ bg: 'brand.greenActive' }}
                 w="full"
                 size="lg"
                 borderRadius="xl"

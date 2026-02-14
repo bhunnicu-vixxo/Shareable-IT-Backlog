@@ -29,6 +29,7 @@ export async function identify(req: Request, res: Response, next: NextFunction):
     // Create session with cached approval status
     req.session.userId = String(user.id)
     req.session.isAdmin = user.isAdmin
+    req.session.isIT = user.isIT
     req.session.isApproved = user.isApproved
     req.session.isDisabled = user.isDisabled
     req.session.approvalCheckedAt = Date.now()
@@ -45,6 +46,7 @@ export async function identify(req: Request, res: Response, next: NextFunction):
       email: user.email,
       displayName: user.displayName,
       isAdmin: user.isAdmin,
+      isIT: user.isIT,
       isApproved: user.isApproved,
       isDisabled: user.isDisabled,
     })
@@ -97,6 +99,7 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
       email: user.email,
       displayName: user.displayName,
       isAdmin: user.isAdmin,
+      isIT: user.isIT,
       isApproved: user.isApproved,
       isDisabled: user.isDisabled,
     })

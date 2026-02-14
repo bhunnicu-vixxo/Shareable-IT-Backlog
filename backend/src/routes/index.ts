@@ -4,6 +4,7 @@ import adminRoutes from './admin.routes.js'
 import auditRoutes from './audit.routes.js'
 import backlogRoutes from './backlog.routes.js'
 import syncRoutes from './sync.routes.js'
+import itRoutes from './it.routes.js'
 import { requireAuth, requireApproved } from '../middleware/auth.middleware.js'
 import { databaseHealthMiddleware } from '../middleware/database-health.middleware.js'
 
@@ -40,6 +41,7 @@ protectedRouter.use(requireAuth, requireApproved)
 protectedRouter.use(asyncMiddleware(databaseHealthMiddleware))
 protectedRouter.use(backlogRoutes)
 protectedRouter.use(syncRoutes)
+protectedRouter.use(itRoutes)
 router.use(protectedRouter)
 
 export default router

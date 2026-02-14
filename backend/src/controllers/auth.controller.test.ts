@@ -57,6 +57,7 @@ const mockUser = {
   email: 'user@vixxo.com',
   displayName: 'User',
   isAdmin: false,
+  isIT: false,
   isApproved: true,
   isDisabled: false,
   lastAccessAt: null,
@@ -89,6 +90,30 @@ describe('auth.controller', () => {
           email: 'user@vixxo.com',
           isApproved: true,
         }),
+      )
+    })
+
+    it('should store isIT in session from user data', async () => {
+      const itUser = { ...mockUser, isIT: true }
+      mockLookupOrCreateUser.mockResolvedValue(itUser)
+      const { req, res, next } = createMockReqResNext({ body: { email: 'it@vixxo.com' } })
+
+      await identify(req, res, next)
+
+      expect(req.session.isIT).toBe(true)
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ isIT: true }),
+      )
+    })
+
+    it('should include isIT field in identify response', async () => {
+      mockLookupOrCreateUser.mockResolvedValue(mockUser)
+      const { req, res, next } = createMockReqResNext({ body: { email: 'user@vixxo.com' } })
+
+      await identify(req, res, next)
+
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ isIT: false }),
       )
     })
 
@@ -142,6 +167,18 @@ describe('auth.controller', () => {
 
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({ id: 1, email: 'user@vixxo.com' }),
+      )
+    })
+
+    it('should include isIT in me response', async () => {
+      const itUser = { ...mockUser, isIT: true }
+      mockGetUserById.mockResolvedValue(itUser)
+      const { req, res, next } = createMockReqResNext({ session: { userId: '1' } })
+
+      await me(req, res, next)
+
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ isIT: true }),
       )
     })
 

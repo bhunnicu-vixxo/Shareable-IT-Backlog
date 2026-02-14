@@ -20,6 +20,7 @@ const mockUser = {
   email: 'user@vixxo.com',
   displayName: 'User',
   isAdmin: false,
+  isIT: false,
   isApproved: true,
   isDisabled: false,
 }
@@ -50,6 +51,36 @@ describe('useAuth', () => {
     expect(result.current.user).toEqual(mockUser)
     expect(result.current.isIdentified).toBe(true)
     expect(result.current.isApproved).toBe(true)
+  })
+
+  it('should expose isIT as false for regular users', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockUser),
+    })
+
+    const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.isIT).toBe(false)
+  })
+
+  it('should expose isIT as true for IT users', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ...mockUser, isIT: true }),
+    })
+
+    const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.isIT).toBe(true)
   })
 
   it('should handle 401 on /auth/me (no session)', async () => {

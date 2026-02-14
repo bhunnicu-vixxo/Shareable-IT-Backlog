@@ -25,6 +25,7 @@ const makeUserRow = (overrides: Record<string, unknown> = {}) => ({
   email: 'user@vixxo.com',
   display_name: 'User',
   is_admin: false,
+  is_it: false,
   is_approved: false,
   is_disabled: false,
   last_access_at: null,
@@ -65,6 +66,24 @@ describe('auth.service', () => {
       expect(mockQuery.mock.calls[1][1]).toEqual(['user@vixxo.com'])
       expect(user.id).toBe(1)
       expect(user.email).toBe('user@vixxo.com')
+    })
+
+    it('should map is_it database field to isIT in returned user', async () => {
+      const itUserRow = makeUserRow({ id: 3, email: 'it@vixxo.com', is_it: true })
+      mockQuery.mockResolvedValueOnce({ rows: [itUserRow] })
+
+      const user = await lookupOrCreateUser('it@vixxo.com')
+
+      expect(user.isIT).toBe(true)
+    })
+
+    it('should default isIT to false for new users', async () => {
+      const newRow = makeUserRow({ id: 4, email: 'regular@vixxo.com', is_it: false })
+      mockQuery.mockResolvedValueOnce({ rows: [newRow] })
+
+      const user = await lookupOrCreateUser('regular@vixxo.com')
+
+      expect(user.isIT).toBe(false)
     })
 
     it('should normalize email to lowercase and trimmed', async () => {

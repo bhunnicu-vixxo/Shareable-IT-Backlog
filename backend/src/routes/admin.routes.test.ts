@@ -11,6 +11,7 @@ const {
   mockGetAllUsers,
   mockDisableUser,
   mockEnableUser,
+  mockUpdateUserITRole,
   mockListSyncHistory,
   mockAuditLogAdminAction,
 } = vi.hoisted(() => ({
@@ -22,6 +23,7 @@ const {
   mockGetAllUsers: vi.fn(),
   mockDisableUser: vi.fn(),
   mockEnableUser: vi.fn(),
+  mockUpdateUserITRole: vi.fn(),
   mockListSyncHistory: vi.fn(),
   mockAuditLogAdminAction: vi.fn(),
 }))
@@ -38,6 +40,7 @@ vi.mock('../services/users/user.service.js', () => ({
   getAllUsers: mockGetAllUsers,
   disableUser: mockDisableUser,
   enableUser: mockEnableUser,
+  updateUserITRole: mockUpdateUserITRole,
 }))
 
 vi.mock('../services/audit/audit.service.js', () => ({
@@ -154,6 +157,7 @@ describe('Admin Routes (integration)', () => {
     email: 'admin@vixxo.com',
     displayName: 'Admin',
     isAdmin: true,
+    isIT: false,
     isApproved: true,
     isDisabled: false,
     lastAccessAt: null,
@@ -168,6 +172,7 @@ describe('Admin Routes (integration)', () => {
     id: 2,
     email: 'user@vixxo.com',
     isAdmin: false,
+    isIT: false,
   }
 
   // Cache cookies to avoid hitting the identify rate limiter (10 requests/min)
@@ -395,6 +400,95 @@ describe('Admin Routes (integration)', () => {
     it('should return 401 for unauthenticated request', async () => {
       const res = await fetch(`${baseUrl}/api/admin/sync/trigger`, {
         method: 'POST',
+      })
+
+      expect(res.status).toBe(401)
+    })
+  })
+
+  describe('PUT /api/admin/users/:id/it-role', () => {
+    it('should update IT role when admin requests', async () => {
+      const cookie = await authenticateAsAdmin()
+      const updated = {
+        id: 3,
+        email: 'it@vixxo.com',
+        isIT: true,
+      }
+      mockUpdateUserITRole.mockResolvedValue(updated)
+
+      const res = await fetch(`${baseUrl}/api/admin/users/3/it-role`, {
+        method: 'PUT',
+        headers: {
+          Cookie: cookie,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isIT: true }),
+      })
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body).toEqual(updated)
+      expect(mockUpdateUserITRole).toHaveBeenCalledWith(3, true, 1, expect.any(String))
+    })
+
+    it('should return 400 for invalid user ID', async () => {
+      const cookie = await authenticateAsAdmin()
+
+      const res = await fetch(`${baseUrl}/api/admin/users/abc/it-role`, {
+        method: 'PUT',
+        headers: {
+          Cookie: cookie,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isIT: true }),
+      })
+
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('should return 400 when isIT is missing', async () => {
+      const cookie = await authenticateAsAdmin()
+
+      const res = await fetch(`${baseUrl}/api/admin/users/3/it-role`, {
+        method: 'PUT',
+        headers: {
+          Cookie: cookie,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      })
+
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('should return 403 for non-admin user', async () => {
+      const cookie = await authenticateAsRegularUser()
+
+      const res = await fetch(`${baseUrl}/api/admin/users/3/it-role`, {
+        method: 'PUT',
+        headers: {
+          Cookie: cookie,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isIT: true }),
+      })
+
+      expect(res.status).toBe(403)
+      const body = await res.json()
+      expect(body.error.code).toBe('ADMIN_REQUIRED')
+    })
+
+    it('should return 401 for unauthenticated request', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/users/3/it-role`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isIT: true }),
       })
 
       expect(res.status).toBe(401)

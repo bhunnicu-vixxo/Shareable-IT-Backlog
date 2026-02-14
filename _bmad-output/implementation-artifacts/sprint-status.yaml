@@ -164,6 +164,10 @@ development_status:
     status: done
     linear_id: "VIX-365"
     linear_url: "https://linear.app/vixxo/issue/VIX-365/display-sync-status-and-history-in-admin-dashboard"
+  7-6-admin-label-visibility-configuration:
+    status: ready-for-dev
+    linear_id: "VIX-428"
+    linear_url: "https://linear.app/vixxo/issue/VIX-428/admin-label-visibility-configuration"
   epic-7-retrospective: optional
 
   # Epic 8: Design System & UI Components
@@ -265,3 +269,19 @@ development_status:
     linear_id: "VIX-392"
     linear_url: "https://linear.app/vixxo/issue/VIX-392/implement-error-recovery-mechanisms"
   epic-12-retrospective: optional
+
+  # Epic 13: Role-Based Privilege System
+  epic-13: in-progress
+  13-1-add-it-role-to-user-model:
+    status: done
+    linear_id: "VIX-425"
+    linear_url: "https://linear.app/vixxo/issue/VIX-425/add-it-role-to-user-model-alongside-admin"
+  13-2-make-issue-identifiers-clickable-for-privileged-users:
+    status: ready-for-dev
+    linear_id: "VIX-426"
+    linear_url: "https://linear.app/vixxo/issue/VIX-426/make-issue-identifiers-clickable-hyperlinks-for-itadmin-users"
+  13-3-implement-role-based-privilege-system:
+    status: ready-for-dev
+    linear_id: "VIX-427"
+    linear_url: "https://linear.app/vixxo/issue/VIX-427/implement-role-based-screen-access-and-privilege-levels"
+  epic-13-retrospective: optional

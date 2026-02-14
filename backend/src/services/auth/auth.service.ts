@@ -6,6 +6,7 @@ export interface User {
   email: string
   displayName: string | null
   isAdmin: boolean
+  isIT: boolean
   isApproved: boolean
   isDisabled: boolean
   lastAccessAt: string | null
@@ -24,6 +25,7 @@ function mapRowToUser(row: Record<string, unknown>): User {
     email: row.email as string,
     displayName: row.display_name as string | null,
     isAdmin: row.is_admin as boolean,
+    isIT: row.is_it as boolean,
     isApproved: row.is_approved as boolean,
     isDisabled: row.is_disabled as boolean,
     lastAccessAt: row.last_access_at ? (row.last_access_at as Date).toISOString() : null,

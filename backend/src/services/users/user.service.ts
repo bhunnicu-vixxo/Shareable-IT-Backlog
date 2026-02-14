@@ -6,6 +6,7 @@ export interface ManagedUser {
   email: string
   displayName: string | null
   isAdmin: boolean
+  isIT: boolean
   isApproved: boolean
   isDisabled: boolean
   approvedAt: string | null
@@ -227,6 +228,7 @@ export async function disableUser(userId: number, adminId: number, ipAddress: st
       email: row.email as string,
       displayName: row.display_name as string | null,
       isAdmin: row.is_admin as boolean,
+      isIT: row.is_it as boolean,
       isApproved: row.is_approved as boolean,
       isDisabled: row.is_disabled as boolean,
       approvedAt: row.approved_at ? (row.approved_at as Date).toISOString() : null,
@@ -299,6 +301,78 @@ export async function enableUser(userId: number, adminId: number, ipAddress: str
       email: row.email as string,
       displayName: row.display_name as string | null,
       isAdmin: row.is_admin as boolean,
+      isIT: row.is_it as boolean,
+      isApproved: row.is_approved as boolean,
+      isDisabled: row.is_disabled as boolean,
+      approvedAt: row.approved_at ? (row.approved_at as Date).toISOString() : null,
+      lastAccessAt: row.last_access_at ? (row.last_access_at as Date).toISOString() : null,
+      createdAt: (row.created_at as Date).toISOString(),
+    }
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Update a user's IT role (is_it flag).
+ * Creates an audit log entry for the action.
+ * Runs inside a database transaction.
+ */
+export async function updateUserITRole(
+  userId: number,
+  isIT: boolean,
+  adminId: number,
+  ipAddress: string = '',
+): Promise<ManagedUser> {
+  const client = await pool.connect()
+
+  try {
+    await client.query('BEGIN')
+
+    const existing = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [userId])
+    if (existing.rows.length === 0) {
+      const err = new Error(`User with ID ${userId} not found`) as Error & { statusCode: number; code: string }
+      err.statusCode = 404
+      err.code = 'USER_NOT_FOUND'
+      throw err
+    }
+
+    const user = existing.rows[0]
+
+    const result = await client.query(
+      `UPDATE users SET is_it = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [userId, isIT],
+    )
+
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, resource, resource_id, details, ip_address, is_admin_action)
+       VALUES ($1, 'USER_IT_ROLE_UPDATED', 'user', $2, $3, $4, true)`,
+      [
+        adminId,
+        String(userId),
+        JSON.stringify({
+          target: { userId, email: user.email as string },
+          before: { isIT: user.is_it as boolean },
+          after: { isIT },
+        }),
+        ipAddress,
+      ],
+    )
+
+    await client.query('COMMIT')
+
+    logger.info({ userId, adminId, isIT, email: user.email }, 'User IT role updated by admin')
+
+    const row = result.rows[0]
+    return {
+      id: row.id as number,
+      email: row.email as string,
+      displayName: row.display_name as string | null,
+      isAdmin: row.is_admin as boolean,
+      isIT: row.is_it as boolean,
       isApproved: row.is_approved as boolean,
       isDisabled: row.is_disabled as boolean,
       approvedAt: row.approved_at ? (row.approved_at as Date).toISOString() : null,
@@ -319,7 +393,7 @@ export async function enableUser(userId: number, adminId: number, ipAddress: str
  */
 export async function getAllUsers(): Promise<ManagedUser[]> {
   const result = await query(
-    `SELECT id, email, display_name, is_admin, is_approved, is_disabled,
+    `SELECT id, email, display_name, is_admin, is_it, is_approved, is_disabled,
             approved_at, last_access_at, created_at
      FROM users
      ORDER BY created_at ASC`,
@@ -330,6 +404,7 @@ export async function getAllUsers(): Promise<ManagedUser[]> {
     email: row.email as string,
     displayName: row.display_name as string | null,
     isAdmin: row.is_admin as boolean,
+    isIT: row.is_it as boolean,
     isApproved: row.is_approved as boolean,
     isDisabled: row.is_disabled as boolean,
     approvedAt: row.approved_at ? (row.approved_at as Date).toISOString() : null,

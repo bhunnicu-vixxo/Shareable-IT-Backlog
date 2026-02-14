@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { requireAuth, requireApproved } from '../middleware/auth.middleware.js'
 import { requireAdmin } from '../middleware/admin.middleware.js'
-import { listPendingUsers, approveUserHandler, listAllUsers, disableUserHandler, enableUserHandler, adminTriggerSync, getSyncHistory, getSyncSchedule, updateSyncSchedule } from '../controllers/admin.controller.js'
+import { listPendingUsers, approveUserHandler, listAllUsers, disableUserHandler, enableUserHandler, updateUserITRoleHandler, adminTriggerSync, getSyncHistory, getSyncSchedule, updateSyncSchedule } from '../controllers/admin.controller.js'
 
 const router = Router()
 
@@ -11,6 +11,7 @@ router.get('/admin/users', requireAuth, requireApproved, requireAdmin, listAllUs
 router.post('/admin/users/:id/approve', requireAuth, requireApproved, requireAdmin, approveUserHandler)
 router.post('/admin/users/:id/disable', requireAuth, requireApproved, requireAdmin, disableUserHandler)
 router.post('/admin/users/:id/enable', requireAuth, requireApproved, requireAdmin, enableUserHandler)
+router.put('/admin/users/:id/it-role', requireAuth, requireApproved, requireAdmin, updateUserITRoleHandler)
 
 // Admin sync routes
 router.post('/admin/sync/trigger', requireAuth, requireApproved, requireAdmin, adminTriggerSync)

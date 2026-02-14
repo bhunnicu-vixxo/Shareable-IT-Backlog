@@ -867,6 +867,77 @@ So that I can monitor sync health and troubleshoot issues.
 - Use Chakra UI Table, Badge, Button components
 - Color code: green (success), red (failure), yellow (partial)
 
+### Story 7.6: Admin Label Visibility Configuration
+
+As an admin,
+I want to control which Linear labels appear in the end-user label filter,
+So that business users only see labels that are meaningful to them and aren't confused by internal IT labels (e.g., "Frontend", "Backend", "Rollover", "Tech Debt").
+
+**Core Design Principle — Opt-In Visibility:**
+Labels are **hidden by default**. New labels discovered during sync are added to the admin list but do NOT appear in the end-user filter until an admin explicitly enables them. This means the admin only visits the settings screen when they intentionally want to surface a label — they never have to reactively clean up labels that the IT team created in Linear.
+
+**Acceptance Criteria:**
+
+**Given** I am an admin user on the Settings tab of the admin dashboard
+**When** I view the Label Visibility section
+**Then** I see a list of all labels that exist in the synced Linear data
+**And** each label has a toggle (on/off) indicating whether it is visible to end users
+**And** new/unreviewed labels are clearly separated or badged so I can spot them quickly
+**And** labels that are toggled ON appear in the public backlog label filter
+**And** labels that are toggled OFF are hidden from the public label filter
+**And** changes take effect immediately (or on next page load)
+
+**Given** a new label appears during a Linear sync that has never been seen before
+**When** the sync completes
+**Then** the new label is added to the admin label list with visibility **OFF** (hidden by default)
+**And** the label is marked as "new/unreviewed" so the admin can find it easily
+**And** end users see no change — the new label does not leak into their filter
+
+**Given** an admin enables a label
+**When** they toggle a label to ON
+**Then** that label begins appearing in the end-user label filter dropdown
+**And** the label filter shows item counts so users know how many items match
+**And** the label's "new" badge is cleared (it's been reviewed)
+
+**Given** a business user is viewing the backlog
+**When** the label filter dropdown renders
+**Then** only admin-approved (toggled ON) labels appear as filter options
+**And** items tagged with hidden labels still appear in the backlog list (hiding a label from the filter does NOT hide items — it just removes the filter shortcut)
+**And** hidden labels still appear as pills on item cards (or optionally hidden there too — admin configurable)
+
+**Given** no labels have been enabled yet (fresh install or no admin action taken)
+**When** a business user views the backlog
+**Then** the label filter is either hidden entirely or shows an "All Items" state with no filter options
+**And** the experience is clean — no empty dropdown
+
+**Technical Details:**
+- Database: Create `label_visibility` table with columns: `id`, `label_name` (unique), `is_visible` (boolean, default **FALSE**), `show_on_cards` (boolean, default TRUE), `first_seen_at` (timestamp), `reviewed_at` (timestamp, nullable — NULL means unreviewed), `updated_at` (timestamp), `updated_by` (user ID)
+- Backend: New REST endpoints under admin routes:
+  - `GET /api/admin/labels` — returns all known labels with visibility settings (includes unreviewed count)
+  - `PATCH /api/admin/labels/:labelName` — toggle visibility for a single label (also sets `reviewed_at`)
+  - `PATCH /api/admin/labels/bulk` — bulk update visibility for multiple labels
+  - `GET /api/labels/visible` — public endpoint returning only visible label names (used by frontend filter)
+- Backend: During sync, upsert any newly discovered labels into `label_visibility` with `is_visible = FALSE` and `reviewed_at = NULL`
+- Frontend: Build `LabelVisibilityManager` component for the admin Settings tab (replaces the current placeholder)
+  - Two sections: "Unreviewed Labels" (new since last review) and "All Labels" (full list with current toggle states)
+  - Toggle switch per label for "Show in filter" and optionally "Show on cards"
+  - Show item count per label so admin can make informed decisions about what's useful
+  - Search/filter within the admin list for teams with many labels
+  - Bulk actions: "Enable All", "Disable All"
+  - Badge on the Settings tab itself if there are unreviewed labels (e.g., "Settings (3)")
+- Frontend: Update `LabelFilter` component to fetch visible labels from the public API endpoint instead of deriving them solely from item data
+- Frontend: If zero labels are enabled, hide the label filter dropdown entirely (clean empty state)
+- Apply `requireAdmin()` middleware to admin label endpoints
+- Audit log: Record label visibility changes (who toggled what, when)
+
+**UX Considerations:**
+- Use the existing admin Settings tab (currently a placeholder) as the home for this feature
+- The "unreviewed" section at the top gives the admin a clear call-to-action without requiring them to scan the full list
+- Show a notification badge on the Settings tab when new labels are waiting for review (subtle, not intrusive)
+- Admin should be able to quickly scan which labels are on/off — consider a two-column layout or compact list with toggles
+- Show the count of backlog items using each label so admins know what's worth surfacing
+- Consider a "preview" that shows what the end-user filter would look like with current settings
+
 ## Epic 8: Design System & UI Components
 
 **Goal:** Implement Chakra UI integration with Vixxo brand customization and build custom components specified in the UX design.
@@ -1401,6 +1472,88 @@ So that the application handles common failure scenarios gracefully.
 - Log errors with context
 - Test error scenarios
 
+## Epic 13: Role-Based Privilege System
+
+**Goal:** Extend the existing user model and access control system to support granular role-based privileges (Regular User, IT, Admin), enabling conditional UI features and screen access based on user role.
+
+**FR Coverage:** Extends FR16-FR22 (User Management & Access Control), introduces new privilege tiers
+
+### Story 13.1: Add IT Role to User Model Alongside Admin
+
+As a system administrator,
+I want to designate users as IT, Admin, or regular users,
+So that I can control access to privileged features based on role.
+
+**Acceptance Criteria:**
+
+**Given** the users table currently only has `is_admin` boolean
+**When** I run the new database migration
+**Then** an `is_it` boolean column is added to the users table (default FALSE)
+**And** existing admins retain their admin privileges
+**And** the backend auth service includes `isIT` in the session and API response
+**And** the frontend User type and useAuth() hook expose `isIT`
+**And** a new `requireIT()` middleware allows IT-or-above access on backend routes
+
+**Technical Details:**
+- Database: Add `is_it BOOLEAN NOT NULL DEFAULT FALSE` to `users` table via new migration
+- Backend: Update `auth.service.ts` to include `isIT` in user lookup
+- Backend: Update session types to include `isIT`
+- Backend: Create `requireIT()` middleware (passes if `isIT || isAdmin`)
+- Frontend: Add `isIT: boolean` to `User` interface in `auth.types.ts`
+- Frontend: Add `isIT` derived state to `useAuth()` hook
+- Backward compatible: existing admins still work, `is_it` defaults to FALSE
+
+### Story 13.2: Make Issue Identifiers Clickable Hyperlinks for IT/Admin Users
+
+As an IT or Admin user,
+I want issue identifiers (e.g., VIX-265) to be clickable links to Linear,
+So that I can quickly navigate to the full Linear issue for context.
+
+**Acceptance Criteria:**
+
+**Given** I am viewing the backlog list or item detail modal
+**When** I have an IT or Admin role
+**Then** issue identifiers (e.g., VIX-265) render as clickable hyperlinks
+**And** clicking the link opens the Linear issue in a new browser tab
+**And** the link uses the existing `item.url` field (no new API calls)
+**And** the link style matches the existing `mono-id` aesthetic with subtle hover indicator
+**And** regular users continue to see plain text (no change)
+
+**Technical Details:**
+- Frontend: Update `backlog-item-card.tsx` (line ~147-149) to conditionally render `<Link>` vs `<Text>`
+- Frontend: Update `item-detail-modal.tsx` header identifier similarly
+- Use `useAuth()` hook to check `isIT || isAdmin`
+- `BacklogItem.url` field already contains the Linear deep-link URL
+- Style: match `.mono-id` class, add `textDecoration: underline` on hover, `target="_blank"` + `rel="noopener noreferrer"`
+
+### Story 13.3: Implement Role-Based Screen Access and Privilege Levels
+
+As a developer,
+I want a centralized permission system that maps roles to capabilities,
+So that conditional UI rendering and route protection are consistent and maintainable.
+
+**Acceptance Criteria:**
+
+**Given** users have roles (regular, IT, admin)
+**When** the app renders screens and features
+**Then** a `usePermissions()` hook provides boolean flags for each capability
+**And** a `<RequireRole>` component conditionally renders children based on role
+**And** backend routes use role-appropriate middleware guards
+**And** the privilege matrix is implemented:
+  - View backlog items: all users
+  - Linear hyperlinks & "Open in Linear": IT + Admin
+  - View migration metadata: IT + Admin
+  - User management / approval: Admin only
+  - System configuration: Admin only
+
+**Technical Details:**
+- Frontend: Create `usePermissions()` hook in `features/auth/hooks/use-permissions.ts`
+- Frontend: Create `<RequireRole>` component in `features/auth/components/require-role.tsx`
+- Frontend: Permissions config mapping roles to capabilities in `features/auth/utils/permissions.ts`
+- Backend: Extend middleware with `requireIT()` for IT-or-above routes
+- Backend: Apply middleware to appropriate routes (e.g., migration metadata endpoints)
+- Remove `SHOW_OPEN_IN_LINEAR` feature flag — replace with role-based check
+
 ---
 
 ## FR Coverage Map
@@ -1415,7 +1568,10 @@ So that the application handles common failure scenarios gracefully.
 - Epic 6: Stories 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
 
 **User Management & Access Control (FR16-FR22):**
-- Epic 7: Stories 7.1, 7.2, 7.3, 7.4, 7.5
+- Epic 7: Stories 7.1, 7.2, 7.3, 7.4, 7.5, 7.6
+
+**Admin Configuration (extends FR7, FR20):**
+- Epic 7: Story 7.6 (Label Visibility — admin controls which labels appear in end-user filter)
 
 **Item Information Access (FR23-FR25):**
 - Epic 5: Stories 5.1, 5.2, 5.3

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Box, Badge, Button, Heading, HStack, Input, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { useAllUsers, type ManagedUser } from '../hooks/use-all-users'
 import { useToggleUserStatus } from '../hooks/use-toggle-user-status'
+import { useToggleITRole } from '../hooks/use-toggle-it-role'
 import { useAuth } from '@/features/auth/hooks/use-auth'
 import { formatRelativeTime, formatDateOnly } from '@/utils/formatters'
 
@@ -12,11 +13,9 @@ function getStatusBadge(user: ManagedUser) {
 }
 
 function getRoleBadge(user: ManagedUser) {
-  return user.isAdmin ? (
-    <Badge colorPalette="blue">Admin</Badge>
-  ) : (
-    <Badge colorPalette="gray">User</Badge>
-  )
+  if (user.isAdmin) return <Badge colorPalette="blue">Admin</Badge>
+  if (user.isIT) return <Badge colorPalette="purple">IT</Badge>
+  return <Badge colorPalette="gray">User</Badge>
 }
 
 /**
@@ -54,6 +53,7 @@ export function UserManagementListSkeleton() {
 export function UserManagementList() {
   const { users, isLoading, error } = useAllUsers()
   const { toggleStatus, isToggling } = useToggleUserStatus()
+  const { toggleITRole, isToggling: isTogglingIT } = useToggleITRole()
   const { user: currentUser } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
   const [togglingId, setTogglingId] = useState<number | null>(null)
@@ -75,6 +75,23 @@ export function UserManagementList() {
     const q = searchQuery.toLowerCase()
     return u.email.toLowerCase().includes(q) || (u.displayName?.toLowerCase().includes(q) ?? false)
   })
+
+  const handleToggleIT = async (userId: number, email: string, currentIsIT: boolean) => {
+    setTogglingId(userId)
+    setSuccessMessage(null)
+    setActionError(null)
+    try {
+      await toggleITRole({ userId, isIT: !currentIsIT })
+      setSuccessMessage(`${email} IT role ${!currentIsIT ? 'granted' : 'revoked'}`)
+      if (successTimeoutRef.current !== null) window.clearTimeout(successTimeoutRef.current)
+      successTimeoutRef.current = window.setTimeout(() => setSuccessMessage(null), 3000)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update IT role'
+      setActionError(message)
+    } finally {
+      setTogglingId(null)
+    }
+  }
 
   const handleToggle = async (userId: number, email: string, action: 'disable' | 'enable') => {
     setTogglingId(userId)
@@ -158,37 +175,54 @@ export function UserManagementList() {
                 </Text>
               </VStack>
 
-              {/* Show Disable for approved (non-disabled) users, except current admin */}
-              {user.isApproved && !user.isDisabled && user.id !== currentUser?.id && (
-                <Button
-                  size="sm"
-                  colorPalette="red"
-                  variant="outline"
-                  onClick={() => handleToggle(user.id, user.email, 'disable')}
-                  loading={isToggling && togglingId === user.id}
-                  disabled={isToggling}
-                  aria-label={`Disable ${user.email}`}
-                >
-                  Disable
-                </Button>
-              )}
+              <HStack gap={2}>
+                {/* IT role toggle for approved, non-admin users */}
+                {user.isApproved && !user.isDisabled && !user.isAdmin && (
+                  <Button
+                    size="sm"
+                    colorPalette="purple"
+                    variant={user.isIT ? 'solid' : 'outline'}
+                    onClick={() => handleToggleIT(user.id, user.email, user.isIT)}
+                    loading={(isTogglingIT) && togglingId === user.id}
+                    disabled={isToggling || isTogglingIT}
+                    aria-label={user.isIT ? `Revoke IT role from ${user.email}` : `Grant IT role to ${user.email}`}
+                  >
+                    {user.isIT ? 'Revoke IT' : 'Grant IT'}
+                  </Button>
+                )}
 
-              {/* Show Enable for disabled users */}
-              {user.isDisabled && (
-                <Button
-                  size="sm"
-                  colorPalette="green"
-                  variant="outline"
-                  onClick={() => handleToggle(user.id, user.email, 'enable')}
-                  loading={isToggling && togglingId === user.id}
-                  disabled={isToggling}
-                  aria-label={`Enable ${user.email}`}
-                >
-                  Enable
-                </Button>
-              )}
+                {/* Show Disable for approved (non-disabled) users, except current admin */}
+                {user.isApproved && !user.isDisabled && user.id !== currentUser?.id && (
+                  <Button
+                    size="sm"
+                    colorPalette="red"
+                    variant="outline"
+                    onClick={() => handleToggle(user.id, user.email, 'disable')}
+                    loading={isToggling && togglingId === user.id}
+                    disabled={isToggling || isTogglingIT}
+                    aria-label={`Disable ${user.email}`}
+                  >
+                    Disable
+                  </Button>
+                )}
 
-              {/* No action button for pending users - managed via UserApprovalList */}
+                {/* Show Enable for disabled users */}
+                {user.isDisabled && (
+                  <Button
+                    size="sm"
+                    colorPalette="green"
+                    variant="outline"
+                    onClick={() => handleToggle(user.id, user.email, 'enable')}
+                    loading={isToggling && togglingId === user.id}
+                    disabled={isToggling || isTogglingIT}
+                    aria-label={`Enable ${user.email}`}
+                  >
+                    Enable
+                  </Button>
+                )}
+
+                {/* No action button for pending users - managed via UserApprovalList */}
+              </HStack>
             </HStack>
           </Box>
         ))}
