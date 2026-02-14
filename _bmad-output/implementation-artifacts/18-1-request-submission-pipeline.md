@@ -115,7 +115,7 @@ so that I have a single, trackable place to ask for IT work — instead of sendi
   const linearClient = new LinearClient({ apiKey: process.env.LINEAR_API_KEY });
   const issue = await linearClient.createIssue({ teamId, title, description, priority });
   ```
-- **Duplicate detection**: Use PostgreSQL `ILIKE` for Phase 1: `SELECT identifier, title, status FROM backlog_items WHERE title ILIKE '%${searchText}%' LIMIT 5`. For Phase 2, consider `pg_trgm` extension for fuzzy matching.
+- **Duplicate detection**: Use PostgreSQL `ILIKE` for Phase 1 with parameterized queries: `SELECT identifier, title, status FROM backlog_items WHERE title ILIKE $1 LIMIT 5` (pass `['%' + searchText + '%']` as params). For Phase 2, consider `pg_trgm` extension for fuzzy matching.
 - **Status enum**: `submitted` → `reviewing` → `approved`/`rejected`/`merged`. Transitions enforced server-side.
 - **Category options**: Populate from the same labels available in the backlog (query visible labels from the labels API).
 
