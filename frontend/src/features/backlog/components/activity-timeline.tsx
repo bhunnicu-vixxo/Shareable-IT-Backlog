@@ -12,6 +12,8 @@ export interface ActivityTimelineProps {
  *
  * - Reverse-chronological order (newest first)
  * - Visually distinct from Comments section (lighter, smaller, timeline dots)
+ * - Section header with left accent stripe
+ * - Brand teal timeline connector line
  * - Uses theme tokens only — no hardcoded hex values
  * - Accessible: semantic HTML, screen-reader friendly text
  */
@@ -19,11 +21,19 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
   const items = activities ?? []
   return (
     <Box>
-      <Text fontSize="sm" fontWeight="semibold" color="gray.600" mb="2">
+      <Text
+        fontSize="sm"
+        fontWeight="700"
+        color="brand.gray"
+        mb="2"
+        className="section-accent"
+        fontFamily="heading"
+        letterSpacing="-0.01em"
+      >
         Activity ({items.length})
       </Text>
       {items.length === 0 ? (
-        <Text fontSize="sm" color="gray.500">
+        <Text fontSize="sm" color="brand.grayLight">
           No activity recorded yet
         </Text>
       ) : (
@@ -33,7 +43,7 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
           align="stretch"
           gap="0"
           borderLeftWidth="2px"
-          borderColor="gray.200"
+          borderColor="brand.tealLight"
           pl="4"
           ml="1"
           role="list"
@@ -63,18 +73,18 @@ function ActivityEntry({ activity }: { activity: IssueActivity }) {
         width: '2',
         height: '2',
         borderRadius: 'full',
-        bg: 'gray.400',
+        bg: 'brand.teal',
       }}
     >
       <Flex gap="2" alignItems="baseline" flexWrap="wrap">
-        <Text fontSize="xs" color="gray.500" flexShrink={0}>
+        <Text fontSize="xs" color="brand.grayLight" flexShrink={0}>
           {formatDateTime(activity.createdAt)}
         </Text>
-        <Text fontSize="xs" color="gray.600" fontWeight="medium" flexShrink={0}>
+        <Text fontSize="xs" color="brand.gray" fontWeight="600" flexShrink={0}>
           {activity.actorName}
         </Text>
       </Flex>
-      <Text fontSize="sm" color="gray.800">
+      <Text fontSize="sm" color="brand.gray">
         {activity.description}
       </Text>
     </Flex>

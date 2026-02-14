@@ -30,25 +30,30 @@ export function StaleDataBanner({ isStale, reason, lastSyncedAt, onRetry }: Stal
   return (
     <Alert.Root
       status="warning"
-      variant="subtle"
-      borderRadius="md"
+      variant="outline"
+      borderRadius="lg"
       mb={4}
       role="alert"
       aria-live="polite"
       data-testid="stale-data-banner"
+      bg="surface.raised"
+      borderColor="yellow.600/50"
+      color="fg.brand"
     >
-      <Alert.Indicator />
+      <Alert.Indicator color="yellow.500" />
       <Box flex="1">
         <Alert.Title fontSize="sm" fontWeight="semibold" data-testid="stale-banner-title">
           Showing cached data
         </Alert.Title>
-        <Alert.Description fontSize="xs" color="fg.muted" data-testid="stale-banner-description">
+        <Alert.Description fontSize="xs" color="fg.brandMuted" data-testid="stale-banner-description">
           {reason}. Last synced: {timeDisplay}.
         </Alert.Description>
       </Box>
       <Button
         size="xs"
         variant="outline"
+        color="fg.brand"
+        borderColor="border.subtle"
         onClick={onRetry}
         aria-label="Refresh data"
         data-testid="stale-banner-retry"

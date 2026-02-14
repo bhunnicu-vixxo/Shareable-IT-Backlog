@@ -103,14 +103,19 @@ describe('Theme Configuration', () => {
   })
 
   describe('font tokens', () => {
-    it('uses Arial as primary heading font', () => {
+    it('uses Plus Jakarta Sans as primary heading font', () => {
       const value = system.token('fonts.heading')
-      expect(value).toContain('Arial')
+      expect(value).toContain('Plus Jakarta Sans')
     })
 
-    it('uses Arial as primary body font', () => {
+    it('uses Source Sans 3 as primary body font', () => {
       const value = system.token('fonts.body')
-      expect(value).toContain('Arial')
+      expect(value).toContain('Source Sans 3')
+    })
+
+    it('uses JetBrains Mono as monospace font', () => {
+      const value = system.token('fonts.mono')
+      expect(value).toContain('JetBrains Mono')
     })
   })
 

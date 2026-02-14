@@ -41,10 +41,16 @@ function App() {
   // 1. Loading state — checking session
   if (isLoading) {
     return (
-      <Box display="flex" alignItems="center" justifyContent="center" minH="100vh">
-        <VStack gap={4}>
-          <Spinner size="xl" />
-          <Text color="fg.muted">Loading...</Text>
+      <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        minH="100vh"
+        bg="#FAFAF7"
+      >
+        <VStack gap={4} className="animate-fade-in">
+          <Spinner size="xl" color="#8E992E" />
+          <Text color="#718096" fontFamily="heading" fontWeight="500">Loading...</Text>
         </VStack>
       </Box>
     )
@@ -93,8 +99,8 @@ function App() {
                 <AdminPage />
               ) : (
                 <Box display="flex" alignItems="center" justifyContent="center" minH="80vh">
-                  <VStack gap={4}>
-                    <Heading size="lg">Access Denied</Heading>
+                  <VStack gap={4} className="animate-fade-in">
+                    <Heading size="lg" fontFamily="heading" letterSpacing="-0.02em" color="brand.gray">Access Denied</Heading>
                     <Text color="fg.muted">You do not have admin privileges to view this page.</Text>
                   </VStack>
                 </Box>

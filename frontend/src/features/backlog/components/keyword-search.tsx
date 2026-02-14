@@ -1,4 +1,5 @@
 import { Box, IconButton, Input } from '@chakra-ui/react'
+import { Search } from 'lucide-react'
 
 export interface KeywordSearchProps {
   /** Current search value (controlled) */
@@ -12,21 +13,22 @@ export interface KeywordSearchProps {
 }
 
 /**
- * Accessible keyword search input with a clear button.
+ * Accessible keyword search input with search icon and clear button.
  *
  * - Uses `role="searchbox"` for screen-reader discoverability.
  * - Visually-hidden label "Search backlog items".
  * - Clear button appears only when the input has a value.
+ * - Search icon provides visual affordance.
  * - Focus indicator uses Vixxo Green (`brand.green`).
  */
 export function KeywordSearch({
   value,
   onChange,
   onClear,
-  placeholder = 'Search…',
+  placeholder = 'Search items…',
 }: KeywordSearchProps) {
   return (
-    <Box position="relative" minW="180px">
+    <Box position="relative" w="full">
       {/* Visually-hidden label for screen readers */}
       <label
         htmlFor="backlog-search-input"
@@ -41,6 +43,18 @@ export function KeywordSearch({
       >
         Search backlog items
       </label>
+      {/* Search icon */}
+      <Box
+        position="absolute"
+        left="2.5"
+        top="50%"
+        transform="translateY(-50%)"
+        color="fg.brandMuted"
+        pointerEvents="none"
+        zIndex="1"
+      >
+        <Search size={14} />
+      </Box>
       <Input
         id="backlog-search-input"
         role="searchbox"
@@ -56,12 +70,19 @@ export function KeywordSearch({
             onClear()
           }
         }}
+        pl="8"
         pr={value ? '8' : undefined}
+        borderRadius="lg"
+        bg="surface.sunken"
+        color="fg.brand"
+        borderColor="border.subtle"
+        _placeholder={{ color: 'fg.brandMuted' }}
         _focusVisible={{
           outline: '2px solid',
           outlineColor: 'brand.green',
           outlineOffset: '2px',
           borderColor: 'brand.green',
+          bg: 'surface.raised',
         }}
       />
       {value && (
@@ -69,6 +90,7 @@ export function KeywordSearch({
           aria-label="Clear search input"
           size="xs"
           variant="ghost"
+          color="fg.brandMuted"
           position="absolute"
           right="1"
           top="50%"

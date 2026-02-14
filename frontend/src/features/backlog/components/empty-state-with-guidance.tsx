@@ -109,9 +109,10 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
       data-testid="empty-state-with-guidance"
       data-compact={compact || undefined}
       borderWidth="1px"
-      borderRadius="md"
-      borderColor="gray.200"
-      bg="white"
+      borderRadius="lg"
+      borderColor="border.subtle"
+      bg="surface.raised"
+      boxShadow="0 1px 2px rgba(62,69,67,0.04)"
       px={compact ? '4' : '6'}
       py={compact ? '6' : '10'}
       textAlign="center"
@@ -135,13 +136,13 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
           </EmptyState.Indicator>
         )}
         <EmptyState.Title
-          color="brand.gray"
+          color="fg.brand"
           fontSize={compact ? 'sm' : undefined}
         >
           {getHeading(keyword, businessUnit, showNewOnly)}
         </EmptyState.Title>
         <EmptyState.Description
-          color="brand.grayLight"
+          color="fg.brandMuted"
           maxW="72ch"
           fontSize={compact ? 'xs' : undefined}
         >

@@ -13,7 +13,7 @@ export interface MarkdownContentProps {
  */
 export function MarkdownContent({ content }: MarkdownContentProps) {
   return (
-    <Box fontSize="sm" color="gray.700">
+    <Box fontSize="sm" color="brand.gray">
       <ReactMarkdown
         remarkPlugins={[remarkBreaks]}
         components={{

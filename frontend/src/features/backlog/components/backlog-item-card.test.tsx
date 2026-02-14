@@ -223,8 +223,11 @@ describe('BacklogItemCard', () => {
     // Description and labels are rendered with display:none in compact mode
     const description = screen.queryByTestId('card-description')
     expect(description).toHaveStyle({ display: 'none' })
-    // Labels container is hidden
-    const labelsContainer = screen.getByText('Backend').closest('[class*="stack"]')
+    // Labels container (outer HStack wrapping all label pills) is hidden.
+    // The label text lives inside an inner HStack (the pill), so we
+    // traverse up two stack levels to reach the outer container.
+    const labelPill = screen.getByText('Backend').closest('[class*="stack"]')
+    const labelsContainer = labelPill?.parentElement?.closest('[class*="stack"]')
     expect(labelsContainer).toHaveStyle({ display: 'none' })
   })
 

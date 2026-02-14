@@ -13,7 +13,7 @@ describe('KeywordSearch', () => {
   it('renders with default placeholder', () => {
     render(<KeywordSearch value="" onChange={vi.fn()} onClear={vi.fn()} />)
 
-    const input = screen.getByPlaceholderText('Search…')
+    const input = screen.getByPlaceholderText('Search items…')
     expect(input).toBeInTheDocument()
   })
 

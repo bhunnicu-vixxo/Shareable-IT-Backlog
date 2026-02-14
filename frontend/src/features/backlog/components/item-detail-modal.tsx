@@ -15,12 +15,22 @@ import { SHOW_OPEN_IN_LINEAR } from '@/utils/constants'
 import { formatDateOnly } from '@/utils/formatters'
 import { useBacklogItemDetail } from '../hooks/use-backlog-item-detail'
 import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
+import { getLabelColor } from '../utils/label-colors'
 import { ActivityTimeline } from './activity-timeline'
 import { CommentThread } from './comment-thread'
 import { ItemErrorState } from './item-error-state'
 import { ItemNotFoundState } from './item-not-found-state'
 import { MarkdownContent } from './markdown-content'
 import type { BacklogItem, BacklogItemComment, IssueActivity } from '../types/backlog.types'
+
+/** Maps priority number to a top-border color for the modal header accent. */
+const PRIORITY_ACCENT_COLORS: Record<number, string> = {
+  1: '#E53E3E',   // Urgent — red
+  2: '#956125',   // High — copper
+  3: '#2C7B80',   // Normal — teal
+  4: '#395389',   // Low — blue
+  0: '#CBD5E0',   // None — light gray
+}
 
 /**
  * Layout-accurate skeleton for the item detail modal body.
@@ -86,9 +96,11 @@ export interface ItemDetailModalProps {
 /**
  * Modal displaying full backlog item details and comments.
  *
- * - Uses Chakra UI Dialog with built-in focus trap, ESC to close, overlay click to close
- * - Fetches detail when itemId is set (lazy load)
- * - Handles loading and error (404) states
+ * Features:
+ * - Priority accent color on top border
+ * - Section headers with left-accent decorators
+ * - Refined metadata grid with clear label/value hierarchy
+ * - Scale-in entrance animation
  */
 export function ItemDetailModal({
   isOpen,
@@ -105,6 +117,11 @@ export function ItemDetailModal({
     if (!details.open) onClose()
   }
 
+  // Priority accent for top border
+  const accentColor = data?.item
+    ? PRIORITY_ACCENT_COLORS[data.item.priority] ?? PRIORITY_ACCENT_COLORS[0]
+    : undefined
+
   return (
     <Dialog.Root
       open={isOpen}
@@ -120,7 +137,13 @@ export function ItemDetailModal({
     >
       <Dialog.Backdrop />
       <Dialog.Positioner>
-        <Dialog.Content aria-label="Backlog item details">
+        <Dialog.Content
+          aria-label="Backlog item details"
+          borderRadius="xl"
+          overflow="hidden"
+          borderTopWidth={accentColor ? '3px' : undefined}
+          borderTopColor={accentColor}
+        >
           {!isError && (
             <Dialog.CloseTrigger
               position="absolute"
@@ -129,7 +152,7 @@ export function ItemDetailModal({
               aria-label="Close"
             />
           )}
-          <Dialog.Header pt="6" pr="10" pb="2">
+          <Dialog.Header pt="6" pr="10" pb="2" bg="surface.raised">
             {isLoading && (
               <Flex gap="4" alignItems="flex-start">
                 <Skeleton boxSize="10" borderRadius="full" flexShrink={0} />
@@ -146,7 +169,13 @@ export function ItemDetailModal({
                   priorityLabel={data.item.priorityLabel}
                 />
                 <Box flex="1" minWidth="0">
-                  <Dialog.Title fontSize="lg" fontWeight="bold">
+                  <Dialog.Title
+                    fontSize="lg"
+                    fontWeight="bold"
+                    fontFamily="heading"
+                    letterSpacing="-0.02em"
+                    color="fg.brand"
+                  >
                     {data.item.title}
                   </Dialog.Title>
                   <Flex gap="2" mt="2" flexWrap="wrap" alignItems="center">
@@ -156,14 +185,14 @@ export function ItemDetailModal({
                       color={(STATUS_COLORS[data.item.statusType] ?? DEFAULT_STATUS_COLORS).color}
                       px="2"
                       py="0.5"
-                      borderRadius="sm"
+                      borderRadius="full"
                     >
                       {data.item.status}
                     </Badge>
-                    <Text fontSize="sm" color="gray.500">
+                    <Text fontSize="sm" color="fg.brandMuted" className="mono-id">
                       {data.item.identifier}
                     </Text>
-                    <Text fontSize="sm" color="gray.500">
+                    <Text fontSize="sm" color="fg.brandMuted">
                       {data.item.teamName}
                     </Text>
                   </Flex>
@@ -171,13 +200,13 @@ export function ItemDetailModal({
               </Flex>
             )}
             {!isLoading && isError && (
-              <Dialog.Title fontSize="lg" fontWeight="bold" color="gray.700">
+              <Dialog.Title fontSize="lg" fontWeight="bold" color="fg.brand" fontFamily="heading">
                 Item Unavailable
               </Dialog.Title>
             )}
           </Dialog.Header>
 
-          <Dialog.Body pb="6">
+          <Dialog.Body pb="6" bg="surface.raised">
             {isLoading && <ItemDetailBodySkeleton />}
 
             {!isLoading && data && (
@@ -200,7 +229,7 @@ export function ItemDetailModal({
             )}
           </Dialog.Body>
 
-          <Dialog.Footer borderTopWidth="1px" pt="4">
+          <Dialog.Footer borderTopWidth="1px" borderColor="border.subtle" pt="4" bg="surface.raised">
             {SHOW_OPEN_IN_LINEAR && data?.item.url && (
               <Link
                 href={data.item.url}
@@ -230,12 +259,15 @@ function ItemDetailContent({
   activities: IssueActivity[]
 }) {
   return (
-    <VStack align="stretch" gap="4">
-      {/* Metadata grid */}
+    <VStack align="stretch" gap="5">
+      {/* Metadata grid — refined label/value hierarchy */}
       <Box
         display="grid"
         gridTemplateColumns="repeat(auto-fill, minmax(140px, 1fr))"
-        gap="3"
+        gap="4"
+        p="4"
+        bg="surface.sunken"
+        borderRadius="lg"
       >
         <DetailField label="Priority" value={item.priorityLabel} />
         <DetailField label="Assignee" value={item.assigneeName} />
@@ -247,23 +279,33 @@ function ItemDetailContent({
       {/* Labels */}
       {item.labels.length > 0 && (
         <Box>
-          <Text fontSize="sm" fontWeight="semibold" color="gray.600" mb="1">
-            Labels
-          </Text>
-          <Flex gap="1" flexWrap="wrap">
-            {item.labels.map((label) => (
-              <Box
-                key={label.id}
-                px="2"
-                py="0.5"
-                borderRadius="sm"
-                fontSize="xs"
-                bg="gray.100"
-                color="gray.700"
-              >
-                {label.name}
-              </Box>
-            ))}
+          <SectionHeading>Labels</SectionHeading>
+          <Flex gap="1.5" flexWrap="wrap">
+            {item.labels.map((label) => {
+              const labelColor = getLabelColor(label.name)
+              return (
+                <HStack
+                  key={label.id}
+                  gap="1.5"
+                  px="2.5"
+                  py="1"
+                  borderRadius="full"
+                  fontSize="xs"
+                  bg={labelColor.bg}
+                  color={labelColor.color}
+                  fontWeight="600"
+                >
+                  <Box
+                    w="7px"
+                    h="7px"
+                    borderRadius="full"
+                    bg={labelColor.dot}
+                    flexShrink={0}
+                  />
+                  {label.name}
+                </HStack>
+              )
+            })}
           </Flex>
         </Box>
       )}
@@ -271,9 +313,7 @@ function ItemDetailContent({
       {/* Description */}
       {item.description && (
         <Box>
-          <Text fontSize="sm" fontWeight="semibold" color="gray.600" mb="1">
-            Description
-          </Text>
+          <SectionHeading>Description</SectionHeading>
           <MarkdownContent content={item.description} />
         </Box>
       )}
@@ -283,12 +323,27 @@ function ItemDetailContent({
 
       {/* Comments */}
       <Box>
-        <Text fontSize="sm" fontWeight="semibold" color="gray.600" mb="2">
-          Comments ({comments.length})
-        </Text>
+        <SectionHeading>Comments ({comments.length})</SectionHeading>
         <CommentThread comments={comments} />
       </Box>
     </VStack>
+  )
+}
+
+/** Section heading with left accent stripe for visual hierarchy. */
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <Text
+      fontSize="sm"
+      fontWeight="700"
+      color="fg.brand"
+      mb="2"
+      className="section-accent"
+      fontFamily="heading"
+      letterSpacing="-0.01em"
+    >
+      {children}
+    </Text>
   )
 }
 
@@ -301,10 +356,10 @@ function DetailField({
 }) {
   return (
     <Box>
-      <Text fontSize="xs" color="gray.500" fontWeight="medium">
+      <Text fontSize="xs" color="fg.brandMuted" fontWeight="500" textTransform="uppercase" letterSpacing="0.04em">
         {label}
       </Text>
-      <Text fontSize="sm" color="gray.800">
+      <Text fontSize="sm" color="fg.brand" fontWeight="600" mt="0.5">
         {value ?? '—'}
       </Text>
     </Box>

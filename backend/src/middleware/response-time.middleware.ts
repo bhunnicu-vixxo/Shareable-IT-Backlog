@@ -23,8 +23,10 @@ export function responseTimeMiddleware(req: Request, res: Response, next: NextFu
   const originalJson = res.json.bind(res)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   res.json = function patchedJson(body?: any): Response {
-    const durationMs = computeDurationMs()
-    res.setHeader('X-Response-Time', `${durationMs}ms`)
+    if (!res.headersSent) {
+      const durationMs = computeDurationMs()
+      res.setHeader('X-Response-Time', `${durationMs}ms`)
+    }
     return originalJson(body)
   }
 
@@ -33,7 +35,7 @@ export function responseTimeMiddleware(req: Request, res: Response, next: NextFu
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   res.send = function patchedSend(body?: any): Response {
     // Only set if not already set (json calls send internally after our patch)
-    if (!res.getHeader('X-Response-Time')) {
+    if (!res.headersSent && !res.getHeader('X-Response-Time')) {
       const durationMs = computeDurationMs()
       res.setHeader('X-Response-Time', `${durationMs}ms`)
     }
@@ -41,10 +43,13 @@ export function responseTimeMiddleware(req: Request, res: Response, next: NextFu
   }
 
   // Also patch res.end() for responses that do not call json/send (e.g. 304).
+  // Guard against headers already sent — express-session's connect-pg-simple store
+  // can invoke res.end() asynchronously after the response has been flushed, which
+  // causes ERR_HTTP_HEADERS_SENT if we try to setHeader at that point.
   const originalEnd = res.end.bind(res)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   res.end = function patchedEnd(...args: any[]): Response {
-    if (!res.getHeader('X-Response-Time')) {
+    if (!res.headersSent && !res.getHeader('X-Response-Time')) {
       const durationMs = computeDurationMs()
       res.setHeader('X-Response-Time', `${durationMs}ms`)
     }
