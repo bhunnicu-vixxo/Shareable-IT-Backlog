@@ -858,6 +858,224 @@ describe('BacklogList', () => {
     expect(screen.getByRole('button', { name: 'Clear search filter' })).toBeInTheDocument()
   })
 
+  it('filters by description, teamName, status, and identifier', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({
+          id: '1',
+          title: 'Item one',
+          description: 'This involves network security',
+          teamName: 'Operations',
+          status: 'In Progress',
+          identifier: 'VIX-100',
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Item two',
+          description: 'Budget planning task',
+          teamName: 'Finance',
+          status: 'Backlog',
+          identifier: 'VIX-200',
+        }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Item one')).toBeInTheDocument()
+    })
+
+    // Search by description content
+    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
+    fireEvent.change(searchInput, { target: { value: 'network' } })
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Item one/)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/Item two/)).not.toBeInTheDocument()
+    })
+
+    // Search by identifier
+    fireEvent.change(searchInput, { target: { value: 'VIX-200' } })
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Item two/)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/Item one/)).not.toBeInTheDocument()
+    })
+  })
+
+  it('search is case-insensitive and trims whitespace', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'VPN Configuration' }),
+        createMockItem({ id: '2', title: 'Database Setup' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('VPN Configuration')).toBeInTheDocument()
+    })
+
+    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
+    fireEvent.change(searchInput, { target: { value: '  VpN  ' } })
+
+    await waitFor(() => {
+      // VPN Configuration should still be visible (matched); Database Setup should be gone
+      expect(screen.getByLabelText(/VPN Configuration/)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/Database Setup/)).not.toBeInTheDocument()
+    })
+  })
+
+  it('combines label + New-only + keyword search', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({
+          id: '1',
+          title: 'Siebel vpn task',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          isNew: true,
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Siebel billing',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          isNew: true,
+        }),
+        createMockItem({
+          id: '3',
+          title: 'Gateway vpn task',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+          isNew: true,
+        }),
+        createMockItem({
+          id: '4',
+          title: 'Siebel vpn old',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          isNew: false,
+        }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 4,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Siebel vpn task')).toBeInTheDocument()
+    })
+
+    // Type keyword first
+    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
+    fireEvent.change(searchInput, { target: { value: 'vpn' } })
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText(/Siebel billing/)).not.toBeInTheDocument()
+    })
+
+    // Toggle "New only" — should filter out "Siebel vpn old" (isNew: false)
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Siebel vpn task/)).toBeInTheDocument()
+      expect(screen.getByLabelText(/Gateway vpn task/)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/Siebel vpn old/)).not.toBeInTheDocument()
+    })
+  })
+
+  it('"Clear search" button in empty state resets keyword filter', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'VPN configuration' }),
+        createMockItem({ id: '2', title: 'Database migration' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('VPN configuration')).toBeInTheDocument()
+    })
+
+    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
+    fireEvent.change(searchInput, { target: { value: 'zzzzz' } })
+
+    await waitFor(() => {
+      expect(screen.getByText(/No items found matching/)).toBeInTheDocument()
+    })
+
+    // Click the "Clear search filter" button in the empty-state area
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search filter' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('VPN configuration')).toBeInTheDocument()
+      expect(screen.getByText('Database migration')).toBeInTheDocument()
+    })
+  })
+
+  it('highlights matching text in item titles when searching', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'VPN configuration issue' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 1,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('VPN configuration issue')).toBeInTheDocument()
+    })
+
+    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
+    fireEvent.change(searchInput, { target: { value: 'vpn' } })
+
+    await waitFor(() => {
+      const markElement = document.querySelector('mark')
+      expect(markElement).toBeInTheDocument()
+      expect(markElement?.textContent).toBe('VPN')
+    })
+  })
+
+  it('results count includes search query when active', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'VPN configuration' }),
+        createMockItem({ id: '2', title: 'VPN monitoring' }),
+        createMockItem({ id: '3', title: 'Database setup' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Showing 3 items')).toBeInTheDocument()
+    })
+
+    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
+    fireEvent.change(searchInput, { target: { value: 'vpn' } })
+
+    await waitFor(() => {
+      expect(screen.getByText('Showing 2 of 3 items matching "vpn"')).toBeInTheDocument()
+    })
+  })
+
   it('renders stack rank badges with sequential numbering', async () => {
     const response: BacklogListResponse = {
       items: [
@@ -924,6 +1142,164 @@ describe('BacklogList', () => {
     const lowIdx = titles.findIndex((t) => t.includes('Low item'))
     expect(urgentIdx).toBeLessThan(normalIdx)
     expect(normalIdx).toBeLessThan(lowIdx)
+  })
+
+  it('reverses sort order when direction toggle is clicked', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Low item', priority: 4 }),
+        createMockItem({ id: '2', title: 'Urgent item', priority: 1 }),
+        createMockItem({ id: '3', title: 'Normal item', priority: 3 }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Urgent item')).toBeInTheDocument()
+    })
+
+    // Click direction toggle to switch to descending
+    fireEvent.click(screen.getByRole('button', { name: 'Sort descending' }))
+
+    // Now priority descending (4, 3, 1 → Low, Normal, Urgent)
+    await waitFor(() => {
+      const cards = screen.getAllByRole('button', { name: /,\s*Priority/ })
+      const titles = cards.map((card) => card.getAttribute('aria-label') ?? '')
+      const urgentIdx = titles.findIndex((t) => t.includes('Urgent item'))
+      const normalIdx = titles.findIndex((t) => t.includes('Normal item'))
+      const lowIdx = titles.findIndex((t) => t.includes('Low item'))
+      expect(lowIdx).toBeLessThan(normalIdx)
+      expect(normalIdx).toBeLessThan(urgentIdx)
+    })
+
+    // Button label should now say "Sort ascending"
+    expect(screen.getByRole('button', { name: 'Sort ascending' })).toBeInTheDocument()
+  })
+
+  it('keeps priority 0 ("None") items last in both asc and desc', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'None item', priority: 0, priorityLabel: 'None' }),
+        createMockItem({ id: '2', title: 'Urgent item', priority: 1, priorityLabel: 'Urgent' }),
+        createMockItem({ id: '3', title: 'Low item', priority: 4, priorityLabel: 'Low' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Urgent item')).toBeInTheDocument()
+    })
+
+    // Default (asc): None should be last
+    const cardsAsc = screen.getAllByRole('button', { name: /,\s*Priority/ })
+    const labelsAsc = cardsAsc.map((c) => c.getAttribute('aria-label') ?? '')
+    const noneIdxAsc = labelsAsc.findIndex((l) => l.includes('None item'))
+    const lastIdxAsc = labelsAsc.length - 1
+    expect(noneIdxAsc).toBe(lastIdxAsc)
+
+    // Toggle to desc: None should still be last
+    fireEvent.click(screen.getByRole('button', { name: 'Sort descending' }))
+
+    await waitFor(() => {
+      const cardsDesc = screen.getAllByRole('button', { name: /,\s*Priority/ })
+      const labelsDesc = cardsDesc.map((c) => c.getAttribute('aria-label') ?? '')
+      const noneIdxDesc = labelsDesc.findIndex((l) => l.includes('None item'))
+      expect(noneIdxDesc).toBe(labelsDesc.length - 1)
+    })
+  })
+
+  it('sorts by date created when sort field is changed', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Newest', createdAt: '2026-02-10T10:00:00.000Z' }),
+        createMockItem({ id: '2', title: 'Oldest', createdAt: '2026-01-01T10:00:00.000Z' }),
+        createMockItem({ id: '3', title: 'Middle', createdAt: '2026-02-01T10:00:00.000Z' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Newest')).toBeInTheDocument()
+    })
+
+    const trigger = screen.getByRole('combobox', { name: /sort backlog items/i })
+    fireEvent.click(trigger)
+    const option = await screen.findByRole('option', { name: 'Date Created' })
+    fireEvent.click(option)
+
+    // Ascending date: oldest first → Oldest, Middle, Newest
+    // Cards use role="button" with aria-label like "Title, Priority Label"
+    await waitFor(() => {
+      const allCards = screen.getAllByRole('button', { name: /,\s*Priority/ })
+      const cardLabels = allCards.map((c) => c.getAttribute('aria-label') ?? '')
+      const oldestIdx = cardLabels.findIndex((l) => l.includes('Oldest'))
+      const middleIdx = cardLabels.findIndex((l) => l.includes('Middle'))
+      const newestIdx = cardLabels.findIndex((l) => l.includes('Newest'))
+      expect(oldestIdx).toBeLessThan(middleIdx)
+      expect(middleIdx).toBeLessThan(newestIdx)
+    })
+  })
+
+  it('applies sort to filtered results (label + keyword + sort)', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({
+          id: '1',
+          title: 'Siebel low',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          priority: 4,
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Siebel urgent',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          priority: 1,
+        }),
+        createMockItem({
+          id: '3',
+          title: 'Gateway high',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+          priority: 2,
+        }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Siebel low')).toBeInTheDocument()
+    })
+
+    // Type keyword "Siebel" to filter to Siebel items
+    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
+    fireEvent.change(searchInput, { target: { value: 'Siebel' } })
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText(/Gateway high/)).not.toBeInTheDocument()
+    })
+
+    // Default sort is priority asc → Siebel urgent (1) before Siebel low (4)
+    // Cards use role="button" with aria-label like "Title, Priority Label"
+    const allCards = screen.getAllByRole('button', { name: /,\s*Priority/ })
+    const cardLabels = allCards.map((c) => c.getAttribute('aria-label') ?? '')
+    const urgentIdx = cardLabels.findIndex((l) => l.includes('Siebel urgent'))
+    const lowIdx = cardLabels.findIndex((l) => l.includes('Siebel low'))
+    expect(urgentIdx).toBeLessThan(lowIdx)
   })
 
   // ─── Virtual Scrolling Tests ───
