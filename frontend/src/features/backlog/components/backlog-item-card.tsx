@@ -1,7 +1,7 @@
 import { memo, forwardRef } from 'react'
 import { Badge, Box, Flex, HStack, Link, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { formatDistanceToNow } from 'date-fns'
-import { useAuth } from '@/features/auth/hooks/use-auth'
+import { usePermissions } from '@/features/auth/hooks/use-permissions'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
 import { getLabelColor } from '../utils/label-colors'
@@ -57,8 +57,7 @@ export const BacklogItemCard = memo(
     { item, onClick, highlightTokens = [], variant, stackRank }: BacklogItemCardProps,
     ref,
   ) {
-    const { isIT, isAdmin } = useAuth()
-    const isPrivileged = isIT || isAdmin
+    const { canViewLinearLinks } = usePermissions()
     const isClickable = !!onClick
     const hasExplicitVariant = variant !== undefined
     const effectiveVariant = variant ?? 'default'
@@ -68,6 +67,9 @@ export const BacklogItemCard = memo(
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
       if (!isClickable) return
+      // If focus is on a nested interactive element (e.g., the Linear link),
+      // let that element handle keyboard activation instead of the card.
+      if (e.currentTarget !== e.target) return
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
         onClick?.()
@@ -147,7 +149,7 @@ export const BacklogItemCard = memo(
             <Text fontSize="sm" color="fg.brandMuted">
               {item.teamName}
             </Text>
-            {isPrivileged && item.url ? (
+            {canViewLinearLinks && item.url ? (
               <Link
                 href={item.url}
                 target="_blank"

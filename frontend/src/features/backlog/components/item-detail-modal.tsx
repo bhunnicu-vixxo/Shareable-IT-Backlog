@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from '@chakra-ui/react'
-import { useAuth } from '@/features/auth/hooks/use-auth'
+import { usePermissions } from '@/features/auth/hooks/use-permissions'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import { ApiError } from '@/utils/api-error'
 import { formatDateOnly } from '@/utils/formatters'
@@ -108,8 +108,7 @@ export function ItemDetailModal({
   onClose,
   triggerRef,
 }: ItemDetailModalProps) {
-  const { isIT, isAdmin } = useAuth()
-  const isPrivileged = isIT || isAdmin
+  const { canViewLinearLinks } = usePermissions()
   const { data, isLoading, isError, error, refetch } = useBacklogItemDetail(itemId)
 
   const isNotFoundError =
@@ -191,7 +190,7 @@ export function ItemDetailModal({
                     >
                       {data.item.status}
                     </Badge>
-                    {isPrivileged && data.item.url ? (
+                    {canViewLinearLinks && data.item.url ? (
                       <Link
                         href={data.item.url}
                         target="_blank"
@@ -247,7 +246,7 @@ export function ItemDetailModal({
           </Dialog.Body>
 
           <Dialog.Footer borderTopWidth="1px" borderColor="border.subtle" pt="4" bg="surface.raised">
-            {isPrivileged && data?.item.url && (
+            {canViewLinearLinks && data?.item.url && (
               <Link
                 href={data.item.url}
                 target="_blank"

@@ -5,26 +5,18 @@ import userEvent from '@testing-library/user-event'
 import { ItemDetailModal } from './item-detail-modal'
 import type { BacklogDetailResponse, BacklogItem, BacklogItemComment } from '../types/backlog.types'
 
-// Mock useAuth to control role-based rendering
-const mockUseAuth = vi.fn()
-vi.mock('@/features/auth/hooks/use-auth', () => ({
-  useAuth: () => mockUseAuth(),
+// Mock usePermissions to control role-based rendering
+const mockUsePermissions = vi.fn()
+vi.mock('@/features/auth/hooks/use-permissions', () => ({
+  usePermissions: () => mockUsePermissions(),
 }))
 
-const defaultAuthState = {
-  user: null,
-  isLoading: false,
-  isIdentified: false,
-  isApproved: false,
-  isAdmin: false,
-  isIT: false,
-  error: null,
-  identify: vi.fn(),
-  isIdentifying: false,
-  identifyError: null,
-  logout: vi.fn(),
-  isLoggingOut: false,
-  checkSession: vi.fn(),
+const defaultPermissions = {
+  canViewLinearLinks: false,
+  canViewMigrationMetadata: false,
+  canManageUsers: false,
+  canConfigureSystem: false,
+  role: 'user' as const,
 }
 
 function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
@@ -103,7 +95,7 @@ describe('ItemDetailModal', () => {
   const mockOnClose = vi.fn()
 
   beforeEach(() => {
-    mockUseAuth.mockReturnValue(defaultAuthState)
+    mockUsePermissions.mockReturnValue(defaultPermissions)
   })
 
   afterEach(() => {
@@ -744,7 +736,7 @@ describe('ItemDetailModal', () => {
   // ──── Story 13.2: Role-based identifier and footer link tests ───────────
 
   it('renders identifier as clickable link for IT/Admin in header', async () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    mockUsePermissions.mockReturnValue({ ...defaultPermissions, canViewLinearLinks: true, role: 'it' })
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [],
@@ -768,7 +760,7 @@ describe('ItemDetailModal', () => {
   })
 
   it('renders identifier as plain text for regular users in header', async () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: false, isAdmin: false })
+    mockUsePermissions.mockReturnValue(defaultPermissions)
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [],
@@ -789,7 +781,7 @@ describe('ItemDetailModal', () => {
   })
 
   it('shows "Open in Linear" footer link for IT/Admin users', async () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isAdmin: true })
+    mockUsePermissions.mockReturnValue({ ...defaultPermissions, canViewLinearLinks: true, canManageUsers: true, role: 'admin' })
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [],
@@ -813,7 +805,7 @@ describe('ItemDetailModal', () => {
   })
 
   it('hides "Open in Linear" footer link for regular users', async () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: false, isAdmin: false })
+    mockUsePermissions.mockReturnValue(defaultPermissions)
     const detail: BacklogDetailResponse = {
       item: createMockItem(),
       comments: [],
@@ -833,7 +825,7 @@ describe('ItemDetailModal', () => {
   })
 
   it('renders identifier as plain text (no link) when privileged but url is missing in header', async () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    mockUsePermissions.mockReturnValue({ ...defaultPermissions, canViewLinearLinks: true, role: 'it' })
     const detail: BacklogDetailResponse = {
       item: createMockItem({ url: '' }),
       comments: [],
