@@ -63,8 +63,9 @@ export const BacklogItemCard = memo(
     const hasExplicitVariant = variant !== undefined
     const effectiveVariant = variant ?? 'default'
     const isCompact = effectiveVariant === 'compact'
-    const descriptionPreview =
-      item.description ? descriptionPreviewFromMarkdown(item.description, 240) : null
+    const descriptionPreview = item.description
+      ? descriptionPreviewFromMarkdown(item.description, 240)
+      : null
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
       if (!isClickable) return
@@ -116,9 +117,7 @@ export const BacklogItemCard = memo(
         <Box flex="1" minWidth="0">
           {/* Title */}
           <Text fontWeight="bold" fontSize="md" truncate color="fg.brand" letterSpacing="-0.01em">
-            {highlightTokens.length > 0
-              ? highlightText(item.title, highlightTokens)
-              : item.title}
+            {highlightTokens.length > 0 ? highlightText(item.title, highlightTokens) : item.title}
           </Text>
 
           {/* Description (truncated to 2 lines) — hidden in compact mode / mobile when no variant set */}
@@ -158,6 +157,11 @@ export const BacklogItemCard = memo(
                 textDecoration="none"
                 _hover={{ textDecoration: 'underline', color: 'brand.greenAccessible' }}
                 onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation()
+                  }
+                }}
               >
                 {item.identifier}
               </Link>
@@ -197,13 +201,7 @@ export const BacklogItemCard = memo(
                     color={labelColor.color}
                     fontWeight="600"
                   >
-                    <Box
-                      w="6px"
-                      h="6px"
-                      borderRadius="full"
-                      bg={labelColor.dot}
-                      flexShrink={0}
-                    />
+                    <Box w="6px" h="6px" borderRadius="full" bg={labelColor.dot} flexShrink={0} />
                     {label.name}
                   </HStack>
                 )
@@ -240,13 +238,7 @@ function NewItemBadge() {
 }
 
 /** Status badge component with color coding based on workflow state type. */
-function StatusBadge({
-  status,
-  statusType,
-}: {
-  status: string
-  statusType: string
-}) {
+function StatusBadge({ status, statusType }: { status: string; statusType: string }) {
   const colors = STATUS_COLORS[statusType] ?? DEFAULT_STATUS_COLORS
 
   return (
