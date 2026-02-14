@@ -486,7 +486,13 @@ export function BacklogList() {
     const filterParts = parts.length > 0 ? `${parts.join(' ')} ` : ''
     const ofTotal = isFiltered ? ` of ${total}` : ''
     const matchPart = debouncedQuery.trim() ? ` matching "${debouncedQuery.trim()}"` : ''
-    const labelPart = selectedLabels.length > 0 ? ` for ${selectedLabels.join(', ')}` : ''
+    // Keep this short to avoid toolbar reflow for multi-select labels (VIX-431).
+    const labelPart =
+      selectedLabels.length === 1
+        ? ` for ${selectedLabels[0]}`
+        : selectedLabels.length > 1
+          ? ` for ${selectedLabels.length} labels`
+          : ''
     return `Showing ${count}${ofTotal} ${filterParts}${itemWord}${matchPart}${labelPart}`
   }
 
@@ -554,7 +560,21 @@ export function BacklogList() {
             onClear={handleClearKeyword}
           />
         </Box>
-        <Text fontSize="sm" color="fg.brandMuted" ml="auto" fontWeight="500">
+        <Text
+          fontSize="sm"
+          color="fg.brandMuted"
+          fontWeight="500"
+          // Responsive: on narrow viewports, results count wraps to its own row.
+          // On wider viewports, keep it on the right without pushing other controls.
+          flexBasis={{ base: '100%', md: 'auto' }}
+          ml={{ base: 0, md: 'auto' }}
+          minW={0}
+          maxW={{ base: '100%', md: '420px' }}
+          overflow="hidden"
+          textOverflow="ellipsis"
+          whiteSpace="nowrap"
+          textAlign={{ base: 'left', md: 'right' }}
+        >
           {getResultCountText()}
         </Text>
       </Flex>

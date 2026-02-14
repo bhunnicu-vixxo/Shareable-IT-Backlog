@@ -141,18 +141,83 @@ describe('LabelFilter', () => {
         onChange={vi.fn()}
       />,
     )
-    // When multiple labels are selected, trigger shows a summary + chips are visible
+    // When 2 labels are selected, trigger shows count summary
     expect(
       screen.getByRole('combobox', { name: /filter by label/i }),
     ).toHaveTextContent('2 Labels')
-    expect(screen.getAllByText('Siebel').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('Gateway').length).toBeGreaterThanOrEqual(1)
-    expect(
-      screen.getByRole('button', { name: 'Remove label Siebel' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Remove label Gateway' }),
-    ).toBeInTheDocument()
+  })
+
+  describe('no external chips (VIX-431)', () => {
+    it('does not render external chip remove buttons for 1 label', () => {
+      render(
+        <LabelFilter
+          items={mockItems}
+          value={['Siebel']}
+          onChange={vi.fn()}
+        />,
+      )
+      // Trigger shows single label name, but no external chip remove buttons
+      expect(
+        screen.queryByRole('button', { name: /Remove label/ }),
+      ).not.toBeInTheDocument()
+    })
+
+    it('does not render external chip remove buttons for 2 labels', () => {
+      render(
+        <LabelFilter
+          items={mockItems}
+          value={['Siebel', 'Gateway']}
+          onChange={vi.fn()}
+        />,
+      )
+      expect(
+        screen.queryByRole('button', { name: /Remove label/ }),
+      ).not.toBeInTheDocument()
+    })
+
+    it('does not render external chip remove buttons for 3 labels', () => {
+      render(
+        <LabelFilter
+          items={mockItems}
+          value={['Siebel', 'Gateway', 'VixxoLink']}
+          onChange={vi.fn()}
+        />,
+      )
+      expect(
+        screen.getByRole('combobox', { name: /filter by label/i }),
+      ).toHaveTextContent('3 Labels')
+      expect(
+        screen.queryByRole('button', { name: /Remove label/ }),
+      ).not.toBeInTheDocument()
+    })
+
+    it('does not render external chip remove buttons for 4 labels', () => {
+      render(
+        <LabelFilter
+          items={mockItems}
+          value={['Siebel', 'Gateway', 'VixxoLink', 'Corrigo']}
+          onChange={vi.fn()}
+        />,
+      )
+      expect(
+        screen.getByRole('combobox', { name: /filter by label/i }),
+      ).toHaveTextContent('4 Labels')
+      expect(
+        screen.queryByRole('button', { name: /Remove label/ }),
+      ).not.toBeInTheDocument()
+    })
+
+    it('still shows clear trigger when labels are selected', () => {
+      const { container } = render(
+        <LabelFilter
+          items={mockItems}
+          value={['Siebel', 'Gateway', 'VixxoLink']}
+          onChange={vi.fn()}
+        />,
+      )
+      const clearTrigger = container.querySelector('[data-part="clear-trigger"]')
+      expect(clearTrigger).toBeInTheDocument()
+    })
   })
 
   it('shows single label name when one label selected', () => {
@@ -166,23 +231,6 @@ describe('LabelFilter', () => {
     // The trigger area should display the single label name
     const triggerTexts = screen.getAllByText('Siebel')
     expect(triggerTexts.length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('allows removing an individual label via chip remove button', async () => {
-    const onChange = vi.fn()
-    render(
-      <LabelFilter
-        items={mockItems}
-        value={['Siebel', 'Gateway']}
-        onChange={onChange}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: 'Remove label Gateway' }))
-
-    await waitFor(() => {
-      expect(onChange).toHaveBeenCalledWith(['Siebel'])
-    })
   })
 
   it('uses getLabelColor() for colored dots in dropdown options', async () => {
