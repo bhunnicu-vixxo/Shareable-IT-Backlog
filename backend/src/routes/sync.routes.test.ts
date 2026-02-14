@@ -16,6 +16,13 @@ vi.mock('../middleware/auth.middleware.js', () => ({
   requireApproved: vi.fn((_req: unknown, _res: unknown, next: () => void) => next()),
 }))
 
+// Mock database health middleware to pass through (route integration tests should not hit real DB)
+// IMPORTANT: Must be async because routes/index.ts wraps it in an async-middleware helper that calls `.catch`.
+vi.mock('../middleware/database-health.middleware.js', () => ({
+  databaseHealthMiddleware: vi.fn(async (_req: unknown, _res: unknown, next: () => void) => next()),
+  resetDatabaseHealthCache: vi.fn(),
+}))
+
 vi.mock('../services/sync/sync.service.js', () => ({
   syncService: {
     getStatus: mockGetStatus,

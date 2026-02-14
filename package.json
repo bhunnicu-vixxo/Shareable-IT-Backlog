@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "concurrently --kill-others-on-fail -n fe,be -c cyan,green \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "dev:debug": "concurrently --kill-others-on-fail -n fe,be -c cyan,green \"npm run dev -w frontend\" \"npm run dev:debug -w backend\"",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "test:run": "npm run test:run -w backend && npm run test:run -w frontend",
     "import": "node import-to-linear.js",
     "update-issue": "node update-linear-issue.js"
   },

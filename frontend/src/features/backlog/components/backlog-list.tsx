@@ -11,6 +11,7 @@ import { EmptyStateWithGuidance } from './empty-state-with-guidance'
 import { SortControl } from './sort-control'
 import type { SortField, SortDirection } from './sort-control'
 import { ItemDetailModal } from './item-detail-modal'
+import { useVisibleLabels } from '@/shared/hooks/use-visible-labels'
 
 /** Human-readable labels for sort fields (used in screen reader announcements). */
 const SORT_LABELS: Record<SortField, string> = {
@@ -146,6 +147,8 @@ function BacklogErrorState({ message, onRetry }: { message: string; onRetry: () 
  */
 export function BacklogList() {
   const { data, isLoading, isError, error, refetch } = useBacklogItems()
+  const { visibleLabels } = useVisibleLabels()
+  const visibleLabelNames = useMemo(() => new Set(visibleLabels), [visibleLabels])
   const [showNewOnly, setShowNewOnly] = useState(false)
   const [hideDone, setHideDone] = useState(true)
   const [selectedLabels, setSelectedLabels] = useState<string[]>([])
@@ -638,6 +641,7 @@ export function BacklogList() {
                         item={item}
                         stackRank={stackRankMap.get(item.id) ?? virtualItem.index + 1}
                         highlightTokens={searchTokens}
+                        visibleLabelNames={visibleLabelNames}
                         onClick={() => handleItemClick(item.id)}
                       />
                     </Box>
@@ -651,6 +655,7 @@ export function BacklogList() {
             itemId={selectedItemId}
             onClose={handleCloseDetail}
             triggerRef={lastClickedCardRef}
+            visibleLabelNames={visibleLabelNames}
           />
         </>
       )}

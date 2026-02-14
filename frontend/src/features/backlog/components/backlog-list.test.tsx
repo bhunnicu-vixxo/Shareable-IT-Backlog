@@ -14,6 +14,14 @@ import type {
 let virtualItemsLimit: number | null = null
 const scrollToOffset = vi.fn()
 const scrollToIndex = vi.fn()
+vi.mock('@/shared/hooks/use-visible-labels', () => ({
+  useVisibleLabels: () => ({
+    visibleLabels: ['Siebel', 'Gateway', 'VixxoLink', 'Corrigo', 'Bug', 'Feature', 'Enhancement'],
+    isLoading: false,
+    error: null,
+  }),
+}))
+
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
     getVirtualItems: () =>

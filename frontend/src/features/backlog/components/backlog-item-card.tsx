@@ -38,6 +38,11 @@ export interface BacklogItemCardProps {
   variant?: 'default' | 'compact'
   /** Sequential stack rank position (1-based). Shown in badge instead of priority number. */
   stackRank?: number
+  /**
+   * When provided, labels are filtered to only those names included in the set.
+   * Used to hide non-visible labels for non-privileged users.
+   */
+  visibleLabelNames?: ReadonlySet<string>
 }
 
 /**
@@ -54,7 +59,7 @@ export interface BacklogItemCardProps {
  */
 export const BacklogItemCard = memo(
   forwardRef<HTMLDivElement, BacklogItemCardProps>(function BacklogItemCard(
-    { item, onClick, highlightTokens = [], variant, stackRank }: BacklogItemCardProps,
+    { item, onClick, highlightTokens = [], variant, stackRank, visibleLabelNames }: BacklogItemCardProps,
     ref,
   ) {
     const { canViewLinearLinks } = usePermissions()
@@ -64,6 +69,9 @@ export const BacklogItemCard = memo(
     const isCompact = effectiveVariant === 'compact'
     const descriptionPreview =
       item.description ? descriptionPreviewFromMarkdown(item.description, 240) : null
+    const labelsToRender = visibleLabelNames
+      ? item.labels.filter((l) => visibleLabelNames.has(l.name))
+      : item.labels
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
       if (!isClickable) return
@@ -176,7 +184,7 @@ export const BacklogItemCard = memo(
           </HStack>
 
           {/* Labels row — hidden in compact mode / mobile when no variant set */}
-          {item.labels.length > 0 && (
+          {labelsToRender.length > 0 && (
             <HStack
               gap="1"
               mt="1.5"
@@ -185,7 +193,7 @@ export const BacklogItemCard = memo(
                 hasExplicitVariant ? (isCompact ? 'none' : 'flex') : { base: 'none', md: 'flex' }
               }
             >
-              {item.labels.map((label) => {
+              {labelsToRender.map((label) => {
                 const labelColor = getLabelColor(label.name)
                 return (
                   <HStack

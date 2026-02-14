@@ -87,6 +87,18 @@ describe('BacklogItemCard', () => {
     expect(screen.getByText('API')).toBeInTheDocument()
   })
 
+  it('filters labels when visibleLabelNames is provided', () => {
+    const item = createMockItem({
+      labels: [
+        { id: 'l1', name: 'Backend', color: '#0000ff' },
+        { id: 'l2', name: 'API', color: '#00ff00' },
+      ],
+    })
+    render(<BacklogItemCard item={item} visibleLabelNames={new Set(['Backend'])} />)
+    expect(screen.getByText('Backend')).toBeInTheDocument()
+    expect(screen.queryByText('API')).not.toBeInTheDocument()
+  })
+
   it('does not render labels section when no labels', () => {
     render(<BacklogItemCard item={createMockItem({ labels: [] })} />)
     expect(screen.queryByText('Backend')).not.toBeInTheDocument()

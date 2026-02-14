@@ -169,7 +169,7 @@ development_status:
     linear_id: "VIX-365"
     linear_url: "https://linear.app/vixxo/issue/VIX-365/display-sync-status-and-history-in-admin-dashboard"
   7-6-admin-label-visibility-configuration:
-    status: ready-for-dev
+    status: review
     linear_id: "VIX-428"
     linear_url: "https://linear.app/vixxo/issue/VIX-428/admin-label-visibility-configuration"
   epic-7-retrospective: optional

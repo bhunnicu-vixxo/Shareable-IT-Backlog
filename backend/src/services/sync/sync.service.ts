@@ -10,6 +10,7 @@ import { logger } from '../../utils/logger.js'
 import { classifySyncError, SYNC_ERROR_CODES } from './sync-error-classifier.js'
 import { createSyncHistoryEntry, completeSyncHistoryEntry } from './sync-history.service.js'
 import { backlogService } from '../backlog/backlog.service.js'
+import { upsertLabelsFromSync } from '../labels/label-visibility.service.js'
 
 /**
  * Orchestrates scheduled sync of Linear issues into an in-memory cache.
@@ -119,6 +120,18 @@ class SyncService {
           },
           'Transform failures truncated for in-memory storage',
         )
+      }
+
+      // 2b. Upsert discovered labels into label_visibility table (fire-and-forget on failure)
+      try {
+        const uniqueLabelNames = [
+          ...new Set(dtos.flatMap((dto) => dto.labels.map((l) => l.name))),
+        ]
+        if (uniqueLabelNames.length > 0) {
+          await upsertLabelsFromSync(uniqueLabelNames)
+        }
+      } catch (err) {
+        logger.warn({ service: 'sync', err }, 'Failed to upsert labels from sync — continuing')
       }
 
       const durationMs = Date.now() - startTime

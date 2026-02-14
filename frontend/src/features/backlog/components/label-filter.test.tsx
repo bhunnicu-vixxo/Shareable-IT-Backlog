@@ -3,6 +3,15 @@ import { render, screen, waitFor, fireEvent } from '@/utils/test-utils'
 import { LabelFilter } from './label-filter'
 import type { BacklogItem } from '../types/backlog.types'
 
+// Mock the useVisibleLabels hook — return all test label names as visible by default
+vi.mock('@/shared/hooks/use-visible-labels', () => ({
+  useVisibleLabels: () => ({
+    visibleLabels: ['Siebel', 'Gateway', 'VixxoLink', 'Corrigo'],
+    isLoading: false,
+    error: null,
+  }),
+}))
+
 function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
   return {
     id: 'issue-1',
@@ -78,14 +87,12 @@ describe('LabelFilter', () => {
     ).toBeInTheDocument()
   })
 
-  it('handles empty items array gracefully', () => {
-    render(
+  it('handles empty items array gracefully (hides filter when no labels)', () => {
+    const { container } = render(
       <LabelFilter items={[]} value={[]} onChange={vi.fn()} />,
     )
-    const valueText = screen.getByText('All Labels', {
-      selector: '[data-part="value-text"]',
-    })
-    expect(valueText).toBeInTheDocument()
+    // With no items, there are no labels to show — filter is hidden (AC #6)
+    expect(container.firstChild).toBeNull()
   })
 
   it('extracts and displays unique labels sorted alphabetically when opened', async () => {

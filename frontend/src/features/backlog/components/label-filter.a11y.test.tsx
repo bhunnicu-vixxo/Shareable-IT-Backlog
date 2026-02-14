@@ -6,6 +6,14 @@ import {
   expectNoCriticalOrSeriousViolations,
 } from '@/shared/utils/a11y-test-helpers'
 
+vi.mock('@/shared/hooks/use-visible-labels', () => ({
+  useVisibleLabels: () => ({
+    visibleLabels: ['Siebel', 'Gateway', 'VixxoLink'],
+    isLoading: false,
+    error: null,
+  }),
+}))
+
 function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
   return {
     id: 'issue-1',

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { requireAuth, requireApproved } from '../middleware/auth.middleware.js'
 import { requireAdmin } from '../middleware/admin.middleware.js'
-import { listPendingUsers, approveUserHandler, listAllUsers, disableUserHandler, enableUserHandler, updateUserITRoleHandler, adminTriggerSync, getSyncHistory, getSyncSchedule, updateSyncSchedule } from '../controllers/admin.controller.js'
+import { listPendingUsers, approveUserHandler, listAllUsers, disableUserHandler, enableUserHandler, updateUserITRoleHandler, adminTriggerSync, getSyncHistory, getSyncSchedule, updateSyncSchedule, getLabels, updateLabel, bulkUpdateLabels } from '../controllers/admin.controller.js'
 
 const router = Router()
 
@@ -20,5 +20,11 @@ router.get('/admin/sync/history', requireAuth, requireApproved, requireAdmin, ge
 // Admin settings routes
 router.get('/admin/settings/sync-schedule', requireAuth, requireApproved, requireAdmin, getSyncSchedule)
 router.put('/admin/settings/sync-schedule', requireAuth, requireApproved, requireAdmin, updateSyncSchedule)
+
+// Admin label visibility routes
+// IMPORTANT: /bulk MUST come before /:labelName to avoid "bulk" being matched as a label name
+router.get('/admin/settings/labels', requireAuth, requireApproved, requireAdmin, getLabels)
+router.patch('/admin/settings/labels/bulk', requireAuth, requireApproved, requireAdmin, bulkUpdateLabels)
+router.patch('/admin/settings/labels/:labelName', requireAuth, requireApproved, requireAdmin, updateLabel)
 
 export default router

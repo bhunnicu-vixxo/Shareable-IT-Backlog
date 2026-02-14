@@ -1,9 +1,10 @@
-import { Box, Heading, Tabs, Text, VisuallyHidden, VStack } from '@chakra-ui/react'
-import { Settings } from 'lucide-react'
+import { Badge, Box, Heading, HStack, Tabs, Text, VisuallyHidden, VStack } from '@chakra-ui/react'
 import { SyncControl } from './sync-control'
 import { UserApprovalList } from './user-approval-list'
 import { UserManagementList } from './user-management-list'
 import { AuditLogList } from './audit-log-list'
+import { LabelVisibilityManager } from './label-visibility-manager'
+import { useLabelVisibility } from '../hooks/use-label-visibility'
 
 /**
  * Admin dashboard with tabbed navigation.
@@ -17,6 +18,8 @@ import { AuditLogList } from './audit-log-list'
  * - Settings: Placeholder for future system settings
  */
 export function AdminPage() {
+  const { unreviewedCount } = useLabelVisibility()
+
   return (
     <Box maxW="960px" mx="auto" p={{ base: '4', md: '6' }}>
       <VStack gap={6} align="stretch">
@@ -83,7 +86,18 @@ export function AdminPage() {
               fontSize="sm"
               _selected={{ bg: 'surface.sunken', color: 'brand.gray' }}
             >
-              Settings
+              <HStack gap={1.5}>
+                <Text>Settings</Text>
+                {unreviewedCount > 0 && (
+                  <Badge
+                    colorPalette="orange"
+                    size="sm"
+                    data-testid="settings-unreviewed-badge"
+                  >
+                    {unreviewedCount}
+                  </Badge>
+                )}
+              </HStack>
             </Tabs.Trigger>
           </Tabs.List>
 
@@ -110,31 +124,7 @@ export function AdminPage() {
 
           <Tabs.Content value="settings">
             <Box pt={5}>
-              <VStack
-                gap={4}
-                py={16}
-                color="brand.grayLight"
-                align="center"
-                bg="surface.raised"
-                borderRadius="xl"
-                borderWidth="1px"
-                borderColor="gray.100"
-                boxShadow="0 1px 2px rgba(62,69,67,0.04)"
-              >
-                <Box
-                  p="4"
-                  borderRadius="full"
-                  bg="surface.sunken"
-                >
-                  <Settings size={40} strokeWidth={1.5} aria-hidden="true" />
-                </Box>
-                <Text fontSize="lg" fontWeight="600" fontFamily="heading" color="brand.gray">
-                  Settings
-                </Text>
-                <Text fontSize="sm" textAlign="center" maxW="400px" color="brand.grayLight">
-                  System settings will be available in a future update.
-                </Text>
-              </VStack>
+              <LabelVisibilityManager />
             </Box>
           </Tabs.Content>
         </Tabs.Root>

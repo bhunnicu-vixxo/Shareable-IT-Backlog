@@ -8,6 +8,21 @@ export type SyncHistoryStatus = 'syncing' | 'success' | 'error' | 'partial'
 /** How the sync was triggered. */
 export type SyncTriggerType = 'scheduled' | 'manual' | 'startup'
 
+/** A label visibility configuration entry as returned by GET /api/admin/settings/labels. */
+export interface LabelVisibilityEntry {
+  labelName: string
+  isVisible: boolean
+  showOnCards: boolean
+  /** ISO 8601 datetime */
+  firstSeenAt: string
+  /** ISO 8601 datetime or null if unreviewed */
+  reviewedAt: string | null
+  /** ISO 8601 datetime */
+  updatedAt: string
+  updatedBy: number | null
+  itemCount: number
+}
+
 /** A single sync history entry as returned by GET /api/admin/sync/history. */
 export interface SyncHistoryEntry {
   id: number

@@ -6,6 +6,14 @@ import { LabelFilter } from './label-filter'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import type { BacklogItem } from '../types/backlog.types'
 
+vi.mock('@/shared/hooks/use-visible-labels', () => ({
+  useVisibleLabels: () => ({
+    visibleLabels: ['Siebel'],
+    isLoading: false,
+    error: null,
+  }),
+}))
+
 function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
   return {
     id: 'issue-1',
