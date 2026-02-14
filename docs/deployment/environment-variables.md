@@ -67,7 +67,6 @@ For a quick summary table, see the [Deployment Guide](./deployment-guide.md#envi
 |---|---|---|---|---|
 | `VITE_API_URL` | No | `http://localhost:1576/api` | URL | Base URL for backend API calls. **In Docker deployment, this value is baked into the frontend build at image build time** (default is `/api`, and nginx proxies `/api` to the backend). To override in Docker, rebuild the frontend image with a build arg (e.g., `docker compose build --build-arg VITE_API_URL=https://backlog.vixxo.internal/api frontend`). For non-Docker production, set to your backend URL (e.g., `https://backlog.vixxo.internal/api`) before building. |
 | `VITE_PROXY_TARGET` | No | `http://localhost:3000` | URL | Override Vite dev server proxy target. Development only. |
-| `VITE_SHOW_OPEN_IN_LINEAR` | No | — | `true`, `false` | Show "Open in Linear" button for IT users with Linear access. Omit or set to `false` for business users. |
 | `VITE_SYNC_TRIGGER_TOKEN` | No | — | Any string | Admin-only token for triggering sync and viewing detailed sync errors from the frontend. Must match backend's `SYNC_TRIGGER_TOKEN`. |
 
 ## Docker Compose

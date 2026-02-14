@@ -1,9 +1,31 @@
 import { useRef, useState } from 'react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@/utils/test-utils'
 import userEvent from '@testing-library/user-event'
 import { ItemDetailModal } from './item-detail-modal'
 import type { BacklogDetailResponse, BacklogItem, BacklogItemComment } from '../types/backlog.types'
+
+// Mock useAuth to control role-based rendering
+const mockUseAuth = vi.fn()
+vi.mock('@/features/auth/hooks/use-auth', () => ({
+  useAuth: () => mockUseAuth(),
+}))
+
+const defaultAuthState = {
+  user: null,
+  isLoading: false,
+  isIdentified: false,
+  isApproved: false,
+  isAdmin: false,
+  isIT: false,
+  error: null,
+  identify: vi.fn(),
+  isIdentifying: false,
+  identifyError: null,
+  logout: vi.fn(),
+  isLoggingOut: false,
+  checkSession: vi.fn(),
+}
 
 function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
   return {
@@ -79,6 +101,10 @@ function mockFetch500() {
 describe('ItemDetailModal', () => {
   const originalFetch = globalThis.fetch
   const mockOnClose = vi.fn()
+
+  beforeEach(() => {
+    mockUseAuth.mockReturnValue(defaultAuthState)
+  })
 
   afterEach(() => {
     globalThis.fetch = originalFetch
@@ -713,5 +739,117 @@ describe('ItemDetailModal', () => {
     })
     const dashes = screen.getAllByText('—')
     expect(dashes.length).toBeGreaterThanOrEqual(1)
+  })
+
+  // ──── Story 13.2: Role-based identifier and footer link tests ───────────
+
+  it('renders identifier as clickable link for IT/Admin in header', async () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Test backlog item')).toBeInTheDocument()
+    })
+
+    const link = screen.getByRole('link', { name: 'VIX-42' })
+    expect(link).toBeInTheDocument()
+    expect(link).toHaveAttribute('href', 'https://linear.app/vixxo/issue/VIX-42')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('renders identifier as plain text for regular users in header', async () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: false, isAdmin: false })
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Test backlog item')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('VIX-42')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'VIX-42' })).not.toBeInTheDocument()
+  })
+
+  it('shows "Open in Linear" footer link for IT/Admin users', async () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isAdmin: true })
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Test backlog item')).toBeInTheDocument()
+    })
+
+    const footerLink = screen.getByRole('link', { name: /Open in Linear/ })
+    expect(footerLink).toBeInTheDocument()
+    expect(footerLink).toHaveAttribute('href', 'https://linear.app/vixxo/issue/VIX-42')
+    expect(footerLink).toHaveAttribute('target', '_blank')
+    expect(footerLink).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('hides "Open in Linear" footer link for regular users', async () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: false, isAdmin: false })
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Test backlog item')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByRole('link', { name: /Open in Linear/ })).not.toBeInTheDocument()
+  })
+
+  it('renders identifier as plain text (no link) when privileged but url is missing in header', async () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    const detail: BacklogDetailResponse = {
+      item: createMockItem({ url: '' }),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal isOpen={true} itemId="issue-1" onClose={mockOnClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Test backlog item')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('VIX-42')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'VIX-42' })).not.toBeInTheDocument()
   })
 })

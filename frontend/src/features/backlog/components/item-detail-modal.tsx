@@ -9,9 +9,9 @@ import {
   Text,
   VStack,
 } from '@chakra-ui/react'
+import { useAuth } from '@/features/auth/hooks/use-auth'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import { ApiError } from '@/utils/api-error'
-import { SHOW_OPEN_IN_LINEAR } from '@/utils/constants'
 import { formatDateOnly } from '@/utils/formatters'
 import { useBacklogItemDetail } from '../hooks/use-backlog-item-detail'
 import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
@@ -108,6 +108,8 @@ export function ItemDetailModal({
   onClose,
   triggerRef,
 }: ItemDetailModalProps) {
+  const { isIT, isAdmin } = useAuth()
+  const isPrivileged = isIT || isAdmin
   const { data, isLoading, isError, error, refetch } = useBacklogItemDetail(itemId)
 
   const isNotFoundError =
@@ -189,9 +191,24 @@ export function ItemDetailModal({
                     >
                       {data.item.status}
                     </Badge>
-                    <Text fontSize="sm" color="fg.brandMuted" className="mono-id">
-                      {data.item.identifier}
-                    </Text>
+                    {isPrivileged && data.item.url ? (
+                      <Link
+                        href={data.item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        fontSize="sm"
+                        color="fg.brandMuted"
+                        className="mono-id"
+                        textDecoration="none"
+                        _hover={{ textDecoration: 'underline', color: 'brand.greenAccessible' }}
+                      >
+                        {data.item.identifier}
+                      </Link>
+                    ) : (
+                      <Text fontSize="sm" color="fg.brandMuted" className="mono-id">
+                        {data.item.identifier}
+                      </Text>
+                    )}
                     <Text fontSize="sm" color="fg.brandMuted">
                       {data.item.teamName}
                     </Text>
@@ -230,7 +247,7 @@ export function ItemDetailModal({
           </Dialog.Body>
 
           <Dialog.Footer borderTopWidth="1px" borderColor="border.subtle" pt="4" bg="surface.raised">
-            {SHOW_OPEN_IN_LINEAR && data?.item.url && (
+            {isPrivileged && data?.item.url && (
               <Link
                 href={data.item.url}
                 target="_blank"

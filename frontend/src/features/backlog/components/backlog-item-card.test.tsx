@@ -1,7 +1,13 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@/utils/test-utils'
 import { BacklogItemCard, BacklogItemCardSkeleton } from './backlog-item-card'
 import type { BacklogItem } from '../types/backlog.types'
+
+// Mock useAuth to control role-based rendering
+const mockUseAuth = vi.fn()
+vi.mock('@/features/auth/hooks/use-auth', () => ({
+  useAuth: () => mockUseAuth(),
+}))
 
 function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
   return {
@@ -29,7 +35,28 @@ function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
   }
 }
 
+// Default to regular user (non-IT, non-Admin) for existing tests
+const defaultAuthState = {
+  user: null,
+  isLoading: false,
+  isIdentified: false,
+  isApproved: false,
+  isAdmin: false,
+  isIT: false,
+  error: null,
+  identify: vi.fn(),
+  isIdentifying: false,
+  identifyError: null,
+  logout: vi.fn(),
+  isLoggingOut: false,
+  checkSession: vi.fn(),
+}
+
 describe('BacklogItemCard', () => {
+  beforeEach(() => {
+    mockUseAuth.mockReturnValue(defaultAuthState)
+  })
+
   it('renders the item title', () => {
     render(<BacklogItemCard item={createMockItem()} />)
     expect(screen.getByText('Implement login page')).toBeInTheDocument()
@@ -292,6 +319,64 @@ describe('BacklogItemCard', () => {
   it('StatusBadge has aria-label with status text', () => {
     render(<BacklogItemCard item={createMockItem({ status: 'In Progress' })} />)
     expect(screen.getByLabelText('Status: In Progress')).toBeInTheDocument()
+  })
+
+  // --- Story 13.2: Role-based clickable identifier tests ---
+
+  it('renders identifier as clickable link for IT users', () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    render(<BacklogItemCard item={createMockItem()} />)
+
+    const link = screen.getByRole('link', { name: 'VIX-42' })
+    expect(link).toBeInTheDocument()
+    expect(link).toHaveAttribute('href', 'https://linear.app/vixxo/issue/VIX-42')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('renders identifier as clickable link for Admin users', () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isAdmin: true })
+    render(<BacklogItemCard item={createMockItem()} />)
+
+    const link = screen.getByRole('link', { name: 'VIX-42' })
+    expect(link).toBeInTheDocument()
+    expect(link).toHaveAttribute('href', 'https://linear.app/vixxo/issue/VIX-42')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('renders identifier as plain text for regular users (no link)', () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: false, isAdmin: false })
+    render(<BacklogItemCard item={createMockItem()} />)
+
+    expect(screen.getByText('VIX-42')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'VIX-42' })).not.toBeInTheDocument()
+  })
+
+  it('identifier link has mono-id class for IT/Admin users', () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    render(<BacklogItemCard item={createMockItem()} />)
+
+    const link = screen.getByRole('link', { name: 'VIX-42' })
+    expect(link).toHaveClass('mono-id')
+  })
+
+  it('identifier link click does not trigger card onClick', () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    const onClick = vi.fn()
+    render(<BacklogItemCard item={createMockItem()} onClick={onClick} />)
+
+    const link = screen.getByRole('link', { name: 'VIX-42' })
+    fireEvent.click(link)
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
+  it('renders identifier as plain text (no link) when privileged but url is missing', () => {
+    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    render(<BacklogItemCard item={createMockItem({ url: '' })} />)
+
+    expect(screen.getByText('VIX-42')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'VIX-42' })).not.toBeInTheDocument()
   })
 })
 
