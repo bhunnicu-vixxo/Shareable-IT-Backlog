@@ -147,8 +147,13 @@ function BacklogErrorState({ message, onRetry }: { message: string; onRetry: () 
  */
 export function BacklogList() {
   const { data, isLoading, isError, error, refetch } = useBacklogItems()
-  const { visibleLabels } = useVisibleLabels()
-  const visibleLabelNames = useMemo(() => new Set(visibleLabels), [visibleLabels])
+  const { visibleLabels, error: visibleLabelsError } = useVisibleLabels()
+  // When the visible labels API fails, don't filter labels at all (show all).
+  // This prevents a transient API error from hiding all labels.
+  const visibleLabelNames = useMemo(
+    () => (visibleLabelsError ? undefined : new Set(visibleLabels)),
+    [visibleLabels, visibleLabelsError],
+  )
   const [showNewOnly, setShowNewOnly] = useState(false)
   const [hideDone, setHideDone] = useState(true)
   const [selectedLabels, setSelectedLabels] = useState<string[]>([])
@@ -175,20 +180,25 @@ export function BacklogList() {
 
   // Clear selected labels that are no longer visible when visibility settings change
   // This prevents users from being trapped by filters they can't see or clear
+  // Skip this cleanup when the API has errored — we don't want to clear selections on transient failures.
   useEffect(() => {
+    if (visibleLabelsError) {
+      // API error: don't clear selections, labels are not being filtered
+      return
+    }
     if (visibleLabels.length === 0) {
       // If no labels are visible, clear all selections
       if (selectedLabels.length > 0) {
         setSelectedLabels([])
       }
-    } else {
+    } else if (visibleLabelNames) {
       // Remove any selected labels that are no longer visible
       const stillVisible = selectedLabels.filter((label) => visibleLabelNames.has(label))
       if (stillVisible.length !== selectedLabels.length) {
         setSelectedLabels(stillVisible)
       }
     }
-  }, [visibleLabels, visibleLabelNames, selectedLabels])
+  }, [visibleLabels, visibleLabelNames, selectedLabels, visibleLabelsError])
 
   // Base items: applies the "hide done" default before other user-driven filters
   const baseItems = useMemo(() => {
