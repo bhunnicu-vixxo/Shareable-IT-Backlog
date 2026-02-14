@@ -92,6 +92,7 @@ export function useAuth() {
     isIdentified: user !== null,
     isApproved: user?.isApproved === true && user?.isDisabled !== true,
     isAdmin: user?.isAdmin === true,
+    isIT: user?.isIT === true,
     error: meQuery.error && !isAuthError ? meQuery.error.message : null,
     identify: identifyMutation.mutateAsync,
     isIdentifying: identifyMutation.isPending,

@@ -6,6 +6,7 @@ export interface ManagedUser {
   email: string
   displayName: string | null
   isAdmin: boolean
+  isIT: boolean
   isApproved: boolean
   isDisabled: boolean
   approvedAt: string | null

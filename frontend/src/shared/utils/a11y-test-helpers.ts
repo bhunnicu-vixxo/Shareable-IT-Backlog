@@ -133,6 +133,8 @@ export function expectNoCriticalOrSeriousViolations(results: AxeCore.AxeResults)
     DEFAULT_IMPACTS.includes((v.impact ?? 'minor') as NonNullable<AxeCore.Result['impact']>)
   )
 
-  // Reuse vitest-axe reporter formatting while scoping to the impacts we care about.
-  expect({ ...results, violations: scoped }).toHaveNoViolations()
+  // Keep this assertion TypeScript-friendly during `tsc -b`.
+  // (The `toHaveNoViolations` matcher is registered at runtime in `vitest.setup.ts`,
+  // but its type augmentation is not visible to the app tsconfig build.)
+  expect(scoped).toHaveLength(0)
 }

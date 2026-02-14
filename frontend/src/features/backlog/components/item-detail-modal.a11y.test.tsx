@@ -83,7 +83,7 @@ describe('ItemDetailModal accessibility', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as ReturnType<typeof useBacklogItemDetail>)
+    } as unknown as ReturnType<typeof useBacklogItemDetail>)
 
     const results = await checkAccessibility(<ItemDetailModal {...defaultProps} />, {
       // Chakra Dialog portals outside landmarks in jsdom; `region` isn't meaningful here.
@@ -99,7 +99,7 @@ describe('ItemDetailModal accessibility', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as ReturnType<typeof useBacklogItemDetail>)
+    } as unknown as ReturnType<typeof useBacklogItemDetail>)
 
     const results = await checkAccessibility(<ItemDetailModal {...defaultProps} />, {
       disabledRules: ['region'],

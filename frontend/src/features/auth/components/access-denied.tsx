@@ -88,7 +88,8 @@ export function AccessDenied({ onRetry }: AccessDeniedProps) {
 
         <Button
           onClick={onRetry}
-          variant="danger"
+          variant="solid"
+          colorPalette="red"
           size="lg"
           borderRadius="xl"
           mt="2"

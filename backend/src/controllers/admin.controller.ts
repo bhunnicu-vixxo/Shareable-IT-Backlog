@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 import cron from 'node-cron'
-import { getPendingUsers, approveUser, getAllUsers, disableUser, enableUser } from '../services/users/user.service.js'
+import { getPendingUsers, approveUser, getAllUsers, disableUser, enableUser, updateUserITRole } from '../services/users/user.service.js'
 import { syncService } from '../services/sync/sync.service.js'
 import { syncScheduler } from '../services/sync/sync-scheduler.service.js'
 import { listSyncHistory } from '../services/sync/sync-history.service.js'
@@ -97,6 +97,45 @@ export async function enableUserHandler(req: Request, res: Response, next: NextF
     const adminId = Number(req.session.userId)
     const result = await enableUser(userId, adminId, req.ip ?? '')
     res.json(result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * PUT /api/admin/users/:id/it-role
+ * Toggles a user's IT role. Body: { isIT: boolean }
+ */
+export async function updateUserITRoleHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = Number(req.params.id)
+    if (isNaN(userId) || userId <= 0) {
+      res.status(400).json({
+        error: {
+          message: 'Invalid user ID',
+          code: 'VALIDATION_ERROR',
+        },
+      })
+      return
+    }
+
+    const { isIT } = req.body as { isIT?: boolean }
+    if (typeof isIT !== 'boolean') {
+      res.status(400).json({
+        error: {
+          message: 'Missing required field: isIT (boolean)',
+          code: 'VALIDATION_ERROR',
+        },
+      })
+      return
+    }
+
+    const adminId = Number(req.session.userId)
+    const updatedUser = await updateUserITRole(userId, isIT, adminId, req.ip ?? '')
+
+    logger.info({ userId, adminId, isIT }, 'Admin updated user IT role')
+
+    res.json(updatedUser)
   } catch (err) {
     next(err)
   }

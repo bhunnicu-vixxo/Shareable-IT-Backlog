@@ -52,6 +52,7 @@ describe('SyncStatusIndicator accessibility', () => {
         itemsFailed: null,
       },
       isLoading: false,
+      error: null,
     })
 
     const results = await checkAccessibility(<SyncStatusIndicator />)
@@ -70,6 +71,7 @@ describe('SyncStatusIndicator accessibility', () => {
         itemsFailed: null,
       },
       isLoading: false,
+      error: null,
     })
 
     const results = await checkAccessibility(<SyncStatusIndicator />)
@@ -88,6 +90,7 @@ describe('SyncStatusIndicator accessibility', () => {
         itemsFailed: null,
       },
       isLoading: false,
+      error: null,
     })
 
     const results = await checkAccessibility(<SyncStatusIndicator />)
@@ -98,6 +101,7 @@ describe('SyncStatusIndicator accessibility', () => {
     mockUseSyncStatus.mockReturnValue({
       syncStatus: null,
       isLoading: true,
+      error: null,
     })
 
     const results = await checkAccessibility(<SyncStatusIndicator />)
@@ -116,6 +120,7 @@ describe('SyncStatusIndicator accessibility', () => {
         itemsFailed: null,
       },
       isLoading: false,
+      error: null,
     })
 
     const { container } = render(<SyncStatusIndicator />)
