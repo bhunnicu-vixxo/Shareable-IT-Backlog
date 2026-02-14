@@ -538,6 +538,47 @@ So that I understand why no items are shown and how to adjust my filters.
 - Include "Clear filters" button
 - Use Chakra UI EmptyState patterns
 
+### Story 4.5: Replace Business Unit Filter with Multi-Select Label Filter
+
+As a business user,
+I want to filter backlog items by one or more labels (e.g., "Siebel", "Gateway", "VixxoLink"),
+So that I can quickly narrow down items to the specific systems or categories I care about, rather than filtering by business unit which is less useful for finding relevant work.
+
+**Context:**
+The current Business Unit filter (based on `teamName`) is not providing adequate value to end users. Labels from Linear (e.g., "Siebel", "Gateway", "VixxoLink", "Corrigo") are a much more meaningful way for business users to find and filter items. This story replaces the existing `BusinessUnitFilter` component with a new multi-select `LabelFilter` that allows users to select one or more labels simultaneously.
+
+**Acceptance Criteria:**
+
+**Given** I am a business user viewing the backlog
+**When** I see the filter bar
+**Then** I see a multi-select label filter dropdown (replacing the old business unit filter)
+**And** the dropdown lists all unique labels found across backlog items
+**And** I can select multiple labels at once (e.g., "Siebel" + "Gateway")
+**And** items are filtered to show only those matching ANY of the selected labels (OR logic)
+**And** the results count updates to reflect the filtered items
+**And** the selected labels are clearly visible as chips/tags in the filter control
+
+**Given** I have selected one or more labels
+**When** I want to clear the filter
+**Then** I can remove individual labels or clear all at once
+**And** the backlog returns to showing all items
+
+**Given** the label filter is active
+**When** combined with other filters (keyword search, sort, hide done, new only)
+**Then** all filters work together correctly
+**And** the empty state guidance accounts for the label filter
+
+**Technical Details:**
+- Remove `BusinessUnitFilter` component usage from `BacklogList`
+- Create new `LabelFilter` component with multi-select support using Chakra UI
+- Extract unique labels from backlog items data (from `item.labels` array)
+- Use `label-colors.ts` for consistent label pill coloring in the dropdown
+- Update `EmptyStateWithGuidance` to handle label filter context
+- Update relevant tests
+- Ensure accessibility: keyboard navigable, ARIA labels, screen reader support
+- `npm run build` passes with zero TypeScript errors in both `backend/` and `frontend/`
+- All existing tests continue to pass
+
 ## Epic 5: Item Detail Views
 
 **Goal:** Provide comprehensive item detail views that show all relevant information from Linear, including updates, notes, and comments.

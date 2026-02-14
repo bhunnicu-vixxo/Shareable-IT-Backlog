@@ -6,16 +6,16 @@ import { FilterX, SearchX } from 'lucide-react'
 export interface EmptyStateWithGuidanceProps {
   /** Active search term (empty string if none). */
   keyword: string
-  /** Selected business unit (null if none). */
-  businessUnit: string | null
+  /** Selected label names (empty array if none). */
+  selectedLabels: string[]
   /** Whether the "New only" toggle is active. */
   showNewOnly: boolean
   /** Whether completed/cancelled items are hidden. */
   hideDone?: boolean
   /** Callback to clear the keyword search. */
   onClearKeyword: () => void
-  /** Callback to clear the business unit filter. */
-  onClearBusinessUnit: () => void
+  /** Callback to clear the label filter. */
+  onClearLabels: () => void
   /** Callback to clear the "New only" toggle. */
   onClearNewOnly: () => void
   /** Callback to show completed/cancelled items (clear hideDone filter). */
@@ -29,7 +29,7 @@ export interface EmptyStateWithGuidanceProps {
 /** Returns the contextual heading based on which filters are active. */
 function getHeading(
   keyword: string,
-  businessUnit: string | null,
+  selectedLabels: string[],
   showNewOnly: boolean,
   hideDone: boolean,
 ): string {
@@ -40,14 +40,16 @@ function getHeading(
     return `No items found matching "${trimmedKeyword}"`
   }
 
-  // BU + new-only
-  if (businessUnit && showNewOnly) {
-    return `No new items for ${businessUnit}`
+  const labelText = selectedLabels.length > 0 ? selectedLabels.join(', ') : ''
+
+  // Labels + new-only
+  if (labelText && showNewOnly) {
+    return `No new items for ${labelText}`
   }
 
-  // BU only
-  if (businessUnit) {
-    return `No items found for ${businessUnit}`
+  // Labels only
+  if (labelText) {
+    return `No items found for ${labelText}`
   }
 
   // New-only only
@@ -67,22 +69,22 @@ function getHeading(
 /** Returns the contextual description with actionable suggestions. */
 function getDescription(
   keyword: string,
-  businessUnit: string | null,
+  selectedLabels: string[],
   showNewOnly: boolean,
   hideDone: boolean,
 ): string {
   const trimmedKeyword = keyword.trim()
 
   if (trimmedKeyword) {
-    return 'Try different keywords, adjust your filters, or check that items are assigned to the expected business unit.'
+    return 'Try different keywords, adjust your filters, or check that items have the expected labels.'
   }
 
-  if (businessUnit && showNewOnly) {
-    return 'Try selecting a different business unit, remove the "New only" filter to see all items, or check business unit assignment.'
+  if (selectedLabels.length > 0 && showNewOnly) {
+    return 'Try selecting different labels, remove the "New only" filter to see all items, or check label assignment.'
   }
 
-  if (businessUnit) {
-    return 'Try selecting a different business unit, clear the filter, or check business unit assignment.'
+  if (selectedLabels.length > 0) {
+    return 'Try selecting different labels, clear the filter, or check label assignment.'
   }
 
   if (showNewOnly) {
@@ -104,11 +106,11 @@ function getDescription(
  */
 export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
   keyword,
-  businessUnit,
+  selectedLabels,
   showNewOnly,
   hideDone = false,
   onClearKeyword,
-  onClearBusinessUnit,
+  onClearLabels,
   onClearNewOnly,
   onClearHideDone,
   onClearAll,
@@ -116,6 +118,7 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
 }: EmptyStateWithGuidanceProps) {
   const trimmedKeyword = keyword.trim()
   const hasKeyword = trimmedKeyword.length > 0
+  const hasLabels = selectedLabels.length > 0
 
   return (
     <EmptyState.Root
@@ -156,14 +159,14 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
           color="fg.brand"
           fontSize={compact ? 'sm' : undefined}
         >
-          {getHeading(keyword, businessUnit, showNewOnly, hideDone)}
+          {getHeading(keyword, selectedLabels, showNewOnly, hideDone)}
         </EmptyState.Title>
         <EmptyState.Description
           color="fg.brandMuted"
           maxW="72ch"
           fontSize={compact ? 'xs' : undefined}
         >
-          {getDescription(keyword, businessUnit, showNewOnly, hideDone)}
+          {getDescription(keyword, selectedLabels, showNewOnly, hideDone)}
         </EmptyState.Description>
       </EmptyState.Content>
       <HStack gap="2" flexWrap="wrap" justifyContent="center">
@@ -175,9 +178,9 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
             Clear search filter
           </Button>
         )}
-        {!compact && businessUnit && (
-          <Button onClick={onClearBusinessUnit} variant="outline" size="sm">
-            Clear business unit filter
+        {!compact && hasLabels && (
+          <Button onClick={onClearLabels} variant="outline" size="sm">
+            Clear label filter
           </Button>
         )}
         {!compact && showNewOnly && (
