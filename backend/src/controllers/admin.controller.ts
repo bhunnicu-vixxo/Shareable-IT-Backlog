@@ -1,11 +1,25 @@
 import type { Request, Response, NextFunction } from 'express'
 import cron from 'node-cron'
-import { getPendingUsers, approveUser, getAllUsers, disableUser, enableUser, updateUserITRole } from '../services/users/user.service.js'
-import { listAllLabels, updateLabelVisibility, bulkUpdateVisibility } from '../services/labels/label-visibility.service.js'
+import {
+  getPendingUsers,
+  approveUser,
+  getAllUsers,
+  disableUser,
+  enableUser,
+  updateUserITRole,
+} from '../services/users/user.service.js'
+import {
+  listAllLabels,
+  updateLabelVisibility,
+  bulkUpdateVisibility,
+} from '../services/labels/label-visibility.service.js'
 import { syncService } from '../services/sync/sync.service.js'
 import { syncScheduler } from '../services/sync/sync-scheduler.service.js'
 import { listSyncHistory } from '../services/sync/sync-history.service.js'
-import { getSyncCronSchedule, setSyncCronSchedule } from '../services/settings/app-settings.service.js'
+import {
+  getSyncCronSchedule,
+  setSyncCronSchedule,
+} from '../services/settings/app-settings.service.js'
 import { auditService } from '../services/audit/audit.service.js'
 import { logger } from '../utils/logger.js'
 
@@ -13,7 +27,11 @@ import { logger } from '../utils/logger.js'
  * GET /api/admin/users/pending
  * Returns a list of users with is_approved = false and is_disabled = false.
  */
-export async function listPendingUsers(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function listPendingUsers(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const pendingUsers = await getPendingUsers()
     res.json(pendingUsers)
@@ -26,7 +44,11 @@ export async function listPendingUsers(_req: Request, res: Response, next: NextF
  * POST /api/admin/users/:id/approve
  * Approves a pending user. Sets is_approved = true, records approved_at and approved_by.
  */
-export async function approveUserHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function approveUserHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = Number(req.params.id)
     if (isNaN(userId) || userId <= 0) {
@@ -54,7 +76,11 @@ export async function approveUserHandler(req: Request, res: Response, next: Next
  * GET /api/admin/users
  * Returns a list of ALL users (approved, pending, disabled) for admin management.
  */
-export async function listAllUsers(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function listAllUsers(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const users = await getAllUsers()
     res.json(users)
@@ -67,7 +93,11 @@ export async function listAllUsers(_req: Request, res: Response, next: NextFunct
  * POST /api/admin/users/:id/disable
  * Disables a user's access. Cannot be used to disable the admin's own account.
  */
-export async function disableUserHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function disableUserHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = Number(req.params.id)
     if (isNaN(userId) || userId <= 0) {
@@ -87,7 +117,11 @@ export async function disableUserHandler(req: Request, res: Response, next: Next
  * POST /api/admin/users/:id/enable
  * Re-enables a previously disabled user.
  */
-export async function enableUserHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function enableUserHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = Number(req.params.id)
     if (isNaN(userId) || userId <= 0) {
@@ -107,7 +141,11 @@ export async function enableUserHandler(req: Request, res: Response, next: NextF
  * PUT /api/admin/users/:id/it-role
  * Toggles a user's IT role. Body: { isIT: boolean }
  */
-export async function updateUserITRoleHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function updateUserITRoleHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = Number(req.params.id)
     if (isNaN(userId) || userId <= 0) {
@@ -147,7 +185,11 @@ export async function updateUserITRoleHandler(req: Request, res: Response, next:
  * Admin-protected manual sync trigger that captures triggeredBy.
  * Returns 202 Accepted with current status, or 409 if sync already running.
  */
-export async function adminTriggerSync(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function adminTriggerSync(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const currentStatus = syncService.getStatus()
 
@@ -190,7 +232,11 @@ export async function adminTriggerSync(req: Request, res: Response, next: NextFu
  * GET /api/admin/sync/history
  * Returns sync history entries (newest-first). Accepts optional ?limit= query param.
  */
-export async function getSyncHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getSyncHistory(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const rawLimit = req.query.limit
     let limit: number | undefined
@@ -212,7 +258,11 @@ export async function getSyncHistory(req: Request, res: Response, next: NextFunc
  * GET /api/admin/settings/sync-schedule
  * Returns the current sync cron schedule and whether the scheduler is running.
  */
-export async function getSyncSchedule(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getSyncSchedule(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const schedule = await getSyncCronSchedule()
     res.json({
@@ -231,7 +281,11 @@ export async function getSyncSchedule(_req: Request, res: Response, next: NextFu
  *
  * Request body: `{ "schedule": "<cron expression>" }` (e.g. every 15 min)
  */
-export async function updateSyncSchedule(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function updateSyncSchedule(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const { schedule } = req.body as { schedule?: string }
 
@@ -370,7 +424,10 @@ export async function updateLabel(req: Request, res: Response, next: NextFunctio
     // NOTE: Express already decodes route params, so we use labelName directly
     // (no need to call decodeURIComponent, which would break labels containing '%')
 
-    // Audit log BEFORE state change (compliance — if audit fails, change must not proceed)
+    // Perform the update first — if the label doesn't exist, this throws LABEL_NOT_FOUND
+    const updatedEntry = await updateLabelVisibility(labelName, isVisible, adminId)
+
+    // Audit log AFTER successful state change to avoid false audit entries for failed updates
     await auditService.logAdminAction({
       userId: adminId,
       action: 'LABEL_VISIBILITY_UPDATED',
@@ -383,8 +440,6 @@ export async function updateLabel(req: Request, res: Response, next: NextFunctio
         isVisible,
       },
     })
-
-    const updatedEntry = await updateLabelVisibility(labelName, isVisible, adminId)
 
     logger.info({ adminId, labelName, isVisible }, 'Admin updated label visibility')
 
@@ -399,7 +454,11 @@ export async function updateLabel(req: Request, res: Response, next: NextFunctio
  * Bulk updates label visibility.
  * Body: { labels: [{ labelName: string, isVisible: boolean }] }
  */
-export async function bulkUpdateLabels(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function bulkUpdateLabels(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const { labels } = req.body as { labels?: { labelName: string; isVisible: boolean }[] }
 
@@ -440,7 +499,10 @@ export async function bulkUpdateLabels(req: Request, res: Response, next: NextFu
     // bulkUpdateVisibility handles its own transactional audit logging internally
     const updatedEntries = await bulkUpdateVisibility(labels, adminId, req.ip ?? '')
 
-    logger.info({ adminId, labelCount: updatedEntries.length }, 'Admin bulk updated label visibility')
+    logger.info(
+      { adminId, labelCount: updatedEntries.length },
+      'Admin bulk updated label visibility',
+    )
 
     res.json(updatedEntries)
   } catch (err) {
