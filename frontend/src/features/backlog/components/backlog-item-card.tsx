@@ -1,6 +1,7 @@
 import { memo, forwardRef } from 'react'
-import { Badge, Box, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
+import { Badge, Box, Flex, HStack, Link, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { formatDistanceToNow } from 'date-fns'
+import { useAuth } from '@/features/auth/hooks/use-auth'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
 import { getLabelColor } from '../utils/label-colors'
@@ -56,6 +57,8 @@ export const BacklogItemCard = memo(
     { item, onClick, highlightTokens = [], variant, stackRank }: BacklogItemCardProps,
     ref,
   ) {
+    const { isIT, isAdmin } = useAuth()
+    const isPrivileged = isIT || isAdmin
     const isClickable = !!onClick
     const hasExplicitVariant = variant !== undefined
     const effectiveVariant = variant ?? 'default'
@@ -144,9 +147,25 @@ export const BacklogItemCard = memo(
             <Text fontSize="sm" color="fg.brandMuted">
               {item.teamName}
             </Text>
-            <Text fontSize="sm" color="fg.brandMuted" className="mono-id">
-              {item.identifier}
-            </Text>
+            {isPrivileged && item.url ? (
+              <Link
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                fontSize="sm"
+                color="fg.brandMuted"
+                className="mono-id"
+                textDecoration="none"
+                _hover={{ textDecoration: 'underline', color: 'brand.greenAccessible' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {item.identifier}
+              </Link>
+            ) : (
+              <Text fontSize="sm" color="fg.brandMuted" className="mono-id">
+                {item.identifier}
+              </Text>
+            )}
             <Text fontSize="xs" color="fg.brandMuted">
               {item.updatedAt === item.createdAt
                 ? `Created ${formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}`
