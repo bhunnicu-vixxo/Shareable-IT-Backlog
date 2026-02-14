@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { Box, Button, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { useBacklogItems } from '../hooks/use-backlog-items'
 import { useDebouncedValue } from '../hooks/use-debounced-value'
+import { useVisibleLabels } from '@/shared/hooks/use-visible-labels'
 import { tokenizeQuery } from '../utils/highlight'
 import { BacklogItemCard } from './backlog-item-card'
 import { LabelFilter } from './label-filter'
@@ -157,6 +158,22 @@ export function BacklogList() {
   const lastClickedItemId = useRef<string | null>(null)
   const parentRef = useRef<HTMLDivElement>(null)
   const liveRegionRef = useRef<HTMLDivElement | null>(null)
+
+  // Fetch visible labels for filtering label display on cards/modal
+  const { visibleLabels } = useVisibleLabels()
+  const visibleLabelNamesSet = useMemo(
+    () => new Set(visibleLabels),
+    [visibleLabels],
+  )
+
+  // Clear any selected labels that are no longer visible (prevents "stuck" filters)
+  useEffect(() => {
+    if (visibleLabels.length === 0) return
+    const invisibleSelected = selectedLabels.filter((l) => !visibleLabelNamesSet.has(l))
+    if (invisibleSelected.length > 0) {
+      setSelectedLabels((prev) => prev.filter((l) => visibleLabelNamesSet.has(l)))
+    }
+  }, [visibleLabels, visibleLabelNamesSet, selectedLabels])
 
   // Debounce the keyword query so filtering doesn't run on every keystroke
   const debouncedQuery = useDebouncedValue(keywordQuery, 300)
@@ -613,6 +630,7 @@ export function BacklogList() {
                         stackRank={stackRankMap.get(item.id) ?? virtualItem.index + 1}
                         highlightTokens={searchTokens}
                         onClick={() => handleItemClick(item.id)}
+                        visibleLabelNames={visibleLabelNamesSet}
                       />
                     </Box>
                   </div>
@@ -625,6 +643,7 @@ export function BacklogList() {
             itemId={selectedItemId}
             onClose={handleCloseDetail}
             triggerRef={lastClickedCardRef}
+            visibleLabelNames={visibleLabelNamesSet}
           />
         </>
       )}
