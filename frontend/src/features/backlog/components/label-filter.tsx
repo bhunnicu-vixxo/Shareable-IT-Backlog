@@ -3,8 +3,6 @@ import {
   Badge,
   Box,
   Flex,
-  HStack,
-  IconButton,
   Select,
   createListCollection,
 } from '@chakra-ui/react'
@@ -116,14 +114,19 @@ export const LabelFilter = memo(function LabelFilter({
   // Determine sizing based on compact prop
   const selectSize = compact ? 'xs' : 'sm'
   const triggerMinW = compact ? '140px' : '160px'
-  const chipFontSize = compact ? 'xs' : 'sm'
-
-  const handleRemoveLabel = (labelName: string) => {
-    onChange(value.filter((v) => v !== labelName))
-  }
+  const triggerWidth = compact
+    ? ({ base: '100%', sm: '140px' } as const)
+    : ({ base: '100%', sm: '160px' } as const)
 
   return (
-    <Box position="relative" display="inline-flex" alignItems="center" gap="2" flexWrap="wrap">
+    <Box
+      position="relative"
+      display="flex"
+      alignItems="center"
+      gap="2"
+      flex={{ base: '1 1 100%', sm: '0 0 auto' }}
+      minW={{ base: '100%', sm: 'auto' }}
+    >
       <Select.Root
         collection={collection}
         value={value}
@@ -145,7 +148,7 @@ export const LabelFilter = memo(function LabelFilter({
         >
           Filter by label
         </Select.Label>
-        <Select.Control>
+        <Select.Control minW={0} maxW="100%" w={triggerWidth}>
           <Select.Trigger
             borderColor={value.length > 0 ? 'brand.green' : undefined}
             _focusVisible={{
@@ -157,13 +160,22 @@ export const LabelFilter = memo(function LabelFilter({
             outline={value.length > 0 ? '1px solid' : undefined}
             outlineColor={value.length > 0 ? 'brand.green' : undefined}
             borderWidth="1px"
-            minW={triggerMinW}
+            w="100%"
+            minW={0}
             color="fg.brand"
             {...(value.length > 0 ? { 'data-active': '' } : {})}
           >
             {value.length > 0 ? (
-              <HStack gap="1.5">
-                <Box as="span" fontSize="sm">
+              <Flex alignItems="center" gap="1.5" minW={0} maxW="100%">
+                <Box
+                  as="span"
+                  fontSize="sm"
+                  minW={0}
+                  overflow="hidden"
+                  textOverflow="ellipsis"
+                  whiteSpace="nowrap"
+                  title={value.length === 1 ? value[0] : undefined}
+                >
                   {value.length === 1 ? value[0] : `${value.length} Labels`}
                 </Box>
                 <Badge
@@ -176,10 +188,11 @@ export const LabelFilter = memo(function LabelFilter({
                   fontSize="2xs"
                   lineHeight="1"
                   minH="auto"
+                  flexShrink={0}
                 >
                   {value.length}
                 </Badge>
-              </HStack>
+              </Flex>
             ) : (
               <Select.ValueText placeholder="All Labels" />
             )}
@@ -228,50 +241,6 @@ export const LabelFilter = memo(function LabelFilter({
           </Select.Content>
         </Select.Positioner>
       </Select.Root>
-
-      {/* Selected label chips shown outside the trigger to avoid nested <button> markup (AC #4/#5) */}
-      {value.length > 0 && (
-        <HStack gap="1" flexWrap="wrap" aria-label="Selected labels">
-          {value.map((labelName) => {
-            const colors = getLabelColor(labelName)
-            return (
-              <Flex
-                key={labelName}
-                alignItems="center"
-                gap="1"
-                px="2"
-                py="0.5"
-                borderRadius="full"
-                bg={colors.bg}
-                color={colors.color}
-                maxW={compact ? '160px' : '220px'}
-              >
-                <Box
-                  as="span"
-                  fontSize={chipFontSize}
-                  overflow="hidden"
-                  textOverflow="ellipsis"
-                  whiteSpace="nowrap"
-                >
-                  {labelName}
-                </Box>
-                <IconButton
-                  aria-label={`Remove label ${labelName}`}
-                  size="2xs"
-                  variant="ghost"
-                  color="currentColor"
-                  minW="auto"
-                  h="auto"
-                  p="0.5"
-                  onClick={() => handleRemoveLabel(labelName)}
-                >
-                  ✕
-                </IconButton>
-              </Flex>
-            )
-          })}
-        </HStack>
-      )}
 
       {/* ARIA live region for screen reader announcements */}
       <Box

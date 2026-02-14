@@ -104,6 +104,10 @@ development_status:
     status: done
     linear_id: "VIX-430"
     linear_url: "https://linear.app/vixxo/issue/VIX-430/replace-business-unit-filter-with-multi-select-label-filter"
+  4-6-label-filter-layout-fix:
+    status: review
+    linear_id: "VIX-431"
+    linear_url: "https://linear.app/vixxo/issue/VIX-431/label-filter-layout-breaks-when-multiple-labels-are-selected"
   epic-4-retrospective: optional
 
   # Epic 5: Item Detail Views

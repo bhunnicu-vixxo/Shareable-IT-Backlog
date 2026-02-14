@@ -527,6 +527,13 @@ describe('BacklogList', () => {
       // VixxoLink should be hidden
       expect(screen.queryByText('VixxoLink item')).not.toBeInTheDocument()
     })
+
+    // Keep results count short for multi-select labels (VIX-431)
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Showing 2 of 3 items for 2 labels/),
+      ).toBeInTheDocument()
+    })
   })
 
   it('displays results count with label names when filtered', async () => {

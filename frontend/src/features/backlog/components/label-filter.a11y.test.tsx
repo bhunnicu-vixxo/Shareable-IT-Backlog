@@ -76,5 +76,12 @@ describe('LabelFilter accessibility', () => {
     )
     expectNoCriticalOrSeriousViolations(results)
   })
+
+  it('should have no axe violations with collapsed chips (3+ selections)', async () => {
+    const results = await checkAccessibility(
+      <LabelFilter items={mockItems} value={['Siebel', 'Gateway', 'VixxoLink']} onChange={vi.fn()} />,
+    )
+    expectNoCriticalOrSeriousViolations(results)
+  })
 })
 
