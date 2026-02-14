@@ -11,7 +11,8 @@ export function BacklogPage() {
   const queryClient = useQueryClient()
   const { data } = useBacklogItems()
   const { isStale, reason, lastSyncedAt } = useDataFreshness(
-    data ? { servedFromCache: data.servedFromCache, lastSyncedAt: data.lastSyncedAt } : undefined,
+    data?.servedFromCache,
+    data?.lastSyncedAt,
   )
 
   // Auto-refresh backlog items when a sync completes (bridges 5s sync poll → backlog data)

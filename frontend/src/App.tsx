@@ -13,7 +13,7 @@ import { ErrorFallback } from '@/shared/components/error-fallback'
 import { ServiceUnavailable } from '@/shared/components/service-unavailable'
 import { useServiceHealth } from '@/shared/hooks/use-service-health'
 
-function App() {
+function AppContent() {
   const { isChecking, isNetworkDenied, retry } = useNetworkAccess()
   const {
     user,
@@ -85,31 +85,37 @@ function App() {
 
   // 5. Authenticated + approved — show app routes with shared header
   return (
+    <AppLayout>
+      <Routes>
+        <Route path="/" element={<BacklogPage />} />
+        <Route
+          path="/admin"
+          element={
+            isAdmin ? (
+              <AdminPage />
+            ) : (
+              <Box display="flex" alignItems="center" justifyContent="center" minH="80vh">
+                <VStack gap={4} className="animate-fade-in">
+                  <Heading size="lg" fontFamily="heading" letterSpacing="-0.02em" color="brand.gray">Access Denied</Heading>
+                  <Text color="fg.muted">You do not have admin privileges to view this page.</Text>
+                </VStack>
+              </Box>
+            )
+          }
+        />
+      </Routes>
+    </AppLayout>
+  )
+}
+
+function App() {
+  return (
     <ErrorBoundary
       fallbackRender={({ error, resetErrorBoundary }) => (
         <ErrorFallback error={error} resetError={resetErrorBoundary} />
       )}
     >
-      <AppLayout>
-        <Routes>
-          <Route path="/" element={<BacklogPage />} />
-          <Route
-            path="/admin"
-            element={
-              isAdmin ? (
-                <AdminPage />
-              ) : (
-                <Box display="flex" alignItems="center" justifyContent="center" minH="80vh">
-                  <VStack gap={4} className="animate-fade-in">
-                    <Heading size="lg" fontFamily="heading" letterSpacing="-0.02em" color="brand.gray">Access Denied</Heading>
-                    <Text color="fg.muted">You do not have admin privileges to view this page.</Text>
-                  </VStack>
-                </Box>
-              )
-            }
-          />
-        </Routes>
-      </AppLayout>
+      <AppContent />
     </ErrorBoundary>
   )
 }

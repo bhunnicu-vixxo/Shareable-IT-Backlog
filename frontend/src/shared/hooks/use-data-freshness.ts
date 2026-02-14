@@ -1,14 +1,5 @@
 import { useMemo } from 'react'
 
-export interface DataFreshnessInput {
-  /** Whether the response was served from the backend sync cache. */
-  servedFromCache?: boolean
-  /** ISO 8601 timestamp of the last successful sync, or null if never synced. */
-  lastSyncedAt?: string | null
-  /** Optional reason for staleness override (e.g., from backend error context). */
-  staleReason?: string
-}
-
 export interface DataFreshnessResult {
   /** Whether the data should be considered stale (served from cache during an outage). */
   isStale: boolean
@@ -27,14 +18,17 @@ export interface DataFreshnessResult {
  *
  * This hook is intentionally separate from SyncStatusIndicator (which shows subtle
  * freshness dots) — it drives the more prominent StaleDataBanner for active outages.
+ *
+ * @param servedFromCache - Whether the response was served from the backend sync cache.
+ * @param lastSyncedAt - ISO 8601 timestamp of the last successful sync, or null/undefined if never synced.
+ * @param staleReason - Optional reason for staleness override (e.g., from backend error context).
  */
-export function useDataFreshness(input: DataFreshnessInput | undefined): DataFreshnessResult {
+export function useDataFreshness(
+  servedFromCache: boolean | undefined,
+  lastSyncedAt: string | null | undefined,
+  staleReason?: string,
+): DataFreshnessResult {
   return useMemo(() => {
-    if (!input) {
-      return { isStale: false, reason: '', lastSyncedAt: null }
-    }
-
-    const { servedFromCache, lastSyncedAt, staleReason } = input
     const syncTime = lastSyncedAt ?? null
 
     // Not served from cache — data is fresh (live from Linear)
@@ -60,5 +54,5 @@ export function useDataFreshness(input: DataFreshnessInput | undefined): DataFre
       reason: staleReason ?? 'Data may be outdated due to a service disruption',
       lastSyncedAt: syncTime,
     }
-  }, [input])
+  }, [servedFromCache, lastSyncedAt, staleReason])
 }
