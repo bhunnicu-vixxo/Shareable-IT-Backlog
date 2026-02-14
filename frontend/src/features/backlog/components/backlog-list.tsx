@@ -326,11 +326,12 @@ export function BacklogList() {
   const handleClearKeyword = useCallback(() => setKeywordQuery(''), [])
   const handleClearBusinessUnit = useCallback(() => setSelectedBusinessUnit(null), [])
   const handleClearNewOnly = useCallback(() => setShowNewOnly(false), [])
+  const handleClearHideDone = useCallback(() => setHideDone(false), [])
   const handleClearAll = useCallback(() => {
     setKeywordQuery('')
     setSelectedBusinessUnit(null)
     setShowNewOnly(false)
-    setHideDone(true)
+    setHideDone(false)
   }, [])
   const handleToggleNewOnly = useCallback(() => setShowNewOnly((prev) => !prev), [])
   // Note: Each card still gets a per-item inline closure in the .map() below
@@ -499,7 +500,7 @@ export function BacklogList() {
   }
 
   /** Whether any filter is active (used for empty-state detection). */
-  const hasActiveFilters = showNewOnly || !!selectedBusinessUnit || debouncedQuery.trim().length > 0
+  const hasActiveFilters = showNewOnly || !!selectedBusinessUnit || debouncedQuery.trim().length > 0 || hideDone
 
   return (
     <Box>
@@ -584,9 +585,11 @@ export function BacklogList() {
           keyword={debouncedQuery}
           businessUnit={selectedBusinessUnit}
           showNewOnly={showNewOnly}
+          hideDone={hideDone}
           onClearKeyword={handleClearKeyword}
           onClearBusinessUnit={handleClearBusinessUnit}
           onClearNewOnly={handleClearNewOnly}
+          onClearHideDone={handleClearHideDone}
           onClearAll={handleClearAll}
         />
       ) : (
