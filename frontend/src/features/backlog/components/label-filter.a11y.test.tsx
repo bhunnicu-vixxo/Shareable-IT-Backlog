@@ -1,5 +1,5 @@
 import { describe, it, vi } from 'vitest'
-import { BusinessUnitFilter } from './business-unit-filter'
+import { LabelFilter } from './label-filter'
 import type { BacklogItem } from '../types/backlog.types'
 import {
   checkAccessibility,
@@ -33,45 +33,40 @@ function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
 }
 
 const mockItems: BacklogItem[] = [
-  createMockItem({ id: '1', teamName: 'Vixxo' }),
-  createMockItem({ id: '2', teamName: 'Engineering' }),
-  createMockItem({ id: '3', teamName: 'Product' }),
+  createMockItem({
+    id: '1',
+    labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+  }),
+  createMockItem({
+    id: '2',
+    labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+  }),
+  createMockItem({
+    id: '3',
+    labels: [{ id: 'l3', name: 'VixxoLink', color: '#0000ff' }],
+  }),
 ]
 
-describe('BusinessUnitFilter accessibility', () => {
+describe('LabelFilter accessibility', () => {
   it('should have no axe violations with no selection', async () => {
     const results = await checkAccessibility(
-      <BusinessUnitFilter
-        items={mockItems}
-        value={null}
-        onChange={vi.fn()}
-        resultCount={3}
-      />
+      <LabelFilter items={mockItems} value={[]} onChange={vi.fn()} />,
     )
     expectNoCriticalOrSeriousViolations(results)
   })
 
   it('should have no axe violations with a selection', async () => {
     const results = await checkAccessibility(
-      <BusinessUnitFilter
-        items={mockItems}
-        value="Vixxo"
-        onChange={vi.fn()}
-        resultCount={1}
-      />
+      <LabelFilter items={mockItems} value={['Siebel']} onChange={vi.fn()} />,
     )
     expectNoCriticalOrSeriousViolations(results)
   })
 
-  it('should have no axe violations in compact mode', async () => {
+  it('should have no axe violations with multiple selections', async () => {
     const results = await checkAccessibility(
-      <BusinessUnitFilter
-        items={mockItems}
-        value={null}
-        onChange={vi.fn()}
-        compact
-      />
+      <LabelFilter items={mockItems} value={['Siebel', 'Gateway']} onChange={vi.fn()} />,
     )
     expectNoCriticalOrSeriousViolations(results)
   })
 })
+

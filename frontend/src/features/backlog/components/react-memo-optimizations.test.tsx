@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@/utils/test-utils'
 import { BacklogItemCard } from './backlog-item-card'
 import { EmptyStateWithGuidance } from './empty-state-with-guidance'
-import { BusinessUnitFilter } from './business-unit-filter'
+import { LabelFilter } from './label-filter'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import type { BacklogItem } from '../types/backlog.types'
 
@@ -69,10 +69,10 @@ describe('React.memo optimizations', () => {
       render(
         <EmptyStateWithGuidance
           keyword="test"
-          businessUnit={null}
+          selectedLabels={[]}
           showNewOnly={false}
           onClearKeyword={vi.fn()}
-          onClearBusinessUnit={vi.fn()}
+          onClearLabels={vi.fn()}
           onClearNewOnly={vi.fn()}
           onClearAll={vi.fn()}
         />,
@@ -81,22 +81,24 @@ describe('React.memo optimizations', () => {
     })
   })
 
-  describe('BusinessUnitFilter', () => {
+  describe('LabelFilter', () => {
     it('is wrapped with React.memo', () => {
-      expect(BusinessUnitFilter).toHaveProperty('$$typeof')
-      expect(BusinessUnitFilter.displayName).toBe('BusinessUnitFilter')
+      expect(LabelFilter).toHaveProperty('$$typeof')
+      expect(LabelFilter.displayName).toBe('LabelFilter')
     })
 
     it('renders correctly when memoized', () => {
-      const items = [createMockItem({ teamName: 'Team A' })]
+      const items = [createMockItem({
+        labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+      })]
       render(
-        <BusinessUnitFilter
+        <LabelFilter
           items={items}
-          value={null}
+          value={[]}
           onChange={vi.fn()}
         />,
       )
-      expect(screen.getByText('Filter by business unit')).toBeInTheDocument()
+      expect(screen.getByText('Filter by label')).toBeInTheDocument()
     })
   })
 

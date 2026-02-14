@@ -5,7 +5,7 @@ import { useBacklogItems } from '../hooks/use-backlog-items'
 import { useDebouncedValue } from '../hooks/use-debounced-value'
 import { tokenizeQuery } from '../utils/highlight'
 import { BacklogItemCard } from './backlog-item-card'
-import { BusinessUnitFilter } from './business-unit-filter'
+import { LabelFilter } from './label-filter'
 import { KeywordSearch } from './keyword-search'
 import { EmptyStateWithGuidance } from './empty-state-with-guidance'
 import { SortControl } from './sort-control'
@@ -148,7 +148,7 @@ export function BacklogList() {
   const { data, isLoading, isError, error, refetch } = useBacklogItems()
   const [showNewOnly, setShowNewOnly] = useState(false)
   const [hideDone, setHideDone] = useState(true)
-  const [selectedBusinessUnit, setSelectedBusinessUnit] = useState<string | null>(null)
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([])
   const [keywordQuery, setKeywordQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortField>('priority')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -204,11 +204,13 @@ export function BacklogList() {
   )
 
   // Client-side chained filters + sort — O(n log n), instant re-render, no API call
-  // Chain: hide done → business unit → "New only" → keyword search → sort
+  // Chain: hide done → labels → "New only" → keyword search → sort
   const displayedItems = useMemo(() => {
     let filtered = baseItems
-    if (selectedBusinessUnit) {
-      filtered = filtered.filter((item) => item.teamName === selectedBusinessUnit)
+    if (selectedLabels.length > 0) {
+      filtered = filtered.filter((item) =>
+        item.labels.some((l) => selectedLabels.includes(l.name)),
+      )
     }
     if (showNewOnly) {
       filtered = filtered.filter((item) => item.isNew)
@@ -261,7 +263,7 @@ export function BacklogList() {
     })
 
     return sorted
-  }, [baseItems, selectedBusinessUnit, showNewOnly, searchTokens, sortBy, sortDirection])
+  }, [baseItems, selectedLabels, showNewOnly, searchTokens, sortBy, sortDirection])
 
   // Virtual scrolling — only renders visible items in the DOM
   const virtualizer = useVirtualizer({
@@ -324,12 +326,12 @@ export function BacklogList() {
   // Stabilize callback handlers with useCallback to maintain referential stability
   // for memoized child components (React.memo). State setters are stable references.
   const handleClearKeyword = useCallback(() => setKeywordQuery(''), [])
-  const handleClearBusinessUnit = useCallback(() => setSelectedBusinessUnit(null), [])
+  const handleClearLabels = useCallback(() => setSelectedLabels([]), [])
   const handleClearNewOnly = useCallback(() => setShowNewOnly(false), [])
   const handleClearHideDone = useCallback(() => setHideDone(false), [])
   const handleClearAll = useCallback(() => {
     setKeywordQuery('')
-    setSelectedBusinessUnit(null)
+    setSelectedLabels([])
     setShowNewOnly(false)
     setHideDone(false)
   }, [])
@@ -476,11 +478,13 @@ export function BacklogList() {
   // still discover "no new items for <BU>" scenarios when combined with BU filtering.
   const newItemCount = baseItems.filter((item) => item.isNew).length
 
-  // Used for display only. When a business unit is selected, show a BU-scoped
-  // count to avoid implying that the new-item count applies to the current BU
+  // Used for display only. When labels are selected, show a label-scoped
+  // count to avoid implying that the new-item count applies to the current labels
   // when it doesn't.
   const scopedNewItemCount = (
-    selectedBusinessUnit ? baseItems.filter((item) => item.teamName === selectedBusinessUnit) : baseItems
+    selectedLabels.length > 0
+      ? baseItems.filter((item) => item.labels.some((l) => selectedLabels.includes(l.name)))
+      : baseItems
   ).filter((item) => item.isNew).length
 
   /** Build a descriptive results count reflecting active filters. */
@@ -495,12 +499,12 @@ export function BacklogList() {
     const filterParts = parts.length > 0 ? `${parts.join(' ')} ` : ''
     const ofTotal = isFiltered ? ` of ${total}` : ''
     const matchPart = debouncedQuery.trim() ? ` matching "${debouncedQuery.trim()}"` : ''
-    const buPart = selectedBusinessUnit ? ` for ${selectedBusinessUnit}` : ''
-    return `Showing ${count}${ofTotal} ${filterParts}${itemWord}${matchPart}${buPart}`
+    const labelPart = selectedLabels.length > 0 ? ` for ${selectedLabels.join(', ')}` : ''
+    return `Showing ${count}${ofTotal} ${filterParts}${itemWord}${matchPart}${labelPart}`
   }
 
   /** Whether any filter is active (used for empty-state detection). */
-  const hasActiveFilters = showNewOnly || !!selectedBusinessUnit || debouncedQuery.trim().length > 0 || hideDone
+  const hasActiveFilters = showNewOnly || selectedLabels.length > 0 || debouncedQuery.trim().length > 0 || hideDone
 
   return (
     <Box>
@@ -532,10 +536,10 @@ export function BacklogList() {
         borderWidth="1px"
         borderColor="border.subtle"
       >
-        <BusinessUnitFilter
-          items={baseItems}
-          value={selectedBusinessUnit}
-          onChange={setSelectedBusinessUnit}
+        <LabelFilter
+          items={items}
+          value={selectedLabels}
+          onChange={setSelectedLabels}
         />
         <SortControl
           sortBy={sortBy}
@@ -564,7 +568,7 @@ export function BacklogList() {
           >
             {showNewOnly
               ? 'Show all'
-              : `New only (${selectedBusinessUnit ? scopedNewItemCount : newItemCount})`}
+              : `New only (${selectedLabels.length > 0 ? scopedNewItemCount : newItemCount})`}
           </Button>
         )}
         <Box flex="1" minW="180px">
@@ -583,11 +587,11 @@ export function BacklogList() {
       {displayedItems.length === 0 && hasActiveFilters ? (
         <EmptyStateWithGuidance
           keyword={debouncedQuery}
-          businessUnit={selectedBusinessUnit}
+          selectedLabels={selectedLabels}
           showNewOnly={showNewOnly}
           hideDone={hideDone}
           onClearKeyword={handleClearKeyword}
-          onClearBusinessUnit={handleClearBusinessUnit}
+          onClearLabels={handleClearLabels}
           onClearNewOnly={handleClearNewOnly}
           onClearHideDone={handleClearHideDone}
           onClearAll={handleClearAll}

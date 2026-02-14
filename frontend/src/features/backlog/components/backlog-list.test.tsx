@@ -379,11 +379,19 @@ describe('BacklogList', () => {
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
   })
 
-  it('renders BusinessUnitFilter dropdown in filter bar', async () => {
+  // ─── Label Filter Tests ───
+
+  it('renders LabelFilter dropdown in filter bar', async () => {
     const response: BacklogListResponse = {
       items: [
-        createMockItem({ id: '1', teamName: 'Operations' }),
-        createMockItem({ id: '2', teamName: 'Finance' }),
+        createMockItem({
+          id: '1',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+        }),
+        createMockItem({
+          id: '2',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+        }),
       ],
       pageInfo: { hasNextPage: false, endCursor: null },
       totalCount: 2,
@@ -393,20 +401,32 @@ describe('BacklogList', () => {
     render(<BacklogList />)
 
     await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /filter by business unit/i })).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: /filter by label/i })).toBeInTheDocument()
     })
-    // Placeholder shows "All Business Units"
+    // Placeholder shows "All Labels"
     expect(
-      screen.getByText('All Business Units', { selector: '[data-part="value-text"]' }),
+      screen.getByText('All Labels', { selector: '[data-part="value-text"]' }),
     ).toBeInTheDocument()
   })
 
-  it('filters items by business unit when selection is made via keyboard', async () => {
+  it('filters items by single label selection', async () => {
     const response: BacklogListResponse = {
       items: [
-        createMockItem({ id: '1', title: 'Ops item', teamName: 'Operations' }),
-        createMockItem({ id: '2', title: 'Fin item', teamName: 'Finance' }),
-        createMockItem({ id: '3', title: 'Eng item', teamName: 'Engineering' }),
+        createMockItem({
+          id: '1',
+          title: 'Siebel item',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Gateway item',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+        }),
+        createMockItem({
+          id: '3',
+          title: 'VixxoLink item',
+          labels: [{ id: 'l3', name: 'VixxoLink', color: '#0000ff' }],
+        }),
       ],
       pageInfo: { hasNextPage: false, endCursor: null },
       totalCount: 3,
@@ -416,27 +436,88 @@ describe('BacklogList', () => {
     render(<BacklogList />)
 
     await waitFor(() => {
-      expect(screen.getByText('Ops item')).toBeInTheDocument()
+      expect(screen.getByText('Siebel item')).toBeInTheDocument()
     })
 
-    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    const trigger = screen.getByRole('combobox', { name: /filter by label/i })
     fireEvent.click(trigger)
-    const financeOption = await screen.findByRole('option', { name: 'Finance' })
-    fireEvent.click(financeOption)
+    const siebelOption = await screen.findByRole('option', { name: /Siebel/ })
+    fireEvent.click(siebelOption)
 
     await waitFor(() => {
-      expect(screen.getByText('Fin item')).toBeInTheDocument()
-      expect(screen.queryByText('Ops item')).not.toBeInTheDocument()
-      expect(screen.queryByText('Eng item')).not.toBeInTheDocument()
+      expect(screen.getByText('Siebel item')).toBeInTheDocument()
+      expect(screen.queryByText('Gateway item')).not.toBeInTheDocument()
+      expect(screen.queryByText('VixxoLink item')).not.toBeInTheDocument()
     })
   })
 
-  it('displays results count with business unit name when filtered', async () => {
+  it('filters items by multiple labels (OR logic)', async () => {
     const response: BacklogListResponse = {
       items: [
-        createMockItem({ id: '1', title: 'Ops item 1', teamName: 'Operations' }),
-        createMockItem({ id: '2', title: 'Ops item 2', teamName: 'Operations' }),
-        createMockItem({ id: '3', title: 'Fin item', teamName: 'Finance' }),
+        createMockItem({
+          id: '1',
+          title: 'Siebel item',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Gateway item',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+        }),
+        createMockItem({
+          id: '3',
+          title: 'VixxoLink item',
+          labels: [{ id: 'l3', name: 'VixxoLink', color: '#0000ff' }],
+        }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Siebel item')).toBeInTheDocument()
+    })
+
+    // Select Siebel
+    const trigger = screen.getByRole('combobox', { name: /filter by label/i })
+    fireEvent.click(trigger)
+    const siebelOption = await screen.findByRole('option', { name: /Siebel/ })
+    fireEvent.click(siebelOption)
+
+    // Select Gateway (multi-select, so click trigger again and select)
+    const gatewayOption = await screen.findByRole('option', { name: /Gateway/ })
+    fireEvent.click(gatewayOption)
+
+    await waitFor(() => {
+      // Both Siebel and Gateway items should be visible (OR logic)
+      expect(screen.getByText('Siebel item')).toBeInTheDocument()
+      expect(screen.getByText('Gateway item')).toBeInTheDocument()
+      // VixxoLink should be hidden
+      expect(screen.queryByText('VixxoLink item')).not.toBeInTheDocument()
+    })
+  })
+
+  it('displays results count with label names when filtered', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({
+          id: '1',
+          title: 'Siebel item 1',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Siebel item 2',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+        }),
+        createMockItem({
+          id: '3',
+          title: 'Gateway item',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+        }),
       ],
       pageInfo: { hasNextPage: false, endCursor: null },
       totalCount: 3,
@@ -449,22 +530,37 @@ describe('BacklogList', () => {
       expect(screen.getByText('Showing 3 items')).toBeInTheDocument()
     })
 
-    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    const trigger = screen.getByRole('combobox', { name: /filter by label/i })
     fireEvent.click(trigger)
-    const operationsOption = await screen.findByRole('option', { name: 'Operations' })
-    fireEvent.click(operationsOption)
+    const siebelOption = await screen.findByRole('option', { name: /Siebel/ })
+    fireEvent.click(siebelOption)
 
     await waitFor(() => {
-      expect(screen.getByText('Showing 2 of 3 items for Operations')).toBeInTheDocument()
+      expect(screen.getByText('Showing 2 of 3 items for Siebel')).toBeInTheDocument()
     })
   })
 
-  it('combines business unit filter with "New only" filter', async () => {
+  it('combines label filter with "New only" filter', async () => {
     const response: BacklogListResponse = {
       items: [
-        createMockItem({ id: '1', title: 'Ops old', teamName: 'Operations', isNew: false }),
-        createMockItem({ id: '2', title: 'Ops new', teamName: 'Operations', isNew: true }),
-        createMockItem({ id: '3', title: 'Fin new', teamName: 'Finance', isNew: true }),
+        createMockItem({
+          id: '1',
+          title: 'Siebel old',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          isNew: false,
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Siebel new',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          isNew: true,
+        }),
+        createMockItem({
+          id: '3',
+          title: 'Gateway new',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+          isNew: true,
+        }),
       ],
       pageInfo: { hasNextPage: false, endCursor: null },
       totalCount: 3,
@@ -474,35 +570,44 @@ describe('BacklogList', () => {
     render(<BacklogList />)
 
     await waitFor(() => {
-      expect(screen.getByText('Ops old')).toBeInTheDocument()
+      expect(screen.getByText('Siebel old')).toBeInTheDocument()
     })
 
-    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    const trigger = screen.getByRole('combobox', { name: /filter by label/i })
     fireEvent.click(trigger)
-    const operationsOption = await screen.findByRole('option', { name: 'Operations' })
-    fireEvent.click(operationsOption)
+    const siebelOption = await screen.findByRole('option', { name: /Siebel/ })
+    fireEvent.click(siebelOption)
 
     await waitFor(() => {
-      expect(screen.queryByText('Fin new')).not.toBeInTheDocument()
+      expect(screen.queryByText('Gateway new')).not.toBeInTheDocument()
     })
-    expect(screen.getByText('Ops old')).toBeInTheDocument()
-    expect(screen.getByText('Ops new')).toBeInTheDocument()
+    expect(screen.getByText('Siebel old')).toBeInTheDocument()
+    expect(screen.getByText('Siebel new')).toBeInTheDocument()
 
     // Now toggle "New only"
     fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
-      expect(screen.getByText('Ops new')).toBeInTheDocument()
+      expect(screen.getByText('Siebel new')).toBeInTheDocument()
     })
-    expect(screen.queryByText('Ops old')).not.toBeInTheDocument()
-    expect(screen.getByText('Showing 1 of 3 new items for Operations')).toBeInTheDocument()
+    expect(screen.queryByText('Siebel old')).not.toBeInTheDocument()
   })
 
-  it('shows empty filter state with "Clear business unit" when BU filter returns no results', async () => {
+  it('shows empty filter state with "Clear label filter" when label filter returns no results', async () => {
     const response: BacklogListResponse = {
       items: [
-        createMockItem({ id: '1', title: 'Ops item', teamName: 'Operations', isNew: true }),
-        createMockItem({ id: '2', title: 'Fin item', teamName: 'Finance', isNew: false }),
+        createMockItem({
+          id: '1',
+          title: 'Siebel item',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          isNew: true,
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Gateway item',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+          isNew: false,
+        }),
       ],
       pageInfo: { hasNextPage: false, endCursor: null },
       totalCount: 2,
@@ -512,34 +617,44 @@ describe('BacklogList', () => {
     render(<BacklogList />)
 
     await waitFor(() => {
-      expect(screen.getByText('Ops item')).toBeInTheDocument()
+      expect(screen.getByText('Siebel item')).toBeInTheDocument()
     })
 
-    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    const trigger = screen.getByRole('combobox', { name: /filter by label/i })
     fireEvent.click(trigger)
-    const financeOption = await screen.findByRole('option', { name: 'Finance' })
-    fireEvent.click(financeOption)
+    const gatewayOption = await screen.findByRole('option', { name: /Gateway/ })
+    fireEvent.click(gatewayOption)
 
     await waitFor(() => {
-      expect(screen.getByText('Fin item')).toBeInTheDocument()
+      expect(screen.getByText('Gateway item')).toBeInTheDocument()
     })
 
-    // Now toggle "New only" — Finance has no new items
+    // Now toggle "New only" — Gateway has no new items
     fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
-      expect(screen.getByText('No new items for Finance')).toBeInTheDocument()
+      expect(screen.getByText('No new items for Gateway')).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: 'Clear business unit filter' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear label filter' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Clear all filters' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Turn off New only' })).toBeInTheDocument()
   })
 
-  it('"Clear business unit" button resets business unit filter', async () => {
+  it('"Clear label filter" button resets label filter', async () => {
     const response: BacklogListResponse = {
       items: [
-        createMockItem({ id: '1', title: 'Ops item', teamName: 'Operations', isNew: true }),
-        createMockItem({ id: '2', title: 'Fin item', teamName: 'Finance', isNew: false }),
+        createMockItem({
+          id: '1',
+          title: 'Siebel item',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          isNew: true,
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Gateway item',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+          isNew: false,
+        }),
       ],
       pageInfo: { hasNextPage: false, endCursor: null },
       totalCount: 2,
@@ -549,40 +664,50 @@ describe('BacklogList', () => {
     render(<BacklogList />)
 
     await waitFor(() => {
-      expect(screen.getByText('Ops item')).toBeInTheDocument()
+      expect(screen.getByText('Siebel item')).toBeInTheDocument()
     })
 
-    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    const trigger = screen.getByRole('combobox', { name: /filter by label/i })
     fireEvent.click(trigger)
-    const financeOption = await screen.findByRole('option', { name: 'Finance' })
-    fireEvent.click(financeOption)
+    const gatewayOption = await screen.findByRole('option', { name: /Gateway/ })
+    fireEvent.click(gatewayOption)
 
     await waitFor(() => {
-      expect(screen.getByText('Fin item')).toBeInTheDocument()
+      expect(screen.getByText('Gateway item')).toBeInTheDocument()
     })
 
-    // Toggle new only → empty state (Finance has no new items)
+    // Toggle new only → empty state (Gateway has no new items)
     fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
-      expect(screen.getByText('No new items for Finance')).toBeInTheDocument()
+      expect(screen.getByText('No new items for Gateway')).toBeInTheDocument()
     })
 
-    // Click "Clear business unit" to remove business unit filter
-    fireEvent.click(screen.getByRole('button', { name: 'Clear business unit filter' }))
+    // Click "Clear label filter" to remove label filter
+    fireEvent.click(screen.getByRole('button', { name: 'Clear label filter' }))
 
-    // Now showing new items across all BUs — only Ops item is new
+    // Now showing new items across all labels — only Siebel item is new
     await waitFor(() => {
-      expect(screen.getByText('Ops item')).toBeInTheDocument()
+      expect(screen.getByText('Siebel item')).toBeInTheDocument()
     })
-    expect(screen.queryByText('Fin item')).not.toBeInTheDocument()
+    expect(screen.queryByText('Gateway item')).not.toBeInTheDocument()
   })
 
   it('"Clear all filters" button resets all active filters at once', async () => {
     const response: BacklogListResponse = {
       items: [
-        createMockItem({ id: '1', title: 'Ops item', teamName: 'Operations', isNew: true }),
-        createMockItem({ id: '2', title: 'Fin item', teamName: 'Finance', isNew: false }),
+        createMockItem({
+          id: '1',
+          title: 'Siebel item',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          isNew: true,
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Gateway item',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+          isNew: false,
+        }),
       ],
       pageInfo: { hasNextPage: false, endCursor: null },
       totalCount: 2,
@@ -592,23 +717,23 @@ describe('BacklogList', () => {
     render(<BacklogList />)
 
     await waitFor(() => {
-      expect(screen.getByText('Ops item')).toBeInTheDocument()
+      expect(screen.getByText('Siebel item')).toBeInTheDocument()
     })
 
-    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
+    const trigger = screen.getByRole('combobox', { name: /filter by label/i })
     fireEvent.click(trigger)
-    const financeOption = await screen.findByRole('option', { name: 'Finance' })
-    fireEvent.click(financeOption)
+    const gatewayOption = await screen.findByRole('option', { name: /Gateway/ })
+    fireEvent.click(gatewayOption)
 
     await waitFor(() => {
-      expect(screen.getByText('Fin item')).toBeInTheDocument()
+      expect(screen.getByText('Gateway item')).toBeInTheDocument()
     })
 
-    // Toggle new only → empty state (Finance has no new items)
+    // Toggle new only → empty state (Gateway has no new items)
     fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
 
     await waitFor(() => {
-      expect(screen.getByText('No new items for Finance')).toBeInTheDocument()
+      expect(screen.getByText('No new items for Gateway')).toBeInTheDocument()
     })
 
     // Click "Clear all filters" to reset everything
@@ -616,8 +741,8 @@ describe('BacklogList', () => {
 
     // Both items should be visible again
     await waitFor(() => {
-      expect(screen.getByText('Ops item')).toBeInTheDocument()
-      expect(screen.getByText('Fin item')).toBeInTheDocument()
+      expect(screen.getByText('Siebel item')).toBeInTheDocument()
+      expect(screen.getByText('Gateway item')).toBeInTheDocument()
     })
   })
 
@@ -701,126 +826,11 @@ describe('BacklogList', () => {
     const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
     fireEvent.change(searchInput, { target: { value: 'vpn' } })
 
-    // After debounce, items should be filtered. Use waitFor to wait for debounce to fire.
     await waitFor(() => {
       expect(screen.queryByText('Database migration')).not.toBeInTheDocument()
     })
-    // Highlighted text is split across elements; find by aria-label on the card
     expect(screen.getByLabelText(/VPN configuration/)).toBeInTheDocument()
     expect(screen.getByLabelText(/Network VPN issue/)).toBeInTheDocument()
-  })
-
-  it('filters by description, teamName, status, and identifier', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({
-          id: '1',
-          title: 'Item one',
-          description: 'This involves network security',
-          teamName: 'Operations',
-          status: 'In Progress',
-          identifier: 'VIX-100',
-        }),
-        createMockItem({
-          id: '2',
-          title: 'Item two',
-          description: 'Budget planning task',
-          teamName: 'Finance',
-          status: 'Backlog',
-          identifier: 'VIX-200',
-        }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 2,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Item one')).toBeInTheDocument()
-    })
-
-    // Search by description content
-    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
-    fireEvent.change(searchInput, { target: { value: 'network' } })
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Item one/)).toBeInTheDocument()
-      expect(screen.queryByLabelText(/Item two/)).not.toBeInTheDocument()
-    })
-
-    // Search by identifier
-    fireEvent.change(searchInput, { target: { value: 'VIX-200' } })
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Item two/)).toBeInTheDocument()
-      expect(screen.queryByLabelText(/Item one/)).not.toBeInTheDocument()
-    })
-  })
-
-  it('search is case-insensitive and trims whitespace', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'VPN Configuration' }),
-        createMockItem({ id: '2', title: 'Database Setup' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 2,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('VPN Configuration')).toBeInTheDocument()
-    })
-
-    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
-    fireEvent.change(searchInput, { target: { value: '  VpN  ' } })
-
-    await waitFor(() => {
-      // VPN Configuration should still be visible (matched); Database Setup should be gone
-      expect(screen.getByLabelText(/VPN Configuration/)).toBeInTheDocument()
-      expect(screen.queryByLabelText(/Database Setup/)).not.toBeInTheDocument()
-    })
-  })
-
-  it('combines BU + New-only + keyword search', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'Ops vpn task', teamName: 'Operations', isNew: true }),
-        createMockItem({ id: '2', title: 'Ops billing', teamName: 'Operations', isNew: true }),
-        createMockItem({ id: '3', title: 'Fin vpn task', teamName: 'Finance', isNew: true }),
-        createMockItem({ id: '4', title: 'Ops vpn old', teamName: 'Operations', isNew: false }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 4,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Ops vpn task')).toBeInTheDocument()
-    })
-
-    // Type keyword first
-    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
-    fireEvent.change(searchInput, { target: { value: 'vpn' } })
-
-    await waitFor(() => {
-      expect(screen.queryByLabelText(/Ops billing/)).not.toBeInTheDocument()
-    })
-
-    // Toggle "New only" — should filter out "Ops vpn old" (isNew: false)
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Ops vpn task/)).toBeInTheDocument()
-      expect(screen.getByLabelText(/Fin vpn task/)).toBeInTheDocument()
-      expect(screen.queryByLabelText(/Ops vpn old/)).not.toBeInTheDocument()
-    })
   })
 
   it('shows empty state with "Clear search" when keyword search has no results', async () => {
@@ -848,91 +858,6 @@ describe('BacklogList', () => {
     expect(screen.getByRole('button', { name: 'Clear search filter' })).toBeInTheDocument()
   })
 
-  it('"Clear search" button in empty state resets keyword filter', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'VPN configuration' }),
-        createMockItem({ id: '2', title: 'Database migration' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 2,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('VPN configuration')).toBeInTheDocument()
-    })
-
-    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
-    fireEvent.change(searchInput, { target: { value: 'zzzzz' } })
-
-    await waitFor(() => {
-      expect(screen.getByText(/No items found matching/)).toBeInTheDocument()
-    })
-
-    // Click the "Clear search filter" button in the empty-state area
-    fireEvent.click(screen.getByRole('button', { name: 'Clear search filter' }))
-
-    await waitFor(() => {
-      expect(screen.getByText('VPN configuration')).toBeInTheDocument()
-      expect(screen.getByText('Database migration')).toBeInTheDocument()
-    })
-  })
-
-  it('highlights matching text in item titles when searching', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'VPN configuration issue' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 1,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('VPN configuration issue')).toBeInTheDocument()
-    })
-
-    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
-    fireEvent.change(searchInput, { target: { value: 'vpn' } })
-
-    await waitFor(() => {
-      const markElement = document.querySelector('mark')
-      expect(markElement).toBeInTheDocument()
-      expect(markElement?.textContent).toBe('VPN')
-    })
-  })
-
-  it('results count includes search query when active', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'VPN configuration' }),
-        createMockItem({ id: '2', title: 'VPN monitoring' }),
-        createMockItem({ id: '3', title: 'Database setup' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Showing 3 items')).toBeInTheDocument()
-    })
-
-    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
-    fireEvent.change(searchInput, { target: { value: 'vpn' } })
-
-    await waitFor(() => {
-      expect(screen.getByText('Showing 2 of 3 items matching "vpn"')).toBeInTheDocument()
-    })
-  })
-
   it('renders stack rank badges with sequential numbering', async () => {
     const response: BacklogListResponse = {
       items: [
@@ -950,7 +875,6 @@ describe('BacklogList', () => {
       expect(screen.getByText('Urgent item')).toBeInTheDocument()
     })
 
-    // Stack rank badges include both rank and priority in the aria-label
     const rank1Badge = screen.getByRole('img', { name: 'Rank 1, Urgent priority' })
     const rank2Badge = screen.getByRole('img', { name: 'Rank 2, Low priority' })
     expect(rank1Badge).toHaveTextContent('1')
@@ -972,7 +896,6 @@ describe('BacklogList', () => {
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: /sort backlog items/i })).toBeInTheDocument()
     })
-    // Direction toggle button should exist (default asc → shows "Sort descending")
     expect(screen.getByRole('button', { name: 'Sort descending' })).toBeInTheDocument()
   })
 
@@ -994,158 +917,13 @@ describe('BacklogList', () => {
       expect(screen.getByText('Urgent item')).toBeInTheDocument()
     })
 
-    // Default sort: priority ascending (1, 3, 4 → Urgent, Normal, Low)
     const cards = screen.getAllByRole('button', { name: /,\s*Priority/ })
     const titles = cards.map((card) => card.getAttribute('aria-label') ?? '')
-    // Urgent (priority 1) should appear before Normal (3) before Low (4)
     const urgentIdx = titles.findIndex((t) => t.includes('Urgent item'))
     const normalIdx = titles.findIndex((t) => t.includes('Normal item'))
     const lowIdx = titles.findIndex((t) => t.includes('Low item'))
     expect(urgentIdx).toBeLessThan(normalIdx)
     expect(normalIdx).toBeLessThan(lowIdx)
-  })
-
-  it('reverses sort order when direction toggle is clicked', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'Low item', priority: 4 }),
-        createMockItem({ id: '2', title: 'Urgent item', priority: 1 }),
-        createMockItem({ id: '3', title: 'Normal item', priority: 3 }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Urgent item')).toBeInTheDocument()
-    })
-
-    // Click direction toggle to switch to descending
-    fireEvent.click(screen.getByRole('button', { name: 'Sort descending' }))
-
-    // Now priority descending (4, 3, 1 → Low, Normal, Urgent)
-    await waitFor(() => {
-      const cards = screen.getAllByRole('button', { name: /,\s*Priority/ })
-      const titles = cards.map((card) => card.getAttribute('aria-label') ?? '')
-      const urgentIdx = titles.findIndex((t) => t.includes('Urgent item'))
-      const normalIdx = titles.findIndex((t) => t.includes('Normal item'))
-      const lowIdx = titles.findIndex((t) => t.includes('Low item'))
-      expect(lowIdx).toBeLessThan(normalIdx)
-      expect(normalIdx).toBeLessThan(urgentIdx)
-    })
-
-    // Button label should now say "Sort ascending"
-    expect(screen.getByRole('button', { name: 'Sort ascending' })).toBeInTheDocument()
-  })
-
-  it('keeps priority 0 ("None") items last in both asc and desc', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'None item', priority: 0, priorityLabel: 'None' }),
-        createMockItem({ id: '2', title: 'Urgent item', priority: 1, priorityLabel: 'Urgent' }),
-        createMockItem({ id: '3', title: 'Low item', priority: 4, priorityLabel: 'Low' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Urgent item')).toBeInTheDocument()
-    })
-
-    // Default (asc): None should be last
-    const cardsAsc = screen.getAllByRole('button', { name: /,\s*Priority/ })
-    const labelsAsc = cardsAsc.map((c) => c.getAttribute('aria-label') ?? '')
-    const noneIdxAsc = labelsAsc.findIndex((l) => l.includes('None item'))
-    const lastIdxAsc = labelsAsc.length - 1
-    expect(noneIdxAsc).toBe(lastIdxAsc)
-
-    // Toggle to desc: None should still be last
-    fireEvent.click(screen.getByRole('button', { name: 'Sort descending' }))
-
-    await waitFor(() => {
-      const cardsDesc = screen.getAllByRole('button', { name: /,\s*Priority/ })
-      const labelsDesc = cardsDesc.map((c) => c.getAttribute('aria-label') ?? '')
-      const noneIdxDesc = labelsDesc.findIndex((l) => l.includes('None item'))
-      expect(noneIdxDesc).toBe(labelsDesc.length - 1)
-    })
-  })
-
-  it('sorts by date created when sort field is changed', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'Newest', createdAt: '2026-02-10T10:00:00.000Z' }),
-        createMockItem({ id: '2', title: 'Oldest', createdAt: '2026-01-01T10:00:00.000Z' }),
-        createMockItem({ id: '3', title: 'Middle', createdAt: '2026-02-01T10:00:00.000Z' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Newest')).toBeInTheDocument()
-    })
-
-    const trigger = screen.getByRole('combobox', { name: /sort backlog items/i })
-    fireEvent.click(trigger)
-    const option = await screen.findByRole('option', { name: 'Date Created' })
-    fireEvent.click(option)
-
-    // Ascending date: oldest first → Oldest, Middle, Newest
-    // Cards use role="button" with aria-label like "Title, Priority Label"
-    await waitFor(() => {
-      const allCards = screen.getAllByRole('button', { name: /,\s*Priority/ })
-      const cardLabels = allCards.map((c) => c.getAttribute('aria-label') ?? '')
-      const oldestIdx = cardLabels.findIndex((l) => l.includes('Oldest'))
-      const middleIdx = cardLabels.findIndex((l) => l.includes('Middle'))
-      const newestIdx = cardLabels.findIndex((l) => l.includes('Newest'))
-      expect(oldestIdx).toBeLessThan(middleIdx)
-      expect(middleIdx).toBeLessThan(newestIdx)
-    })
-  })
-
-  it('applies sort to filtered results (BU + keyword + sort)', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'Ops low', teamName: 'Operations', priority: 4 }),
-        createMockItem({ id: '2', title: 'Ops urgent', teamName: 'Operations', priority: 1 }),
-        createMockItem({ id: '3', title: 'Fin high', teamName: 'Finance', priority: 2 }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Ops low')).toBeInTheDocument()
-    })
-
-    // Type keyword "Ops" to filter to Operations items
-    const searchInput = screen.getByRole('searchbox', { name: 'Search backlog items' })
-    fireEvent.change(searchInput, { target: { value: 'Ops' } })
-
-    await waitFor(() => {
-      expect(screen.queryByLabelText(/Fin high/)).not.toBeInTheDocument()
-    })
-
-    // Default sort is priority asc → Ops urgent (1) before Ops low (4)
-    // Cards use role="button" with aria-label like "Title, Priority Label"
-    const allCards = screen.getAllByRole('button', { name: /,\s*Priority/ })
-    const cardLabels = allCards.map((c) => c.getAttribute('aria-label') ?? '')
-    const urgentIdx = cardLabels.findIndex((l) => l.includes('Ops urgent'))
-    const lowIdx = cardLabels.findIndex((l) => l.includes('Ops low'))
-    expect(urgentIdx).toBeLessThan(lowIdx)
   })
 
   // ─── Virtual Scrolling Tests ───
@@ -1169,197 +947,6 @@ describe('BacklogList', () => {
     })
     expect(screen.getByText('Item B')).toBeInTheDocument()
     expect(screen.getByText('Item C')).toBeInTheDocument()
-
-    // Verify virtual scroll container exists (has overflowY auto)
-    const scrollContainer = screen.getByText('Item A').closest('[style]')
-    expect(scrollContainer).toBeInTheDocument()
-  })
-
-  it('renders only a visible subset of items when dataset is large (virtualization)', async () => {
-    virtualItemsLimit = 10
-    const items = Array.from({ length: 100 }, (_, i) =>
-      createMockItem({ id: `item-${i}`, title: `Item ${i}` }),
-    )
-    const response: BacklogListResponse = {
-      items,
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 100,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Item 0')).toBeInTheDocument()
-    })
-
-    // Within the mocked visible window
-    expect(screen.getByText('Item 9')).toBeInTheDocument()
-
-    // Outside the mocked visible window — should NOT be in the DOM
-    expect(screen.queryByText('Item 50')).not.toBeInTheDocument()
-    expect(screen.queryByText('Item 99')).not.toBeInTheDocument()
-  })
-
-  it('virtual list renders items with absolute positioning (virtualization pattern)', async () => {
-    const items = Array.from({ length: 20 }, (_, i) =>
-      createMockItem({ id: `item-${i}`, title: `Item ${i}` }),
-    )
-    const response: BacklogListResponse = {
-      items,
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 20,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Item 0')).toBeInTheDocument()
-    })
-
-    // Verify items are rendered with absolute positioning (virtual scrolling pattern)
-    const firstCard = screen.getByText('Item 0').closest('[data-index]')
-    expect(firstCard).toBeInTheDocument()
-    expect(firstCard).toHaveAttribute('data-index', '0')
-    expect(firstCard).toHaveStyle({ position: 'absolute' })
-
-    // Verify multiple items render
-    expect(screen.getByText('Item 5')).toBeInTheDocument()
-    expect(screen.getByText('Item 19')).toBeInTheDocument()
-  })
-
-  it('handles small dataset gracefully in virtual list', async () => {
-    const response: BacklogListResponse = {
-      items: [createMockItem({ id: '1', title: 'Single item' })],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 1,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Single item')).toBeInTheDocument()
-    })
-    expect(screen.getByText('Showing 1 item')).toBeInTheDocument()
-  })
-
-  it('renders EmptyStateWithGuidance outside virtual scroller when filters yield no results', async () => {
-    // Items: one Ops (new), one Finance (not new). Filtering BU=Finance + NewOnly → empty
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'Ops new', teamName: 'Operations', isNew: true }),
-        createMockItem({ id: '2', title: 'Fin old', teamName: 'Finance', isNew: false }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 2,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Ops new')).toBeInTheDocument()
-    })
-
-    // Select Finance BU
-    const trigger = screen.getByRole('combobox', { name: /filter by business unit/i })
-    fireEvent.click(trigger)
-    const financeOption = await screen.findByRole('option', { name: 'Finance' })
-    fireEvent.click(financeOption)
-
-    await waitFor(() => {
-      expect(screen.getByText('Fin old')).toBeInTheDocument()
-    })
-
-    // Toggle "New only" — Finance has no new items → empty state
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
-
-    await waitFor(() => {
-      // EmptyStateWithGuidance renders outside the virtual scroller
-      expect(screen.getByTestId('empty-state-with-guidance')).toBeInTheDocument()
-    })
-    // No backlog item cards should be visible
-    expect(screen.queryByText('Ops new')).not.toBeInTheDocument()
-    expect(screen.queryByText('Fin old')).not.toBeInTheDocument()
-  })
-
-  it('item click handler works on virtualized items', async () => {
-    const listResponse: BacklogListResponse = {
-      items: [
-        createMockItem({ id: 'v-1', title: 'Virtual item', identifier: 'VIX-V1' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 1,
-    }
-    const detailResponse: BacklogDetailResponse = {
-      item: createMockItem({
-        id: 'v-1',
-        title: 'Virtual item',
-        identifier: 'VIX-V1',
-        description: 'Virtual item detail',
-      }),
-      comments: [] as BacklogItemComment[],
-      activities: [],
-    }
-
-    globalThis.fetch = vi.fn().mockImplementation((url: string | URL) => {
-      const urlStr = typeof url === 'string' ? url : url.toString()
-      const isDetailRequest =
-        urlStr.includes('/backlog-items/') && urlStr.split('/').pop() !== 'backlog-items'
-      return Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve(isDetailRequest ? detailResponse : listResponse),
-      })
-    })
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Virtual item')).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByText('Virtual item'))
-
-    await waitFor(() => {
-      expect(screen.getByLabelText('Backlog item details')).toBeInTheDocument()
-    })
-
-    await waitFor(
-      () => {
-        expect(screen.getByText('Virtual item detail')).toBeInTheDocument()
-      },
-      { timeout: 3000 },
-    )
-  })
-
-  it('filter changes update the virtual list', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'Alpha item', isNew: true }),
-        createMockItem({ id: '2', title: 'Beta item', isNew: false }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 2,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha item')).toBeInTheDocument()
-      expect(screen.getByText('Beta item')).toBeInTheDocument()
-    })
-
-    // Toggle "New only"
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha item')).toBeInTheDocument()
-      expect(screen.queryByText('Beta item')).not.toBeInTheDocument()
-    })
   })
 
   it('resets virtual scroll position to top when filters change', async () => {
@@ -1386,254 +973,6 @@ describe('BacklogList', () => {
     })
   })
 
-  it('shows "X of Y items" when filters are active', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: '1', title: 'Match A', isNew: true }),
-        createMockItem({ id: '2', title: 'Match B', isNew: false }),
-        createMockItem({ id: '3', title: 'No match', isNew: false }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      // No filters — shows simple count without "of Y"
-      expect(screen.getByText('Showing 3 items')).toBeInTheDocument()
-    })
-
-    // Toggle "New only" (no debounce, instant filter)
-    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
-
-    await waitFor(() => {
-      // With filter — shows "X of Y" format
-      expect(screen.getByText('Showing 1 of 3 new items')).toBeInTheDocument()
-    })
-  })
-
-  // ─── Arrow Key Navigation Tests (AC #8) ───
-
-  it('ArrowDown moves focus to next item', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: 'a', title: 'Item A' }),
-        createMockItem({ id: 'b', title: 'Item B' }),
-        createMockItem({ id: 'c', title: 'Item C' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Item A')).toBeInTheDocument()
-    })
-
-    // Focus the first card
-    const firstCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[0]
-    firstCard.focus()
-    expect(firstCard).toHaveFocus()
-
-    // Press ArrowDown on the list container
-    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
-    fireEvent.keyDown(listContainer, { key: 'ArrowDown' })
-
-    // Focus should move to second card after requestAnimationFrame
-    await waitFor(() => {
-      const secondCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[1]
-      expect(secondCard).toHaveFocus()
-    })
-  })
-
-  it('ArrowUp moves focus to previous item', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: 'a', title: 'Item A' }),
-        createMockItem({ id: 'b', title: 'Item B' }),
-        createMockItem({ id: 'c', title: 'Item C' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Item A')).toBeInTheDocument()
-    })
-
-    // Focus the third card
-    const thirdCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[2]
-    thirdCard.focus()
-    expect(thirdCard).toHaveFocus()
-
-    // Press ArrowUp on the list container
-    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
-    fireEvent.keyDown(listContainer, { key: 'ArrowUp' })
-
-    // Focus should move to second card
-    await waitFor(() => {
-      const secondCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[1]
-      expect(secondCard).toHaveFocus()
-    })
-  })
-
-  it('Home key moves focus to first item', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: 'a', title: 'Item A' }),
-        createMockItem({ id: 'b', title: 'Item B' }),
-        createMockItem({ id: 'c', title: 'Item C' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Item A')).toBeInTheDocument()
-    })
-
-    // Focus the third card
-    const thirdCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[2]
-    thirdCard.focus()
-
-    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
-    fireEvent.keyDown(listContainer, { key: 'Home' })
-
-    await waitFor(() => {
-      const firstCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[0]
-      expect(firstCard).toHaveFocus()
-    })
-  })
-
-  it('End key moves focus to last item', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: 'a', title: 'Item A' }),
-        createMockItem({ id: 'b', title: 'Item B' }),
-        createMockItem({ id: 'c', title: 'Item C' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Item A')).toBeInTheDocument()
-    })
-
-    // Focus the first card
-    const firstCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[0]
-    firstCard.focus()
-
-    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
-    fireEvent.keyDown(listContainer, { key: 'End' })
-
-    await waitFor(() => {
-      const lastCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[2]
-      expect(lastCard).toHaveFocus()
-    })
-  })
-
-  it('scrolls virtualizer when arrow-nav targets a non-rendered item (virtualization edge case)', async () => {
-    virtualItemsLimit = 1
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: 'a', title: 'Item A' }),
-        createMockItem({ id: 'b', title: 'Item B' }),
-        createMockItem({ id: 'c', title: 'Item C' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 3,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Item A')).toBeInTheDocument()
-    })
-
-    const firstCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[0]
-    firstCard.focus()
-
-    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
-    fireEvent.keyDown(listContainer, { key: 'End' })
-
-    await waitFor(() => {
-      expect(scrollToIndex).toHaveBeenCalledWith(2, { align: 'auto' })
-    })
-  })
-
-  it('ArrowDown at last item does not change focus', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: 'a', title: 'Item A' }),
-        createMockItem({ id: 'b', title: 'Item B' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 2,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Item A')).toBeInTheDocument()
-    })
-
-    // Focus the last card
-    const lastCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[1]
-    lastCard.focus()
-    expect(lastCard).toHaveFocus()
-
-    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
-    fireEvent.keyDown(listContainer, { key: 'ArrowDown' })
-
-    // Last card should retain focus
-    expect(lastCard).toHaveFocus()
-  })
-
-  it('ArrowUp at first item does not change focus', async () => {
-    const response: BacklogListResponse = {
-      items: [
-        createMockItem({ id: 'a', title: 'Item A' }),
-        createMockItem({ id: 'b', title: 'Item B' }),
-      ],
-      pageInfo: { hasNextPage: false, endCursor: null },
-      totalCount: 2,
-    }
-    mockFetchSuccess(response)
-
-    render(<BacklogList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Item A')).toBeInTheDocument()
-    })
-
-    // Focus the first card
-    const firstCard = screen.getAllByRole('button', { name: /,\s*Priority/ })[0]
-    firstCard.focus()
-    expect(firstCard).toHaveFocus()
-
-    const listContainer = screen.getByRole('list', { name: 'Backlog items' })
-    fireEvent.keyDown(listContainer, { key: 'ArrowUp' })
-
-    // First card should retain focus
-    expect(firstCard).toHaveFocus()
-  })
-
   it('does not show "of Y" when all items are displayed', async () => {
     const response: BacklogListResponse = {
       items: [
@@ -1650,7 +989,55 @@ describe('BacklogList', () => {
     await waitFor(() => {
       expect(screen.getByText('Showing 2 items')).toBeInTheDocument()
     })
-    // Should NOT contain "of"
     expect(screen.queryByText(/of \d+ items/)).not.toBeInTheDocument()
+  })
+
+  // ─── Label filter empty state in virtual list ───
+
+  it('renders EmptyStateWithGuidance outside virtual scroller when label filters yield no results', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({
+          id: '1',
+          title: 'Siebel new',
+          labels: [{ id: 'l1', name: 'Siebel', color: '#ff0000' }],
+          isNew: true,
+        }),
+        createMockItem({
+          id: '2',
+          title: 'Gateway old',
+          labels: [{ id: 'l2', name: 'Gateway', color: '#00ff00' }],
+          isNew: false,
+        }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Siebel new')).toBeInTheDocument()
+    })
+
+    // Select Gateway label
+    const trigger = screen.getByRole('combobox', { name: /filter by label/i })
+    fireEvent.click(trigger)
+    const gatewayOption = await screen.findByRole('option', { name: /Gateway/ })
+    fireEvent.click(gatewayOption)
+
+    await waitFor(() => {
+      expect(screen.getByText('Gateway old')).toBeInTheDocument()
+    })
+
+    // Toggle "New only" — Gateway has no new items → empty state
+    fireEvent.click(screen.getByRole('button', { name: 'Show only new items, currently off' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('empty-state-with-guidance')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Siebel new')).not.toBeInTheDocument()
+    expect(screen.queryByText('Gateway old')).not.toBeInTheDocument()
   })
 })

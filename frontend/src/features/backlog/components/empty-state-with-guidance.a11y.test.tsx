@@ -8,10 +8,10 @@ import {
 
 const defaultProps = {
   keyword: '',
-  businessUnit: null,
+  selectedLabels: [] as string[],
   showNewOnly: false,
   onClearKeyword: vi.fn(),
-  onClearBusinessUnit: vi.fn(),
+  onClearLabels: vi.fn(),
   onClearNewOnly: vi.fn(),
   onClearAll: vi.fn(),
 }
@@ -27,11 +27,11 @@ describe('EmptyStateWithGuidance accessibility', () => {
     expectNoCriticalOrSeriousViolations(results)
   })
 
-  it('should have no axe violations with business unit filter active', async () => {
+  it('should have no axe violations with label filter active', async () => {
     const results = await checkAccessibility(
       <EmptyStateWithGuidance
         {...defaultProps}
-        businessUnit="Vixxo"
+        selectedLabels={['Siebel']}
       />
     )
     expectNoCriticalOrSeriousViolations(results)
@@ -52,7 +52,7 @@ describe('EmptyStateWithGuidance accessibility', () => {
       <EmptyStateWithGuidance
         {...defaultProps}
         keyword="test"
-        businessUnit="Engineering"
+        selectedLabels={['Siebel', 'Gateway']}
         showNewOnly={true}
       />
     )
@@ -75,7 +75,7 @@ describe('EmptyStateWithGuidance accessibility', () => {
       <EmptyStateWithGuidance
         {...defaultProps}
         keyword="search"
-        businessUnit="Vixxo"
+        selectedLabels={['Siebel']}
       />
     )
 

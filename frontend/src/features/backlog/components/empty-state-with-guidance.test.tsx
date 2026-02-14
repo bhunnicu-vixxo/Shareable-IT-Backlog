@@ -9,10 +9,10 @@ import {
 function renderComponent(overrides: Partial<EmptyStateWithGuidanceProps> = {}) {
   const defaultProps: EmptyStateWithGuidanceProps = {
     keyword: '',
-    businessUnit: null,
+    selectedLabels: [],
     showNewOnly: false,
     onClearKeyword: vi.fn(),
-    onClearBusinessUnit: vi.fn(),
+    onClearLabels: vi.fn(),
     onClearNewOnly: vi.fn(),
     onClearAll: vi.fn(),
     ...overrides,
@@ -30,7 +30,7 @@ describe('EmptyStateWithGuidance', () => {
   })
 
   it('renders filter icon when keyword is not active', () => {
-    renderComponent({ businessUnit: 'Finance' })
+    renderComponent({ selectedLabels: ['Siebel'] })
     expect(screen.getByTestId('empty-state-icon-filter')).toBeInTheDocument()
     expect(screen.queryByTestId('empty-state-icon-search')).not.toBeInTheDocument()
   })
@@ -47,9 +47,14 @@ describe('EmptyStateWithGuidance', () => {
     expect(screen.getByText('No items found matching "vpn"')).toBeInTheDocument()
   })
 
-  it('shows correct heading when only business unit is active', () => {
-    renderComponent({ businessUnit: 'Operations' })
-    expect(screen.getByText('No items found for Operations')).toBeInTheDocument()
+  it('shows correct heading when only labels are active (single)', () => {
+    renderComponent({ selectedLabels: ['Siebel'] })
+    expect(screen.getByText('No items found for Siebel')).toBeInTheDocument()
+  })
+
+  it('shows correct heading when only labels are active (multiple)', () => {
+    renderComponent({ selectedLabels: ['Siebel', 'Gateway'] })
+    expect(screen.getByText('No items found for Siebel, Gateway')).toBeInTheDocument()
   })
 
   it('shows correct heading when only new-only is active', () => {
@@ -57,13 +62,13 @@ describe('EmptyStateWithGuidance', () => {
     expect(screen.getByText('No new items')).toBeInTheDocument()
   })
 
-  it('shows correct heading when BU + new-only are active', () => {
-    renderComponent({ businessUnit: 'Finance', showNewOnly: true })
-    expect(screen.getByText('No new items for Finance')).toBeInTheDocument()
+  it('shows correct heading when labels + new-only are active', () => {
+    renderComponent({ selectedLabels: ['Siebel'], showNewOnly: true })
+    expect(screen.getByText('No new items for Siebel')).toBeInTheDocument()
   })
 
-  it('shows correct heading when keyword + BU are active (keyword takes priority)', () => {
-    renderComponent({ keyword: 'server', businessUnit: 'Finance' })
+  it('shows correct heading when keyword + labels are active (keyword takes priority)', () => {
+    renderComponent({ keyword: 'server', selectedLabels: ['Siebel'] })
     expect(screen.getByText('No items found matching "server"')).toBeInTheDocument()
   })
 
@@ -73,7 +78,7 @@ describe('EmptyStateWithGuidance', () => {
   })
 
   it('shows correct heading when all filters are active (keyword takes priority)', () => {
-    renderComponent({ keyword: 'update', businessUnit: 'Finance', showNewOnly: true })
+    renderComponent({ keyword: 'update', selectedLabels: ['Siebel'], showNewOnly: true })
     expect(screen.getByText('No items found matching "update"')).toBeInTheDocument()
   })
 
@@ -83,16 +88,16 @@ describe('EmptyStateWithGuidance', () => {
     renderComponent({ keyword: 'test' })
     expect(
       screen.getByText(
-        'Try different keywords, adjust your filters, or check that items are assigned to the expected business unit.',
+        'Try different keywords, adjust your filters, or check that items have the expected labels.',
       ),
     ).toBeInTheDocument()
   })
 
-  it('shows BU description when only business unit is active', () => {
-    renderComponent({ businessUnit: 'Finance' })
+  it('shows label description when only labels are active', () => {
+    renderComponent({ selectedLabels: ['Siebel'] })
     expect(
       screen.getByText(
-        'Try selecting a different business unit, clear the filter, or check business unit assignment.',
+        'Try selecting different labels, clear the filter, or check label assignment.',
       ),
     ).toBeInTheDocument()
   })
@@ -104,11 +109,11 @@ describe('EmptyStateWithGuidance', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows BU + new-only description when both are active', () => {
-    renderComponent({ businessUnit: 'Operations', showNewOnly: true })
+  it('shows labels + new-only description when both are active', () => {
+    renderComponent({ selectedLabels: ['Siebel'], showNewOnly: true })
     expect(
       screen.getByText(
-        'Try selecting a different business unit, remove the "New only" filter to see all items, or check business unit assignment.',
+        'Try selecting different labels, remove the "New only" filter to see all items, or check label assignment.',
       ),
     ).toBeInTheDocument()
   })
@@ -133,7 +138,7 @@ describe('EmptyStateWithGuidance', () => {
   })
 
   it('does not show "Clear search filter" when keyword is empty', () => {
-    renderComponent({ businessUnit: 'Finance' })
+    renderComponent({ selectedLabels: ['Siebel'] })
     expect(screen.queryByRole('button', { name: 'Clear search filter' })).not.toBeInTheDocument()
   })
 
@@ -144,23 +149,23 @@ describe('EmptyStateWithGuidance', () => {
     expect(props.onClearKeyword).toHaveBeenCalledTimes(1)
   })
 
-  it('shows "Clear business unit filter" button only when BU is active', () => {
-    renderComponent({ businessUnit: 'Finance' })
-    expect(screen.getByRole('button', { name: 'Clear business unit filter' })).toBeInTheDocument()
+  it('shows "Clear label filter" button only when labels are active', () => {
+    renderComponent({ selectedLabels: ['Siebel'] })
+    expect(screen.getByRole('button', { name: 'Clear label filter' })).toBeInTheDocument()
   })
 
-  it('does not show "Clear business unit filter" when BU is null', () => {
+  it('does not show "Clear label filter" when no labels selected', () => {
     renderComponent({ showNewOnly: true })
     expect(
-      screen.queryByRole('button', { name: 'Clear business unit filter' }),
+      screen.queryByRole('button', { name: 'Clear label filter' }),
     ).not.toBeInTheDocument()
   })
 
-  it('"Clear business unit filter" calls onClearBusinessUnit', async () => {
+  it('"Clear label filter" calls onClearLabels', async () => {
     const user = userEvent.setup()
-    const { props } = renderComponent({ businessUnit: 'Finance' })
-    await user.click(screen.getByRole('button', { name: 'Clear business unit filter' }))
-    expect(props.onClearBusinessUnit).toHaveBeenCalledTimes(1)
+    const { props } = renderComponent({ selectedLabels: ['Siebel'] })
+    await user.click(screen.getByRole('button', { name: 'Clear label filter' }))
+    expect(props.onClearLabels).toHaveBeenCalledTimes(1)
   })
 
   it('shows "Turn off New only" button only when showNewOnly is active', () => {
@@ -181,10 +186,10 @@ describe('EmptyStateWithGuidance', () => {
   })
 
   it('shows all individual clear buttons when all filters are active', () => {
-    renderComponent({ keyword: 'test', businessUnit: 'Finance', showNewOnly: true })
+    renderComponent({ keyword: 'test', selectedLabels: ['Siebel'], showNewOnly: true })
     expect(screen.getByRole('button', { name: 'Clear all filters' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Clear search filter' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Clear business unit filter' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear label filter' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Turn off New only' })).toBeInTheDocument()
   })
 
@@ -201,7 +206,7 @@ describe('EmptyStateWithGuidance', () => {
   })
 
   it('all action buttons are keyboard-focusable', () => {
-    renderComponent({ keyword: 'test', businessUnit: 'Finance', showNewOnly: true })
+    renderComponent({ keyword: 'test', selectedLabels: ['Siebel'], showNewOnly: true })
     const buttons = screen.getAllByRole('button')
     buttons.forEach((button) => {
       expect(button).not.toBeDisabled()
@@ -213,9 +218,6 @@ describe('EmptyStateWithGuidance', () => {
   it('title uses brand.gray token (no gray.800 or CSS variable anti-patterns)', () => {
     renderComponent({ keyword: 'test' })
     const title = screen.getByText('No items found matching "test"')
-    // Chakra v3 applies color tokens via CSS classes, not inline styles.
-    // Verify the rendered element's outerHTML doesn't contain anti-patterns:
-    // no CSS variable references (old icon pattern) and no old generic gray token names.
     expect(title.outerHTML).not.toContain('var(--chakra-colors-')
     expect(title.outerHTML).not.toContain('gray-800')
     expect(title.outerHTML).not.toContain('gray.800')
@@ -224,10 +226,8 @@ describe('EmptyStateWithGuidance', () => {
   it('description uses brand.grayLight token (no gray.600 or CSS variable anti-patterns)', () => {
     renderComponent({ keyword: 'test' })
     const description = screen.getByText(
-      'Try different keywords, adjust your filters, or check that items are assigned to the expected business unit.',
+      'Try different keywords, adjust your filters, or check that items have the expected labels.',
     )
-    // Chakra v3 applies color tokens via CSS classes, not inline styles.
-    // Verify the rendered element's outerHTML doesn't contain anti-patterns.
     expect(description.outerHTML).not.toContain('var(--chakra-colors-')
     expect(description.outerHTML).not.toContain('gray-600')
     expect(description.outerHTML).not.toContain('gray.600')
@@ -237,25 +237,20 @@ describe('EmptyStateWithGuidance', () => {
     renderComponent({ keyword: 'test' })
     const icon = screen.getByTestId('empty-state-icon-search')
     const iconColor = icon.getAttribute('color')
-    // Icon should NOT have a color attribute — it inherits via currentColor from the Indicator wrapper
     expect(iconColor).toBeNull()
   })
 
   it('filter icon color inherits from Indicator wrapper (no CSS variable on icon SVG)', () => {
-    renderComponent({ businessUnit: 'Finance' })
+    renderComponent({ selectedLabels: ['Siebel'] })
     const icon = screen.getByTestId('empty-state-icon-filter')
     const iconColor = icon.getAttribute('color')
-    // Icon should NOT have a color attribute — it inherits via currentColor from the Indicator wrapper
     expect(iconColor).toBeNull()
   })
 
   it('buttons do NOT have inline _focusVisible style overrides', () => {
-    renderComponent({ keyword: 'test', businessUnit: 'Finance', showNewOnly: true })
+    renderComponent({ keyword: 'test', selectedLabels: ['Siebel'], showNewOnly: true })
     const buttons = screen.getAllByRole('button')
     buttons.forEach((button) => {
-      // Check the full outerHTML (not just the style attribute) for focus-related
-      // anti-patterns. Inline _focusVisible overrides would inject CSS variable
-      // references or outline properties into the rendered element.
       const html = button.outerHTML
       expect(html).not.toContain('outlineColor')
       expect(html).not.toContain('outline-color')
@@ -294,7 +289,7 @@ describe('EmptyStateWithGuidance', () => {
   })
 
   it('compact mode hides indicator/icon (filter variant)', () => {
-    renderComponent({ businessUnit: 'Finance', compact: true })
+    renderComponent({ selectedLabels: ['Siebel'], compact: true })
     expect(screen.queryByTestId('empty-state-icon-filter')).not.toBeInTheDocument()
     expect(screen.queryByTestId('empty-state-icon-search')).not.toBeInTheDocument()
   })
@@ -302,24 +297,24 @@ describe('EmptyStateWithGuidance', () => {
   it('compact mode hides individual clear buttons (only "Clear all filters" shown)', () => {
     renderComponent({
       keyword: 'test',
-      businessUnit: 'Finance',
+      selectedLabels: ['Siebel'],
       showNewOnly: true,
       compact: true,
     })
     expect(screen.getByRole('button', { name: 'Clear all filters' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Clear search filter' })).not.toBeInTheDocument()
     expect(
-      screen.queryByRole('button', { name: 'Clear business unit filter' }),
+      screen.queryByRole('button', { name: 'Clear label filter' }),
     ).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Turn off New only' })).not.toBeInTheDocument()
   })
 
   it('non-compact mode (default) renders at standard size with all buttons', () => {
-    renderComponent({ keyword: 'test', businessUnit: 'Finance', showNewOnly: true })
+    renderComponent({ keyword: 'test', selectedLabels: ['Siebel'], showNewOnly: true })
     expect(screen.getByTestId('empty-state-icon-search')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Clear all filters' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Clear search filter' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Clear business unit filter' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear label filter' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Turn off New only' })).toBeInTheDocument()
   })
 
@@ -354,7 +349,6 @@ describe('EmptyStateWithGuidance', () => {
     )
     const normalDescClass = normalDesc.className
 
-    // Compact mode (fontSize="sm"/"xs") produces different CSS classes than default
     expect(compactTitleClass).not.toBe(normalTitleClass)
     expect(compactDescClass).not.toBe(normalDescClass)
   })
@@ -369,7 +363,6 @@ describe('EmptyStateWithGuidance', () => {
     const normalRoot = screen.getByTestId('empty-state-with-guidance')
     const normalRootClass = normalRoot.className
 
-    // Compact mode (px="4"/py="6") produces different CSS classes than default (px="6"/py="10")
     expect(compactRootClass).not.toBe(normalRootClass)
   })
 })
