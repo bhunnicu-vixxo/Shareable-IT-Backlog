@@ -122,6 +122,27 @@ describe('BacklogList', () => {
     expect(screen.getByText('Second item')).toBeInTheDocument()
   })
 
+  it('excludes completed and cancelled items from the backlog view', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: '1', title: 'Active item', statusType: 'started' }),
+        createMockItem({ id: '2', title: 'Completed item', statusType: 'completed' }),
+        createMockItem({ id: '3', title: 'Cancelled item', statusType: 'cancelled' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 3,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Active item')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Completed item')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cancelled item')).not.toBeInTheDocument()
+  })
+
   it('displays results count', async () => {
     const response: BacklogListResponse = {
       items: [

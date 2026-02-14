@@ -10,16 +10,12 @@ export interface EmptyStateWithGuidanceProps {
   selectedLabels: string[]
   /** Whether the "New only" toggle is active. */
   showNewOnly: boolean
-  /** Whether completed/cancelled items are hidden. */
-  hideDone?: boolean
   /** Callback to clear the keyword search. */
   onClearKeyword: () => void
   /** Callback to clear the label filter. */
   onClearLabels: () => void
   /** Callback to clear the "New only" toggle. */
   onClearNewOnly: () => void
-  /** Callback to show completed/cancelled items (clear hideDone filter). */
-  onClearHideDone?: () => void
   /** Callback to clear all active filters at once. */
   onClearAll: () => void
   /** When true, renders a condensed layout suitable for tight spaces. */
@@ -31,7 +27,6 @@ function getHeading(
   keyword: string,
   selectedLabels: string[],
   showNewOnly: boolean,
-  hideDone: boolean,
 ): string {
   const trimmedKeyword = keyword.trim()
 
@@ -57,11 +52,6 @@ function getHeading(
     return 'No new items'
   }
 
-  // Hide done only (all items are completed/cancelled)
-  if (hideDone) {
-    return 'All items are completed'
-  }
-
   // Fallback (shouldn't normally happen if at least one filter is active)
   return 'No items found'
 }
@@ -71,7 +61,6 @@ function getDescription(
   keyword: string,
   selectedLabels: string[],
   showNewOnly: boolean,
-  hideDone: boolean,
 ): string {
   const trimmedKeyword = keyword.trim()
 
@@ -91,10 +80,6 @@ function getDescription(
     return 'All items have been reviewed. Remove the filter to see all items.'
   }
 
-  if (hideDone) {
-    return 'Click "Show done" to view completed and cancelled items.'
-  }
-
   return 'Try adjusting your filters to find what you are looking for.'
 }
 
@@ -108,11 +93,9 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
   keyword,
   selectedLabels,
   showNewOnly,
-  hideDone = false,
   onClearKeyword,
   onClearLabels,
   onClearNewOnly,
-  onClearHideDone,
   onClearAll,
   compact = false,
 }: EmptyStateWithGuidanceProps) {
@@ -159,14 +142,14 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
           color="fg.brand"
           fontSize={compact ? 'sm' : undefined}
         >
-          {getHeading(keyword, selectedLabels, showNewOnly, hideDone)}
+          {getHeading(keyword, selectedLabels, showNewOnly)}
         </EmptyState.Title>
         <EmptyState.Description
           color="fg.brandMuted"
           maxW="72ch"
           fontSize={compact ? 'xs' : undefined}
         >
-          {getDescription(keyword, selectedLabels, showNewOnly, hideDone)}
+          {getDescription(keyword, selectedLabels, showNewOnly)}
         </EmptyState.Description>
       </EmptyState.Content>
       <HStack gap="2" flexWrap="wrap" justifyContent="center">
@@ -186,11 +169,6 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
         {!compact && showNewOnly && (
           <Button onClick={onClearNewOnly} variant="outline" size="sm">
             Turn off New only
-          </Button>
-        )}
-        {!compact && hideDone && onClearHideDone && (
-          <Button onClick={onClearHideDone} variant="outline" size="sm">
-            Show done
           </Button>
         )}
       </HStack>
