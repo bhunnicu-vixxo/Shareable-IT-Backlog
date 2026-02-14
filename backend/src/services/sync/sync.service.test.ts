@@ -31,6 +31,12 @@ vi.mock('./sync-history.service.js', () => ({
   completeSyncHistoryEntry: (...args: unknown[]) => mockCompleteSyncHistoryEntry(...args),
 }))
 
+// Mock the label-visibility service
+const mockUpsertLabelsFromSync = vi.fn()
+vi.mock('../labels/label-visibility.service.js', () => ({
+  upsertLabelsFromSync: (...args: unknown[]) => mockUpsertLabelsFromSync(...args),
+}))
+
 // Import after mocking
 import { linearClient } from './linear-client.service.js'
 import { toBacklogItemDtosResilient } from './linear-transformers.js'
@@ -86,6 +92,9 @@ describe('SyncService', () => {
     // Default: sync history operations succeed
     mockCreateSyncHistoryEntry.mockResolvedValue(1)
     mockCompleteSyncHistoryEntry.mockResolvedValue(undefined)
+
+    // Default: label upsert succeeds
+    mockUpsertLabelsFromSync.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -685,6 +694,82 @@ describe('SyncService', () => {
 
       // Sync still succeeds (in-memory status is correct)
       expect(service.getStatus().status).toBe('success')
+    })
+  })
+
+  describe('label upsert during sync', () => {
+    it('should upsert unique label names from synced items', async () => {
+      const mockDtos = [
+        createMockBacklogItem({
+          id: 'i-1',
+          labels: [
+            { id: 'l-1', name: 'Bug', color: '#f00' },
+            { id: 'l-2', name: 'Feature', color: '#0f0' },
+          ],
+        }),
+        createMockBacklogItem({
+          id: 'i-2',
+          labels: [
+            { id: 'l-1', name: 'Bug', color: '#f00' },
+            { id: 'l-3', name: 'Enhancement', color: '#00f' },
+          ],
+        }),
+      ]
+
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }, { id: 'i-2' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
+
+      await service.runSync()
+
+      expect(mockUpsertLabelsFromSync).toHaveBeenCalledTimes(1)
+      const labelNames = mockUpsertLabelsFromSync.mock.calls[0][0] as string[]
+      expect(labelNames).toHaveLength(3)
+      expect(labelNames).toContain('Bug')
+      expect(labelNames).toContain('Feature')
+      expect(labelNames).toContain('Enhancement')
+    })
+
+    it('should not call upsert when items have no labels', async () => {
+      const mockDtos = [createMockBacklogItem({ id: 'i-1', labels: [] })]
+
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
+
+      await service.runSync()
+
+      expect(mockUpsertLabelsFromSync).not.toHaveBeenCalled()
+    })
+
+    it('should continue sync even if label upsert fails', async () => {
+      mockUpsertLabelsFromSync.mockRejectedValue(new Error('Label DB error'))
+
+      const mockDtos = [
+        createMockBacklogItem({
+          id: 'i-1',
+          labels: [{ id: 'l-1', name: 'Bug', color: '#f00' }],
+        }),
+      ]
+
+      mockGetIssuesByProject.mockResolvedValue({
+        data: [{ id: 'i-1' }] as never[],
+        rateLimit: null,
+        pageInfo: { hasNextPage: false, endCursor: null },
+      })
+      mockToBacklogItemDtosResilient.mockResolvedValue({ items: mockDtos, failures: [] })
+
+      await service.runSync()
+
+      // Sync should still succeed despite label upsert failure
+      expect(service.getStatus().status).toBe('success')
+      expect(service.getCachedItems()).toHaveLength(1)
     })
   })
 })

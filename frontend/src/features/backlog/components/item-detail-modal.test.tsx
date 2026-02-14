@@ -175,6 +175,29 @@ describe('ItemDetailModal', () => {
     expect(screen.getByText('API')).toBeInTheDocument()
   })
 
+  it('filters labels when visibleLabelNames is provided', async () => {
+    const detail: BacklogDetailResponse = {
+      item: createMockItem(),
+      comments: [],
+      activities: [],
+    }
+    mockFetchDetail(detail)
+
+    render(
+      <ItemDetailModal
+        isOpen={true}
+        itemId="issue-1"
+        onClose={mockOnClose}
+        visibleLabelNames={new Set(['Backend'])}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Backend')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('API')).not.toBeInTheDocument()
+  })
+
   it('renders description as markdown', async () => {
     const detail: BacklogDetailResponse = {
       item: createMockItem({ description: 'Some **bold** text' }),

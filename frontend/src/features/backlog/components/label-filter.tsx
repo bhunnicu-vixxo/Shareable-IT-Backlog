@@ -10,6 +10,7 @@ import {
 } from '@chakra-ui/react'
 import { getLabelColor } from '../utils/label-colors'
 import type { BacklogItem } from '../types/backlog.types'
+import { useVisibleLabels } from '@/shared/hooks/use-visible-labels'
 
 export interface LabelFilterProps {
   /** Full (unfiltered) list of backlog items to extract unique labels from */
@@ -41,8 +42,10 @@ export const LabelFilter = memo(function LabelFilter({
   onChange,
   compact = false,
 }: LabelFilterProps) {
+  const { visibleLabels, isLoading: isVisibleLabelsLoading } = useVisibleLabels()
+
   // Extract unique label names sorted alphabetically, with item counts
-  const labelOptions = useMemo(() => {
+  const allLabelOptions = useMemo(() => {
     const labelCounts = new Map<string, number>()
     for (const item of items) {
       for (const label of item.labels) {
@@ -57,6 +60,13 @@ export const LabelFilter = memo(function LabelFilter({
         count,
       }))
   }, [items])
+
+  // Filter to only show admin-approved visible labels (AC #3, #4, #6)
+  const labelOptions = useMemo(() => {
+    if (visibleLabels.length === 0) return []
+    const visibleSet = new Set(visibleLabels)
+    return allLabelOptions.filter((opt) => visibleSet.has(opt.value))
+  }, [allLabelOptions, visibleLabels])
 
   const collection = useMemo(
     () => createListCollection({ items: labelOptions }),
@@ -80,6 +90,28 @@ export const LabelFilter = memo(function LabelFilter({
       liveRegionRef.current.textContent = text
     }
   }, [value])
+
+  // AC #6: If zero labels are enabled, hide the label filter entirely
+  // BUT: avoid UI flicker while visible labels are still loading (do not leak labels).
+  if (isVisibleLabelsLoading) {
+    return (
+      <Box
+        minW={compact ? '140px' : '160px'}
+        height={compact ? '28px' : '32px'}
+        borderRadius="md"
+        bg="surface.sunken"
+        borderWidth="1px"
+        borderColor="border.subtle"
+        data-testid="label-filter-loading"
+        role="status"
+        aria-label="Loading label filter"
+      />
+    )
+  }
+
+  if (labelOptions.length === 0) {
+    return null
+  }
 
   // Determine sizing based on compact prop
   const selectSize = compact ? 'xs' : 'sm'

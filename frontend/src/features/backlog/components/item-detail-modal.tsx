@@ -91,6 +91,11 @@ export interface ItemDetailModalProps {
   onClose: () => void
   /** Optional ref for the element that triggered the modal (for focus return). */
   triggerRef?: React.RefObject<HTMLElement | null>
+  /**
+   * When provided, labels are filtered to only those names included in the set.
+   * Used to hide non-visible labels for non-privileged users.
+   */
+  visibleLabelNames?: ReadonlySet<string>
 }
 
 /**
@@ -107,6 +112,7 @@ export function ItemDetailModal({
   itemId,
   onClose,
   triggerRef,
+  visibleLabelNames,
 }: ItemDetailModalProps) {
   const { canViewLinearLinks } = usePermissions()
   const { data, isLoading, isError, error, refetch } = useBacklogItemDetail(itemId)
@@ -230,6 +236,7 @@ export function ItemDetailModal({
                 item={data.item}
                 comments={data.comments}
                 activities={data.activities}
+                visibleLabelNames={visibleLabelNames}
               />
             )}
 
@@ -269,11 +276,16 @@ function ItemDetailContent({
   item,
   comments,
   activities,
+  visibleLabelNames,
 }: {
   item: BacklogItem
   comments: BacklogItemComment[]
   activities: IssueActivity[]
+  visibleLabelNames?: ReadonlySet<string>
 }) {
+  const labelsToRender = visibleLabelNames
+    ? item.labels.filter((l) => visibleLabelNames.has(l.name))
+    : item.labels
   return (
     <VStack align="stretch" gap="5">
       {/* Metadata grid — refined label/value hierarchy */}
@@ -293,11 +305,11 @@ function ItemDetailContent({
       </Box>
 
       {/* Labels */}
-      {item.labels.length > 0 && (
+      {labelsToRender.length > 0 && (
         <Box>
           <SectionHeading>Labels</SectionHeading>
           <Flex gap="1.5" flexWrap="wrap">
-            {item.labels.map((label) => {
+            {labelsToRender.map((label) => {
               const labelColor = getLabelColor(label.name)
               return (
                 <HStack

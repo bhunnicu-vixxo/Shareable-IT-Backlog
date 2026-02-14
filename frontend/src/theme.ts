@@ -150,14 +150,14 @@ const buttonRecipe = defineRecipe({
         _active: { bg: 'brand.greenActive' },
         _disabled: { opacity: 0.4, cursor: 'not-allowed', pointerEvents: 'none' },
       },
-      // Secondary — gray outlined, gray text
+      // Secondary — outlined, uses semantic tokens for dark mode
       outline: {
         borderWidth: '1px',
-        borderColor: 'brand.gray',
-        color: 'brand.gray',
+        borderColor: 'border.default',
+        color: 'fg.brand',
         bg: 'transparent',
-        _hover: { bg: 'brand.grayBg' },
-        _active: { bg: 'brand.grayBg' },
+        _hover: { bg: 'surface.hover' },
+        _active: { bg: 'surface.hover' },
         _disabled: { opacity: 0.4, cursor: 'not-allowed', pointerEvents: 'none' },
       },
       // Tertiary — text-link style, accessible green text
@@ -260,6 +260,36 @@ const alertRecipe = defineSlotRecipe({
         indicator: { color: 'brand.teal' },
       },
     },
+  },
+})
+
+// ---------------------------------------------------------------------------
+// Switch slot recipe — high-contrast toggles for dark/light mode
+// ---------------------------------------------------------------------------
+const switchRecipe = defineSlotRecipe({
+  slots: ['root', 'control', 'thumb'],
+  variants: {
+    variant: {
+      // Default variant — brand green when checked, visible gray when unchecked
+      solid: {
+        control: {
+          bg: { _light: '#CBD5E0', _dark: '#4A5568' },
+          borderRadius: 'full',
+          transition: 'background 0.2s',
+          _checked: {
+            bg: { _light: '#8E992E', _dark: '#A3B235' },
+          },
+        },
+        thumb: {
+          bg: 'white',
+          borderRadius: 'full',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+        },
+      },
+    },
+  },
+  defaultVariants: {
+    variant: 'solid',
   },
 })
 
@@ -391,6 +421,7 @@ const config = defineConfig({
     },
     slotRecipes: {
       alert: alertRecipe,
+      switch: switchRecipe,
     },
   },
 

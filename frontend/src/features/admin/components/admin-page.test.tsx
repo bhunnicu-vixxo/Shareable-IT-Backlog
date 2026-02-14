@@ -15,6 +15,19 @@ vi.mock('./sync-control', () => ({
   SyncControl: () => <div data-testid="sync-control">SyncControl</div>,
 }))
 
+vi.mock('./label-visibility-manager', () => ({
+  LabelVisibilityManager: () => <div data-testid="label-visibility-manager">LabelVisibilityManager</div>,
+}))
+
+vi.mock('../hooks/use-label-visibility', () => ({
+  useLabelVisibility: () => ({
+    labels: [],
+    unreviewedCount: 0,
+    isLoading: false,
+    error: null,
+  }),
+}))
+
 import { AdminPage } from './admin-page'
 
 describe('AdminPage', () => {
@@ -54,13 +67,13 @@ describe('AdminPage', () => {
     expect(screen.getByTestId('sync-control')).toBeInTheDocument()
   })
 
-  it('clicking Settings tab shows placeholder message', async () => {
+  it('clicking Settings tab shows LabelVisibilityManager', async () => {
     const user = userEvent.setup()
     render(<AdminPage />)
 
     await user.click(screen.getByTestId('tab-settings'))
 
-    expect(screen.getByText('System settings will be available in a future update.')).toBeInTheDocument()
+    expect(screen.getByTestId('label-visibility-manager')).toBeInTheDocument()
   })
 
   // --- Screen Reader Support (Story 11.2) ---
@@ -104,7 +117,7 @@ describe('AdminPage', () => {
 
     // Switch to Settings tab
     await user.click(screen.getByTestId('tab-settings'))
-    expect(screen.getByText('System settings will be available in a future update.')).toBeInTheDocument()
+    expect(screen.getByTestId('label-visibility-manager')).toBeInTheDocument()
 
     // Switch back to Users tab
     await user.click(screen.getByTestId('tab-users'))

@@ -38,10 +38,19 @@ vi.mock('../services/users/user.service.js', () => ({
   enableUser: mockEnableUser,
 }))
 
+const { mockGetCachedItems } = vi.hoisted(() => ({
+  mockGetCachedItems: vi.fn(),
+}))
+
+const { mockListAllLabels } = vi.hoisted(() => ({
+  mockListAllLabels: vi.fn(),
+}))
+
 vi.mock('../services/sync/sync.service.js', () => ({
   syncService: {
     getStatus: mockGetStatus,
     runSync: mockRunSync,
+    getCachedItems: mockGetCachedItems,
   },
 }))
 
@@ -60,6 +69,12 @@ vi.mock('../services/sync/sync-scheduler.service.js', () => ({
     isRunning: mockSchedulerIsRunning,
     getSchedule: mockSchedulerGetSchedule,
   },
+}))
+
+vi.mock('../services/labels/label-visibility.service.js', () => ({
+  listAllLabels: mockListAllLabels,
+  updateLabelVisibility: vi.fn(),
+  bulkUpdateVisibility: vi.fn(),
 }))
 
 vi.mock('../services/audit/audit.service.js', () => ({
@@ -86,6 +101,7 @@ import {
   adminTriggerSync,
   getSyncHistory,
   updateSyncSchedule,
+  getLabels,
 } from './admin.controller.js'
 
 function createMockReqResNext(
@@ -461,6 +477,54 @@ describe('admin.controller', () => {
       ;(req as unknown as Record<string, unknown>).query = {}
 
       await getSyncHistory(req, res, next)
+
+      expect(next).toHaveBeenCalledWith(error)
+    })
+  })
+
+  describe('getLabels', () => {
+    it('should return labels with item counts from sync cache', async () => {
+      const labels = [
+        { labelName: 'Bug', isVisible: true, showOnCards: true, firstSeenAt: '2026-02-10', reviewedAt: '2026-02-11', updatedAt: '2026-02-11', updatedBy: 1, itemCount: 0 },
+        { labelName: 'Feature', isVisible: false, showOnCards: true, firstSeenAt: '2026-02-10', reviewedAt: null, updatedAt: '2026-02-10', updatedBy: null, itemCount: 0 },
+      ]
+      mockListAllLabels.mockResolvedValue(labels)
+      mockGetCachedItems.mockReturnValue([
+        { id: 'i-1', labels: [{ id: 'l-1', name: 'Bug', color: '#f00' }, { id: 'l-2', name: 'Feature', color: '#0f0' }] },
+        { id: 'i-2', labels: [{ id: 'l-1', name: 'Bug', color: '#f00' }] },
+        { id: 'i-3', labels: [{ id: 'l-1', name: 'Bug', color: '#f00' }] },
+      ])
+
+      const { req, res, next } = createMockReqResNext()
+      await getLabels(req, res, next)
+
+      expect(res.json).toHaveBeenCalledWith([
+        expect.objectContaining({ labelName: 'Bug', itemCount: 3 }),
+        expect.objectContaining({ labelName: 'Feature', itemCount: 1 }),
+      ])
+    })
+
+    it('should return labels with zero counts when sync cache is empty', async () => {
+      const labels = [
+        { labelName: 'Bug', isVisible: true, showOnCards: true, firstSeenAt: '2026-02-10', reviewedAt: '2026-02-11', updatedAt: '2026-02-11', updatedBy: 1, itemCount: 0 },
+      ]
+      mockListAllLabels.mockResolvedValue(labels)
+      mockGetCachedItems.mockReturnValue(null)
+
+      const { req, res, next } = createMockReqResNext()
+      await getLabels(req, res, next)
+
+      expect(res.json).toHaveBeenCalledWith([
+        expect.objectContaining({ labelName: 'Bug', itemCount: 0 }),
+      ])
+    })
+
+    it('should pass errors to next', async () => {
+      const error = new Error('Database error')
+      mockListAllLabels.mockRejectedValue(error)
+      const { req, res, next } = createMockReqResNext()
+
+      await getLabels(req, res, next)
 
       expect(next).toHaveBeenCalledWith(error)
     })
