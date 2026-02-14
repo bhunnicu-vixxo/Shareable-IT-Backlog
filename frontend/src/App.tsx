@@ -56,7 +56,13 @@ function App() {
     )
   }
 
-  // 2. Not identified — show identify form
+  // 2. Service unavailable — API is completely unreachable
+  // Check this before auth flow so unauthenticated users see the error page during outages
+  if (isServiceUnavailable) {
+    return <ServiceUnavailable onRetry={retryService} />
+  }
+
+  // 3. Not identified — show identify form
   if (!isIdentified) {
     return (
       <IdentifyForm
@@ -67,7 +73,7 @@ function App() {
     )
   }
 
-  // 3. Identified but not approved — show pending approval page
+  // 4. Identified but not approved — show pending approval page
   if (!isApproved) {
     return (
       <PendingApproval
@@ -77,12 +83,7 @@ function App() {
     )
   }
 
-  // 3b. Service unavailable — API is completely unreachable
-  if (isServiceUnavailable) {
-    return <ServiceUnavailable onRetry={retryService} />
-  }
-
-  // 4. Authenticated + approved — show app routes with shared header
+  // 5. Authenticated + approved — show app routes with shared header
   return (
     <ErrorBoundary
       fallbackRender={({ error, resetErrorBoundary }) => (
