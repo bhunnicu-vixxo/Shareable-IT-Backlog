@@ -3,10 +3,10 @@ import { render, screen, fireEvent } from '@/utils/test-utils'
 import { BacklogItemCard, BacklogItemCardSkeleton } from './backlog-item-card'
 import type { BacklogItem } from '../types/backlog.types'
 
-// Mock useAuth to control role-based rendering
-const mockUseAuth = vi.fn()
-vi.mock('@/features/auth/hooks/use-auth', () => ({
-  useAuth: () => mockUseAuth(),
+// Mock usePermissions to control role-based rendering
+const mockUsePermissions = vi.fn()
+vi.mock('@/features/auth/hooks/use-permissions', () => ({
+  usePermissions: () => mockUsePermissions(),
 }))
 
 function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
@@ -35,26 +35,18 @@ function createMockItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
   }
 }
 
-// Default to regular user (non-IT, non-Admin) for existing tests
-const defaultAuthState = {
-  user: null,
-  isLoading: false,
-  isIdentified: false,
-  isApproved: false,
-  isAdmin: false,
-  isIT: false,
-  error: null,
-  identify: vi.fn(),
-  isIdentifying: false,
-  identifyError: null,
-  logout: vi.fn(),
-  isLoggingOut: false,
-  checkSession: vi.fn(),
+// Default to regular user (no permissions) for existing tests
+const defaultPermissions = {
+  canViewLinearLinks: false,
+  canViewMigrationMetadata: false,
+  canManageUsers: false,
+  canConfigureSystem: false,
+  role: 'user' as const,
 }
 
 describe('BacklogItemCard', () => {
   beforeEach(() => {
-    mockUseAuth.mockReturnValue(defaultAuthState)
+    mockUsePermissions.mockReturnValue(defaultPermissions)
   })
 
   it('renders the item title', () => {
@@ -324,7 +316,7 @@ describe('BacklogItemCard', () => {
   // --- Story 13.2: Role-based clickable identifier tests ---
 
   it('renders identifier as clickable link for IT users', () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    mockUsePermissions.mockReturnValue({ ...defaultPermissions, canViewLinearLinks: true, role: 'it' })
     render(<BacklogItemCard item={createMockItem()} />)
 
     const link = screen.getByRole('link', { name: 'VIX-42' })
@@ -335,7 +327,7 @@ describe('BacklogItemCard', () => {
   })
 
   it('renders identifier as clickable link for Admin users', () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isAdmin: true })
+    mockUsePermissions.mockReturnValue({ ...defaultPermissions, canViewLinearLinks: true, canManageUsers: true, role: 'admin' })
     render(<BacklogItemCard item={createMockItem()} />)
 
     const link = screen.getByRole('link', { name: 'VIX-42' })
@@ -346,7 +338,7 @@ describe('BacklogItemCard', () => {
   })
 
   it('renders identifier as plain text for regular users (no link)', () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: false, isAdmin: false })
+    mockUsePermissions.mockReturnValue(defaultPermissions)
     render(<BacklogItemCard item={createMockItem()} />)
 
     expect(screen.getByText('VIX-42')).toBeInTheDocument()
@@ -354,7 +346,7 @@ describe('BacklogItemCard', () => {
   })
 
   it('identifier link has mono-id class for IT/Admin users', () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    mockUsePermissions.mockReturnValue({ ...defaultPermissions, canViewLinearLinks: true, role: 'it' })
     render(<BacklogItemCard item={createMockItem()} />)
 
     const link = screen.getByRole('link', { name: 'VIX-42' })
@@ -362,7 +354,7 @@ describe('BacklogItemCard', () => {
   })
 
   it('identifier link click does not trigger card onClick', () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    mockUsePermissions.mockReturnValue({ ...defaultPermissions, canViewLinearLinks: true, role: 'it' })
     const onClick = vi.fn()
     render(<BacklogItemCard item={createMockItem()} onClick={onClick} />)
 
@@ -371,8 +363,18 @@ describe('BacklogItemCard', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
+  it('identifier link Enter key does not trigger card onClick (keyboard)', () => {
+    mockUsePermissions.mockReturnValue({ ...defaultPermissions, canViewLinearLinks: true, role: 'it' })
+    const onClick = vi.fn()
+    render(<BacklogItemCard item={createMockItem()} onClick={onClick} />)
+
+    const link = screen.getByRole('link', { name: 'VIX-42' })
+    fireEvent.keyDown(link, { key: 'Enter' })
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
   it('renders identifier as plain text (no link) when privileged but url is missing', () => {
-    mockUseAuth.mockReturnValue({ ...defaultAuthState, isIT: true })
+    mockUsePermissions.mockReturnValue({ ...defaultPermissions, canViewLinearLinks: true, role: 'it' })
     render(<BacklogItemCard item={createMockItem({ url: '' })} />)
 
     expect(screen.getByText('VIX-42')).toBeInTheDocument()

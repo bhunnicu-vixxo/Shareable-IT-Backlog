@@ -285,7 +285,7 @@ development_status:
     linear_id: "VIX-426"
     linear_url: "https://linear.app/vixxo/issue/VIX-426/make-issue-identifiers-clickable-hyperlinks-for-itadmin-users"
   13-3-implement-role-based-privilege-system:
-    status: ready-for-dev
+    status: done
     linear_id: "VIX-427"
     linear_url: "https://linear.app/vixxo/issue/VIX-427/implement-role-based-screen-access-and-privilege-levels"
   epic-13-retrospective: optional
