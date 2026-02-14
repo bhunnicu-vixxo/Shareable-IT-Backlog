@@ -11,7 +11,6 @@ import { EmptyStateWithGuidance } from './empty-state-with-guidance'
 import { SortControl } from './sort-control'
 import type { SortField, SortDirection } from './sort-control'
 import { ItemDetailModal } from './item-detail-modal'
-import { useVisibleLabels } from '@/shared/hooks/use-visible-labels'
 
 /** Human-readable labels for sort fields (used in screen reader announcements). */
 const SORT_LABELS: Record<SortField, string> = {
@@ -147,15 +146,7 @@ function BacklogErrorState({ message, onRetry }: { message: string; onRetry: () 
  */
 export function BacklogList() {
   const { data, isLoading, isError, error, refetch } = useBacklogItems()
-  const { visibleLabels, error: visibleLabelsError } = useVisibleLabels()
-  // When the visible labels API fails, don't filter labels at all (show all).
-  // This prevents a transient API error from hiding all labels.
-  const visibleLabelNames = useMemo(
-    () => (visibleLabelsError ? undefined : new Set(visibleLabels)),
-    [visibleLabels, visibleLabelsError],
-  )
   const [showNewOnly, setShowNewOnly] = useState(false)
-  const [hideDone, setHideDone] = useState(true)
   const [selectedLabels, setSelectedLabels] = useState<string[]>([])
   const [keywordQuery, setKeywordQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortField>('priority')
@@ -178,37 +169,11 @@ export function BacklogList() {
 
   const items = useMemo(() => data?.items ?? [], [data?.items])
 
-  // Clear selected labels that are no longer visible when visibility settings change
-  // This prevents users from being trapped by filters they can't see or clear
-  // Skip this cleanup when the API has errored — we don't want to clear selections on transient failures.
-  useEffect(() => {
-    if (visibleLabelsError) {
-      // API error: don't clear selections, labels are not being filtered
-      return
-    }
-    if (visibleLabels.length === 0) {
-      // If no labels are visible, clear all selections
-      if (selectedLabels.length > 0) {
-        setSelectedLabels([])
-      }
-    } else if (visibleLabelNames) {
-      // Remove any selected labels that are no longer visible
-      const stillVisible = selectedLabels.filter((label) => visibleLabelNames.has(label))
-      if (stillVisible.length !== selectedLabels.length) {
-        setSelectedLabels(stillVisible)
-      }
-    }
-  }, [visibleLabels, visibleLabelNames, selectedLabels, visibleLabelsError])
-
-  // Base items: applies the "hide done" default before other user-driven filters
-  const baseItems = useMemo(() => {
-    if (hideDone) {
-      return items.filter(
-        (item) => item.statusType !== 'completed' && item.statusType !== 'cancelled',
-      )
-    }
-    return items
-  }, [items, hideDone])
+  // Base items: permanently exclude completed/cancelled items from the backlog view
+  const baseItems = useMemo(
+    () => items.filter((item) => item.statusType !== 'completed' && item.statusType !== 'cancelled'),
+    [items],
+  )
 
   // Canonical stack rank map: every item gets a stable rank based on
   // priority-ascending + prioritySortOrder (tiebreaker) over the *base* set.
@@ -227,14 +192,8 @@ export function BacklogList() {
     return map
   }, [baseItems])
 
-  // Count of hidden done items (shown on toggle button)
-  const doneItemCount = useMemo(
-    () => items.filter((item) => item.statusType === 'completed' || item.statusType === 'cancelled').length,
-    [items],
-  )
-
   // Client-side chained filters + sort — O(n log n), instant re-render, no API call
-  // Chain: hide done → labels → "New only" → keyword search → sort
+  // Chain: labels → "New only" → keyword search → sort
   const displayedItems = useMemo(() => {
     let filtered = baseItems
     if (selectedLabels.length > 0) {
@@ -358,12 +317,10 @@ export function BacklogList() {
   const handleClearKeyword = useCallback(() => setKeywordQuery(''), [])
   const handleClearLabels = useCallback(() => setSelectedLabels([]), [])
   const handleClearNewOnly = useCallback(() => setShowNewOnly(false), [])
-  const handleClearHideDone = useCallback(() => setHideDone(false), [])
   const handleClearAll = useCallback(() => {
     setKeywordQuery('')
     setSelectedLabels([])
     setShowNewOnly(false)
-    setHideDone(false)
   }, [])
   const handleToggleNewOnly = useCallback(() => setShowNewOnly((prev) => !prev), [])
   // Note: Each card still gets a per-item inline closure in the .map() below
@@ -504,8 +461,8 @@ export function BacklogList() {
   }
 
   // Used to decide whether to render the "New only" toggle at all.
-  // We keep this based on the base dataset (respecting hideDone) so users can
-  // still discover "no new items for <BU>" scenarios when combined with BU filtering.
+  // Keep this based on the base dataset (which excludes completed/cancelled items)
+  // so it reflects the same set the list can actually display.
   const newItemCount = baseItems.filter((item) => item.isNew).length
 
   // Used for display only. When labels are selected, show a label-scoped
@@ -534,7 +491,7 @@ export function BacklogList() {
   }
 
   /** Whether any filter is active (used for empty-state detection). */
-  const hasActiveFilters = showNewOnly || selectedLabels.length > 0 || debouncedQuery.trim().length > 0 || hideDone
+  const hasActiveFilters = showNewOnly || selectedLabels.length > 0 || debouncedQuery.trim().length > 0
 
   return (
     <Box>
@@ -577,17 +534,6 @@ export function BacklogList() {
           onSortByChange={setSortBy}
           onSortDirectionChange={setSortDirection}
         />
-        {doneItemCount > 0 && (
-          <Button
-            size="sm"
-            variant={hideDone ? 'solid' : 'outline'}
-            onClick={() => setHideDone((prev) => !prev)}
-            aria-pressed={hideDone}
-            aria-label={hideDone ? `${doneItemCount} completed items hidden, click to show` : 'Completed items shown, click to hide'}
-          >
-            {hideDone ? `Show done (${doneItemCount})` : 'Hide done'}
-          </Button>
-        )}
         {newItemCount > 0 && (
           <Button
             size="sm"
@@ -619,11 +565,9 @@ export function BacklogList() {
           keyword={debouncedQuery}
           selectedLabels={selectedLabels}
           showNewOnly={showNewOnly}
-          hideDone={hideDone}
           onClearKeyword={handleClearKeyword}
           onClearLabels={handleClearLabels}
           onClearNewOnly={handleClearNewOnly}
-          onClearHideDone={handleClearHideDone}
           onClearAll={handleClearAll}
         />
       ) : (
@@ -668,7 +612,6 @@ export function BacklogList() {
                         item={item}
                         stackRank={stackRankMap.get(item.id) ?? virtualItem.index + 1}
                         highlightTokens={searchTokens}
-                        visibleLabelNames={visibleLabelNames}
                         onClick={() => handleItemClick(item.id)}
                       />
                     </Box>
@@ -682,7 +625,6 @@ export function BacklogList() {
             itemId={selectedItemId}
             onClose={handleCloseDetail}
             triggerRef={lastClickedCardRef}
-            visibleLabelNames={visibleLabelNames}
           />
         </>
       )}
