@@ -10,6 +10,8 @@ declare module 'express-serve-static-core' {
       isDisabled?: boolean
       /** Epoch ms when approval status was last verified from DB */
       approvalCheckedAt?: number
+      /** Epoch ms when IT/admin role was last verified from DB */
+      roleCheckedAt?: number
     }
   }
 }

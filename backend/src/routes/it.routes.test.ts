@@ -2,14 +2,15 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vites
 import { createServer, type Server } from 'http'
 import type { AddressInfo } from 'net'
 
-const { mockLookupOrCreateUser } = vi.hoisted(() => ({
+const { mockLookupOrCreateUser, mockGetUserById } = vi.hoisted(() => ({
   mockLookupOrCreateUser: vi.fn(),
+  mockGetUserById: vi.fn(),
 }))
 
 vi.mock('../services/auth/auth.service.js', () => ({
   lookupOrCreateUser: mockLookupOrCreateUser,
-  // requireApproved can fall back to DB lookup; keep harmless defaults
-  getUserById: vi.fn().mockResolvedValue(null),
+  // requireApproved and requireIT can fall back to DB lookup
+  getUserById: mockGetUserById,
   updateLastAccess: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -108,6 +109,8 @@ describe('IT Routes (integration)', () => {
 
   async function authenticate(user: typeof baseUser): Promise<string> {
     mockLookupOrCreateUser.mockResolvedValue(user)
+    // requireApproved and requireIT middleware fall back to DB lookup
+    mockGetUserById.mockResolvedValue(user)
     const res = await fetch(`${baseUrl}/api/auth/identify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
