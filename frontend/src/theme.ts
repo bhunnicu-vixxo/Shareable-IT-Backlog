@@ -303,15 +303,27 @@ const config = defineConfig({
           redHover: { value: '#C53030' },         // Darker for hover
           redAccessible: { value: '#C53030' },    // ≥4.5:1 contrast on white for text (5.47:1)
         },
+        // Surface & atmosphere tokens for layered depth
+        surface: {
+          page: { value: '#FAFAF7' },             // Warm off-white page background
+          raised: { value: '#FFFFFF' },           // Cards, modals, elevated surfaces
+          sunken: { value: '#F4F3EF' },           // Inset areas, code blocks
+          overlay: { value: 'rgba(62,69,67,0.6)' }, // Modal backdrop
+          headerDark: { value: '#2D3331' },       // Dark header — deeper than brand.gray
+        },
       },
       fonts: {
         heading: {
           value:
-            'Arial, Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            '"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         },
         body: {
           value:
-            'Arial, Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            '"Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        },
+        mono: {
+          value:
+            '"JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, monospace',
         },
       },
       // UX type scale (AC: #2)
@@ -342,20 +354,33 @@ const config = defineConfig({
     },
 
     // Semantic color tokens (AC: #4)
+    // Supports light/dark mode via Chakra _dark condition.
     semanticTokens: {
       colors: {
         'brand.primary': { value: '{colors.brand.green}' },
         'brand.primaryHover': { value: '{colors.brand.greenHover}' },
         'brand.success': { value: '{colors.brand.teal}' },
         // WARNING: Yellow is not accessible for text on white. Use as background.
-        'brand.warning': { value: '{colors.brand.yellowLight}' },
+        'brand.warning': { value: { _light: '{colors.brand.yellowLight}', _dark: '#3D3010' } },
         'brand.warningAccent': { value: '{colors.brand.yellow}' },
         // DANGER: Provide accessible red for text usage.
         'brand.danger': { value: '{colors.error.redAccessible}' },
-        'brand.dangerBg': { value: '{colors.error.redLight}' },
+        'brand.dangerBg': { value: { _light: '{colors.error.redLight}', _dark: '#2D1A1A' } },
         'brand.info': { value: '{colors.brand.teal}' },
-        'fg.brand': { value: '{colors.brand.gray}' },
-        'fg.brandMuted': { value: '{colors.brand.grayLight}' },
+        // Foreground (text) — dark mode uses warm near-white tones
+        'fg.brand': { value: { _light: '{colors.brand.gray}', _dark: '#E2E5E4' } },
+        'fg.brandMuted': { value: { _light: '{colors.brand.grayLight}', _dark: '#8A9290' } },
+        'fg.link': { value: { _light: '{colors.brand.greenAccessible}', _dark: '#A3B235' } },
+        // Surface semantics — dark mode uses layered warm charcoal tones
+        'surface.page': { value: { _light: '#F7F7F7', _dark: '#141716' } },
+        'surface.raised': { value: { _light: '#FFFFFF', _dark: '#1E2220' } },
+        'surface.sunken': { value: { _light: '#EFEFEF', _dark: '#181B19' } },
+        'surface.hover': { value: { _light: '#FFFFFF', _dark: '#262A28' } },
+        'surface.overlay': { value: { _light: 'rgba(62,69,67,0.6)', _dark: 'rgba(0,0,0,0.75)' } },
+        'surface.headerDark': { value: { _light: '#2D3331', _dark: '#0F1110' } },
+        // Border semantics
+        'border.default': { value: { _light: '#E2E8F0', _dark: '#2E3230' } },
+        'border.subtle': { value: { _light: '#EDF0EE', _dark: '#252928' } },
       },
     },
 
@@ -371,6 +396,10 @@ const config = defineConfig({
 
   // Global CSS (AC: #6)
   globalCss: {
+    // Page background with warm surface tone
+    'html, body': {
+      bg: 'surface.page',
+    },
     // Focus-visible indicator: Vixxo Green 2px outline (AC: #6)
     '*:focus-visible': {
       outline: '2px solid',
@@ -384,10 +413,15 @@ const config = defineConfig({
     },
     // Global link styles
     'a': {
-      color: 'brand.greenAccessible',
+      color: 'fg.link',
       _hover: {
         textDecoration: 'underline',
       },
+    },
+    // Smooth heading rendering
+    'h1, h2, h3, h4, h5, h6': {
+      fontFamily: 'heading',
+      letterSpacing: '-0.02em',
     },
   },
 })

@@ -933,7 +933,7 @@ describe('BacklogList', () => {
     })
   })
 
-  it('renders priority badges with size hierarchy for mixed priorities', async () => {
+  it('renders stack rank badges with sequential numbering', async () => {
     const response: BacklogListResponse = {
       items: [
         createMockItem({ id: '1', title: 'Urgent item', priority: 1, priorityLabel: 'Urgent' }),
@@ -950,10 +950,11 @@ describe('BacklogList', () => {
       expect(screen.getByText('Urgent item')).toBeInTheDocument()
     })
 
-    const urgentBadge = screen.getByRole('img', { name: 'Priority Urgent' })
-    const lowBadge = screen.getByRole('img', { name: 'Priority Low' })
-    expect(urgentBadge).toHaveStyle({ width: '40px', height: '40px' })
-    expect(lowBadge).toHaveStyle({ width: '28px', height: '28px' })
+    // Stack rank badges include both rank and priority in the aria-label
+    const rank1Badge = screen.getByRole('img', { name: 'Rank 1, Urgent priority' })
+    const rank2Badge = screen.getByRole('img', { name: 'Rank 2, Low priority' })
+    expect(rank1Badge).toHaveTextContent('1')
+    expect(rank2Badge).toHaveTextContent('2')
   })
 
   // ─── Sorting Tests ───

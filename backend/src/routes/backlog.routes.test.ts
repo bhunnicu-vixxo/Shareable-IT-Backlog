@@ -135,7 +135,11 @@ describe('BacklogController.getBacklogItems', () => {
 
     await getBacklogItems(req, res as unknown as Response, mockNext)
 
-    expect(res.body).toEqual(mockResponse)
+    expect(res.body).toEqual({
+      ...mockResponse,
+      servedFromCache: false,
+      lastSyncedAt: null,
+    })
     expect(mockGetBacklogItems).toHaveBeenCalledWith({
       projectId: undefined,
       first: undefined,
@@ -252,7 +256,11 @@ describe('BacklogController.getBacklogItems', () => {
 
     await getBacklogItems(req, res as unknown as Response, mockNext)
 
-    expect(res.body).toEqual(emptyResponse)
+    expect(res.body).toEqual({
+      ...emptyResponse,
+      servedFromCache: false,
+      lastSyncedAt: null,
+    })
   })
 
   it('should return 400 when fields includes unknown field', async () => {
@@ -289,6 +297,8 @@ describe('BacklogController.getBacklogItems', () => {
       items: [{ id: item.id, title: 'Hello' }],
       pageInfo: { hasNextPage: false, endCursor: null },
       totalCount: 1,
+      servedFromCache: false,
+      lastSyncedAt: null,
     })
   })
 
@@ -327,6 +337,8 @@ describe('BacklogController.getBacklogItems', () => {
       items: cachedResponse.items,
       pageInfo: cachedResponse.pageInfo,
       totalCount: cachedResponse.totalCount,
+      servedFromCache: true,
+      lastSyncedAt: null,
     })
     const expectedEtag = generateETag(expectedBody)
 

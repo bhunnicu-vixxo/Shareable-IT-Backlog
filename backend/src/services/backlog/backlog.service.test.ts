@@ -24,6 +24,7 @@ vi.mock('../sync/sync.service.js', () => ({
   syncService: {
     getCachedItems: mockGetCachedItems,
     runSync: mockRunSync,
+    getStatus: vi.fn(() => ({ lastSyncedAt: '2026-02-13T10:00:00Z', status: 'success' })),
   },
 }))
 

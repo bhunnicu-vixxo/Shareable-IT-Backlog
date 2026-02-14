@@ -73,7 +73,7 @@ export interface CommentThreadProps {
  * Threaded comment display component.
  *
  * Groups comments by parentId into thread trees. Top-level comments
- * render at full width; replies are indented with lighter styling.
+ * render at full width; replies are indented with teal left border.
  * Long reply chains (>3 replies) show a "Show N more replies" toggle.
  *
  * Accessible: uses role="list", aria-label, and semantic HTML.
@@ -83,7 +83,7 @@ export function CommentThread({ comments }: CommentThreadProps) {
 
   if (items.length === 0) {
     return (
-      <Text fontSize="sm" color="gray.500">
+      <Text fontSize="sm" color="brand.grayLight">
         No comments yet.
       </Text>
     )
@@ -165,10 +165,11 @@ function CommentCard({
     <Box
       p="3"
       borderWidth="1px"
-      borderRadius="md"
-      borderColor="gray.200"
-      bg={isReply ? 'white' : 'gray.50'}
+      borderRadius="lg"
+      borderColor="gray.100"
+      bg={isReply ? 'surface.raised' : 'surface.sunken'}
       borderLeftWidth={isReply ? '2px' : '1px'}
+      borderLeftColor={isReply ? 'brand.teal' : 'gray.100'}
     >
       <Flex gap="3" alignItems="flex-start">
         <Avatar.Root size="sm" flexShrink={0}>
@@ -181,10 +182,10 @@ function CommentCard({
         </Avatar.Root>
         <Box flex="1" minWidth="0">
           <Flex justifyContent="space-between" alignItems="center" mb="1">
-            <Text fontSize="sm" fontWeight="semibold" color="gray.700">
+            <Text fontSize="sm" fontWeight="600" color="brand.gray">
               {comment.userName ?? 'Unknown'}
             </Text>
-            <Text fontSize="xs" color="gray.500" flexShrink={0}>
+            <Text fontSize="xs" color="brand.grayLight" flexShrink={0}>
               {formatDateTime(comment.createdAt)}
             </Text>
           </Flex>

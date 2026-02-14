@@ -3,6 +3,7 @@ import { Badge, Box, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/rea
 import { formatDistanceToNow } from 'date-fns'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
+import { getLabelColor } from '../utils/label-colors'
 import { highlightText } from '../utils/highlight'
 import type { BacklogItem } from '../types/backlog.types'
 
@@ -34,21 +35,25 @@ export interface BacklogItemCardProps {
   highlightTokens?: string[]
   /** Card layout variant. "default" = full layout; "compact" = condensed without description/labels. */
   variant?: 'default' | 'compact'
+  /** Sequential stack rank position (1-based). Shown in badge instead of priority number. */
+  stackRank?: number
 }
 
 /**
  * Displays a single backlog item in a scannable card format.
  *
+ * Features priority color stripe on left edge, elevated shadow on hover,
+ * and smooth translateX interaction for a polished feel.
+ *
  * Layout:
  *  [Priority Badge]  Title
+ *                    Description preview (2 lines)
  *                    Status | Team | Identifier
  *                    Labels: [Label1] [Label2]
- *
- * When onClick is provided, the card is clickable and keyboard-accessible (Enter/Space to activate).
  */
 export const BacklogItemCard = memo(
   forwardRef<HTMLDivElement, BacklogItemCardProps>(function BacklogItemCard(
-    { item, onClick, highlightTokens = [], variant }: BacklogItemCardProps,
+    { item, onClick, highlightTokens = [], variant, stackRank }: BacklogItemCardProps,
     ref,
   ) {
     const isClickable = !!onClick
@@ -66,24 +71,29 @@ export const BacklogItemCard = memo(
       }
     }
 
+    // Priority stripe CSS class
+    const stripeClass = `priority-stripe-${item.priority}`
+
     return (
       <Flex
         ref={ref}
+        className={`${isClickable ? 'card-interactive' : ''} ${stripeClass}`}
         p={hasExplicitVariant ? (isCompact ? '2' : '4') : { base: '2', md: '4' }}
+        bg="surface.raised"
         borderWidth="1px"
-        borderColor="gray.200"
-        borderRadius="md"
+        borderColor="border.subtle"
+        borderRadius="lg"
+        boxShadow="0 1px 2px rgba(62,69,67,0.04)"
         gap="4"
         alignItems="flex-start"
-        _hover={{ bg: 'brand.grayBg' }}
+        _hover={{ bg: 'surface.hover' }}
         _focusVisible={{
           outline: '2px solid',
           outlineColor: 'brand.green',
           outlineOffset: '2px',
           borderColor: 'brand.green',
         }}
-        transition="background 0.15s"
-        aria-label={`${item.title}, Priority ${item.priorityLabel}, Status: ${item.status}, Business Unit: ${item.teamName}${item.isNew ? ', New item' : ''}`}
+        aria-label={`${stackRank != null ? `Rank ${stackRank}, ` : ''}${item.title}, Priority ${item.priorityLabel}, Status: ${item.status}, Business Unit: ${item.teamName}${item.isNew ? ', New item' : ''}`}
         role={isClickable ? 'button' : 'article'}
         tabIndex={isClickable ? 0 : undefined}
         cursor={isClickable ? 'pointer' : undefined}
@@ -91,17 +101,18 @@ export const BacklogItemCard = memo(
         onKeyDown={handleKeyDown}
         data-variant={effectiveVariant}
       >
-        {/* Left: Priority badge */}
+        {/* Left: Stack rank badge */}
         <StackRankBadge
           priority={item.priority}
           priorityLabel={item.priorityLabel}
+          stackRank={stackRank}
           {...(isCompact ? { size: 'sm' } : {})}
         />
 
         {/* Center: Content */}
         <Box flex="1" minWidth="0">
           {/* Title */}
-          <Text fontWeight="bold" fontSize="md" truncate>
+          <Text fontWeight="bold" fontSize="md" truncate color="fg.brand" letterSpacing="-0.01em">
             {highlightTokens.length > 0
               ? highlightText(item.title, highlightTokens)
               : item.title}
@@ -111,9 +122,11 @@ export const BacklogItemCard = memo(
           {descriptionPreview && (
             <Text
               fontSize="sm"
-              color="brand.grayLight"
+              color="fg.brandMuted"
               lineClamp={2}
               data-testid="card-description"
+              mt="0.5"
+              lineHeight="1.5"
               display={
                 hasExplicitVariant ? (isCompact ? 'none' : 'block') : { base: 'none', md: 'block' }
               }
@@ -125,16 +138,16 @@ export const BacklogItemCard = memo(
           )}
 
           {/* Metadata row */}
-          <HStack gap="2" mt="1" flexWrap="wrap">
+          <HStack gap="2" mt="1.5" flexWrap="wrap">
             <StatusBadge status={item.status} statusType={item.statusType} />
             {item.isNew && <NewItemBadge />}
-            <Text fontSize="sm" color="brand.grayLight">
+            <Text fontSize="sm" color="fg.brandMuted">
               {item.teamName}
             </Text>
-            <Text fontSize="sm" color="brand.grayLight">
+            <Text fontSize="sm" color="fg.brandMuted" className="mono-id">
               {item.identifier}
             </Text>
-            <Text fontSize="xs" color="brand.grayLight">
+            <Text fontSize="xs" color="fg.brandMuted">
               {item.updatedAt === item.createdAt
                 ? `Created ${formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}`
                 : `Updated ${formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}`}
@@ -145,25 +158,37 @@ export const BacklogItemCard = memo(
           {item.labels.length > 0 && (
             <HStack
               gap="1"
-              mt="1"
+              mt="1.5"
               flexWrap="wrap"
               display={
                 hasExplicitVariant ? (isCompact ? 'none' : 'flex') : { base: 'none', md: 'flex' }
               }
             >
-              {item.labels.map((label) => (
-                <Box
-                  key={label.id}
-                  px="2"
-                  py="0.5"
-                  borderRadius="sm"
-                  fontSize="xs"
-                  bg="gray.100"
-                  color="brand.gray"
-                >
-                  {label.name}
-                </Box>
-              ))}
+              {item.labels.map((label) => {
+                const labelColor = getLabelColor(label.name)
+                return (
+                  <HStack
+                    key={label.id}
+                    gap="1.5"
+                    px="2"
+                    py="0.5"
+                    borderRadius="full"
+                    fontSize="xs"
+                    bg={labelColor.bg}
+                    color={labelColor.color}
+                    fontWeight="600"
+                  >
+                    <Box
+                      w="6px"
+                      h="6px"
+                      borderRadius="full"
+                      bg={labelColor.dot}
+                      flexShrink={0}
+                    />
+                    {label.name}
+                  </HStack>
+                )
+              })}
             </HStack>
           )}
         </Box>
@@ -186,7 +211,7 @@ function NewItemBadge() {
       color="brand.gray"
       px="2"
       py="0.5"
-      borderRadius="sm"
+      borderRadius="full"
       fontWeight="semibold"
       aria-label="New item"
     >
@@ -212,7 +237,7 @@ function StatusBadge({
       color={colors.color}
       px="2"
       py="0.5"
-      borderRadius="sm"
+      borderRadius="full"
       fontWeight="semibold"
       aria-label={`Status: ${status}`}
     >
@@ -233,9 +258,12 @@ export function BacklogItemCardSkeleton({ variant }: { variant?: 'default' | 'co
     <Flex
       p={isCompact ? '2' : '4'}
       borderWidth="1px"
-      borderRadius="md"
+      borderColor="gray.100"
+      borderRadius="lg"
       gap="4"
       alignItems="flex-start"
+      bg="surface.raised"
+      boxShadow="0 1px 2px rgba(62,69,67,0.04)"
       data-testid="backlog-item-card-skeleton"
       data-variant={effectiveVariant}
     >

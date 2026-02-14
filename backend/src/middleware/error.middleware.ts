@@ -84,12 +84,93 @@ function sanitizeErrorDetails(value: unknown): unknown {
   return sanitized
 }
 
+/**
+ * PostgreSQL error codes that indicate the database is unavailable.
+ * These map to transient connection/availability issues, not application bugs.
+ *
+ * See https://www.postgresql.org/docs/current/errcodes-appendix.html
+ */
+const PG_UNAVAILABLE_CODES = new Set([
+  '08001', // sqlclient_unable_to_establish_sqlconnection
+  '08006', // connection_failure
+  '57P01', // admin_shutdown
+  '57P03', // cannot_connect_now
+])
+
+/** System-level error codes from Node.js that indicate connection failure. */
+const SYSTEM_CONNECTION_ERRORS = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ENOTFOUND',
+  'ETIMEDOUT',
+])
+
+/**
+ * Check whether an error is explicitly from a non-database source.
+ * This helps avoid misclassifying HTTP or other network errors as database errors.
+ */
+function isNonDatabaseNetworkError(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false
+  const e = err as Record<string, unknown>
+  // LinearNetworkError and similar wrapped errors have distinctive names
+  if (typeof e.name === 'string' && e.name.includes('Linear')) return true
+  // Errors with 'type' set to a Linear-specific value
+  if (typeof e.type === 'string' && e.type.startsWith('LINEAR_')) return true
+  // HTTP library errors (fetch, axios, etc.) often have 'cause' or 'response' properties
+  if ('response' in e && typeof e.response === 'object') return true
+  return false
+}
+
+/**
+ * Check whether an error indicates database unavailability.
+ * Handles both PostgreSQL protocol-level errors (with `code` field)
+ * and system-level connection errors (ECONNREFUSED, etc.).
+ *
+ * Note: System-level codes (ECONNREFUSED, etc.) are generic TCP errors that
+ * could theoretically come from non-database connections. We exclude known
+ * non-database error types (e.g., LinearNetworkError) to reduce false positives.
+ */
+function isDatabaseUnavailableError(err: AppError): boolean {
+  const code = err.code ?? ''
+  // PostgreSQL protocol codes are always database errors
+  if (PG_UNAVAILABLE_CODES.has(code)) return true
+  // Skip known non-database network errors
+  if (isNonDatabaseNetworkError(err)) return false
+  // System-level connection errors are assumed to be database errors
+  // in the absence of evidence they come from another source
+  if (SYSTEM_CONNECTION_ERRORS.has(code)) return true
+  // pg module sometimes sets errno on the error directly
+  if ('errno' in err && typeof (err as Record<string, unknown>).errno === 'string') {
+    if (SYSTEM_CONNECTION_ERRORS.has((err as Record<string, unknown>).errno as string)) return true
+  }
+  return false
+}
+
+/** Default Retry-After for database unavailability (seconds). */
+const DB_RETRY_AFTER_SECONDS = 30
+
 export const errorMiddleware = (
   err: AppError,
   _req: Request,
   res: Response,
   _next: NextFunction,
 ): void => {
+  // Handle database unavailability with HTTP 503 + Retry-After header
+  if (isDatabaseUnavailableError(err)) {
+    logger.error({ err, code: err.code }, 'Database unavailable')
+    res
+      .status(503)
+      .set('Retry-After', String(DB_RETRY_AFTER_SECONDS))
+      .json({
+        error: {
+          message: 'Service temporarily unavailable. Please try again.',
+          code: 'DATABASE_UNAVAILABLE',
+          retryAfter: DB_RETRY_AFTER_SECONDS,
+        },
+      })
+    return
+  }
+
   // Handle Linear API rate limit errors with HTTP 503 + Retry-After header
   if (err instanceof LinearApiError && err.type === 'RATE_LIMITED') {
     const suggestedRetryMs = rateLimiter.getSuggestedRetryAfterMs()

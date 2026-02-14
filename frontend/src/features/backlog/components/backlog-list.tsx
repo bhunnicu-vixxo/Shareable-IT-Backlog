@@ -26,9 +26,19 @@ const SORT_LABELS: Record<SortField, string> = {
  */
 function BacklogListSkeleton() {
   return (
-    <VStack gap="4" align="stretch">
+    <VStack gap="3" align="stretch">
       {Array.from({ length: 5 }).map((_, i) => (
-        <HStack key={i} p="4" borderWidth="1px" borderRadius="md" gap="4">
+        <HStack
+          key={i}
+          p="4"
+          borderWidth="1px"
+          borderColor="border.subtle"
+          borderRadius="lg"
+          gap="4"
+          bg="surface.raised"
+          boxShadow="0 1px 2px rgba(62,69,67,0.04)"
+          className={`animate-fade-in-up stagger-${i + 1}`}
+        >
           <Skeleton boxSize="8" borderRadius="full" />
           <VStack align="start" flex="1" gap="2">
             <Skeleton height="5" width="60%" />
@@ -51,17 +61,29 @@ function BacklogEmptyState({ onRetry }: { onRetry: () => void }) {
       justifyContent="center"
       p="12"
       borderWidth="1px"
-      borderRadius="md"
-      borderColor="gray.200"
+      borderRadius="lg"
+      borderColor="border.subtle"
+      bg="surface.raised"
       textAlign="center"
+      className="animate-fade-in"
     >
-      <Text fontSize="2xl" mb="2">
-        🔍
-      </Text>
-      <Text fontWeight="bold" fontSize="lg" mb="2">
+      <Flex
+        alignItems="center"
+        justifyContent="center"
+        w="14"
+        h="14"
+        borderRadius="full"
+        bg="brand.tealLight"
+        mb="4"
+      >
+        <Text fontSize="xl" color="brand.teal">
+          ⌕
+        </Text>
+      </Flex>
+      <Text fontWeight="bold" fontSize="lg" mb="2" color="fg.brand" fontFamily="heading">
         No backlog items found
       </Text>
-      <Text color="gray.500" mb="4">
+      <Text color="fg.brandMuted" mb="5" maxW="48ch">
         Data may not have been synced yet. Contact your admin to trigger a sync.
       </Text>
       <Button onClick={onRetry} variant="outline" size="sm">
@@ -82,19 +104,31 @@ function BacklogErrorState({ message, onRetry }: { message: string; onRetry: () 
       justifyContent="center"
       p="12"
       borderWidth="1px"
-      borderRadius="md"
-      borderColor="red.200"
-      bg="red.50"
+      borderRadius="lg"
+      borderColor="red.100"
+      bg="error.redLight"
       textAlign="center"
       role="alert"
+      className="animate-fade-in"
     >
-      <Text fontSize="2xl" mb="2">
-        ⚠️
-      </Text>
-      <Text fontWeight="bold" fontSize="lg" mb="2" color="red.600">
+      <Flex
+        alignItems="center"
+        justifyContent="center"
+        w="14"
+        h="14"
+        borderRadius="full"
+        bg="white"
+        boxShadow="0 0 0 4px rgba(229,62,62,0.1)"
+        mb="4"
+      >
+        <Text fontSize="xl" color="error.red">
+          !
+        </Text>
+      </Flex>
+      <Text fontWeight="bold" fontSize="lg" mb="2" color="error.redAccessible" fontFamily="heading">
         Failed to load backlog items
       </Text>
-      <Text color="gray.600" mb="4">
+      <Text color="fg.brandMuted" mb="5" maxW="48ch">
         {message}
       </Text>
       <Button onClick={onRetry} variant="outline" size="sm">
@@ -113,6 +147,7 @@ function BacklogErrorState({ message, onRetry }: { message: string; onRetry: () 
 export function BacklogList() {
   const { data, isLoading, isError, error, refetch } = useBacklogItems()
   const [showNewOnly, setShowNewOnly] = useState(false)
+  const [hideDone, setHideDone] = useState(true)
   const [selectedBusinessUnit, setSelectedBusinessUnit] = useState<string | null>(null)
   const [keywordQuery, setKeywordQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortField>('priority')
@@ -135,10 +170,43 @@ export function BacklogList() {
 
   const items = useMemo(() => data?.items ?? [], [data?.items])
 
+  // Base items: applies the "hide done" default before other user-driven filters
+  const baseItems = useMemo(() => {
+    if (hideDone) {
+      return items.filter(
+        (item) => item.statusType !== 'completed' && item.statusType !== 'cancelled',
+      )
+    }
+    return items
+  }, [items, hideDone])
+
+  // Canonical stack rank map: every item gets a stable rank based on
+  // priority-ascending + prioritySortOrder (tiebreaker) over the *base* set.
+  // This rank does NOT change when the user sorts/filters differently.
+  const stackRankMap = useMemo(() => {
+    const sorted = [...baseItems].sort((a, b) => {
+      const aIsNone = a.priority === 0
+      const bIsNone = b.priority === 0
+      if (aIsNone !== bIsNone) return aIsNone ? 1 : -1
+      const base = a.priority - b.priority
+      if (base !== 0) return base
+      return a.prioritySortOrder - b.prioritySortOrder
+    })
+    const map = new Map<string, number>()
+    sorted.forEach((item, idx) => map.set(item.id, idx + 1))
+    return map
+  }, [baseItems])
+
+  // Count of hidden done items (shown on toggle button)
+  const doneItemCount = useMemo(
+    () => items.filter((item) => item.statusType === 'completed' || item.statusType === 'cancelled').length,
+    [items],
+  )
+
   // Client-side chained filters + sort — O(n log n), instant re-render, no API call
-  // Chain: business unit → "New only" → keyword search → sort
+  // Chain: hide done → business unit → "New only" → keyword search → sort
   const displayedItems = useMemo(() => {
-    let filtered = items
+    let filtered = baseItems
     if (selectedBusinessUnit) {
       filtered = filtered.filter((item) => item.teamName === selectedBusinessUnit)
     }
@@ -193,7 +261,7 @@ export function BacklogList() {
     })
 
     return sorted
-  }, [items, selectedBusinessUnit, showNewOnly, searchTokens, sortBy, sortDirection])
+  }, [baseItems, selectedBusinessUnit, showNewOnly, searchTokens, sortBy, sortDirection])
 
   // Virtual scrolling — only renders visible items in the DOM
   const virtualizer = useVirtualizer({
@@ -258,10 +326,12 @@ export function BacklogList() {
   const handleClearKeyword = useCallback(() => setKeywordQuery(''), [])
   const handleClearBusinessUnit = useCallback(() => setSelectedBusinessUnit(null), [])
   const handleClearNewOnly = useCallback(() => setShowNewOnly(false), [])
+  const handleClearHideDone = useCallback(() => setHideDone(false), [])
   const handleClearAll = useCallback(() => {
     setKeywordQuery('')
     setSelectedBusinessUnit(null)
     setShowNewOnly(false)
+    setHideDone(false)
   }, [])
   const handleToggleNewOnly = useCallback(() => setShowNewOnly((prev) => !prev), [])
   // Note: Each card still gets a per-item inline closure in the .map() below
@@ -402,21 +472,21 @@ export function BacklogList() {
   }
 
   // Used to decide whether to render the "New only" toggle at all.
-  // We keep this based on the full dataset so users can still discover
-  // "no new items for <BU>" scenarios when combined with BU filtering.
-  const newItemCount = items.filter((item) => item.isNew).length
+  // We keep this based on the base dataset (respecting hideDone) so users can
+  // still discover "no new items for <BU>" scenarios when combined with BU filtering.
+  const newItemCount = baseItems.filter((item) => item.isNew).length
 
   // Used for display only. When a business unit is selected, show a BU-scoped
   // count to avoid implying that the new-item count applies to the current BU
   // when it doesn't.
   const scopedNewItemCount = (
-    selectedBusinessUnit ? items.filter((item) => item.teamName === selectedBusinessUnit) : items
+    selectedBusinessUnit ? baseItems.filter((item) => item.teamName === selectedBusinessUnit) : baseItems
   ).filter((item) => item.isNew).length
 
   /** Build a descriptive results count reflecting active filters. */
   const getResultCountText = () => {
     const count = displayedItems.length
-    const total = items.length
+    const total = baseItems.length
     const isFiltered = count !== total
     const parts: string[] = []
     if (showNewOnly) parts.push('new')
@@ -430,7 +500,7 @@ export function BacklogList() {
   }
 
   /** Whether any filter is active (used for empty-state detection). */
-  const hasActiveFilters = showNewOnly || !!selectedBusinessUnit || debouncedQuery.trim().length > 0
+  const hasActiveFilters = showNewOnly || !!selectedBusinessUnit || debouncedQuery.trim().length > 0 || hideDone
 
   return (
     <Box>
@@ -447,18 +517,23 @@ export function BacklogList() {
         whiteSpace="nowrap"
       />
 
-      {/* Filter bar: business unit dropdown, sort, "New only" toggle, search, results count */}
-      {/* Tab order: BusinessUnitFilter → SortControl → "New only" toggle → KeywordSearch (AC #6) */}
+      {/* Filter bar: business unit dropdown, sort, toggles, search, results count */}
       <Flex
         alignItems="center"
-        mb="4"
+        mb="5"
         flexWrap="wrap"
         gap="3"
         role="search"
         aria-label="Filter and sort backlog items"
+        bg="surface.raised"
+        p="3"
+        borderRadius="xl"
+        boxShadow="0 1px 2px rgba(62,69,67,0.04)"
+        borderWidth="1px"
+        borderColor="border.subtle"
       >
         <BusinessUnitFilter
-          items={items}
+          items={baseItems}
           value={selectedBusinessUnit}
           onChange={setSelectedBusinessUnit}
         />
@@ -468,6 +543,17 @@ export function BacklogList() {
           onSortByChange={setSortBy}
           onSortDirectionChange={setSortDirection}
         />
+        {doneItemCount > 0 && (
+          <Button
+            size="sm"
+            variant={hideDone ? 'solid' : 'outline'}
+            onClick={() => setHideDone((prev) => !prev)}
+            aria-pressed={hideDone}
+            aria-label={hideDone ? `${doneItemCount} completed items hidden, click to show` : 'Completed items shown, click to hide'}
+          >
+            {hideDone ? `Show done (${doneItemCount})` : 'Hide done'}
+          </Button>
+        )}
         {newItemCount > 0 && (
           <Button
             size="sm"
@@ -481,12 +567,14 @@ export function BacklogList() {
               : `New only (${selectedBusinessUnit ? scopedNewItemCount : newItemCount})`}
           </Button>
         )}
-        <KeywordSearch
-          value={keywordQuery}
-          onChange={setKeywordQuery}
-          onClear={handleClearKeyword}
-        />
-        <Text fontSize="sm" color="gray.500" ml="auto">
+        <Box flex="1" minW="180px">
+          <KeywordSearch
+            value={keywordQuery}
+            onChange={setKeywordQuery}
+            onClear={handleClearKeyword}
+          />
+        </Box>
+        <Text fontSize="sm" color="fg.brandMuted" ml="auto" fontWeight="500">
           {getResultCountText()}
         </Text>
       </Flex>
@@ -497,9 +585,11 @@ export function BacklogList() {
           keyword={debouncedQuery}
           businessUnit={selectedBusinessUnit}
           showNewOnly={showNewOnly}
+          hideDone={hideDone}
           onClearKeyword={handleClearKeyword}
           onClearBusinessUnit={handleClearBusinessUnit}
           onClearNewOnly={handleClearNewOnly}
+          onClearHideDone={handleClearHideDone}
           onClearAll={handleClearAll}
         />
       ) : (
@@ -542,6 +632,7 @@ export function BacklogList() {
                           cardRefs.current[item.id] = el
                         }}
                         item={item}
+                        stackRank={stackRankMap.get(item.id) ?? virtualItem.index + 1}
                         highlightTokens={searchTokens}
                         onClick={() => handleItemClick(item.id)}
                       />

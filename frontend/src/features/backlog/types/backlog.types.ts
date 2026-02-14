@@ -109,6 +109,10 @@ export interface BacklogListResponse {
   items: BacklogItem[]
   pageInfo: PaginationInfo
   totalCount: number
+  /** Whether the response was served from the backend sync cache. */
+  servedFromCache?: boolean
+  /** ISO 8601 timestamp of the last successful sync, or null if never synced. */
+  lastSyncedAt?: string | null
 }
 
 /** Response from GET /api/backlog-items/:id (detail view). */

@@ -51,6 +51,90 @@ function createMockResponse(): Response & {
   }
 }
 
+describe('errorMiddleware — database unavailability', () => {
+  const mockNext: NextFunction = vi.fn()
+
+  it('returns 503 with DATABASE_UNAVAILABLE for ECONNREFUSED errors', () => {
+    const err = Object.assign(new Error('Connection refused'), {
+      code: 'ECONNREFUSED',
+    })
+
+    const req = createMockRequest()
+    const res = createMockResponse()
+
+    errorMiddleware(err, req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(503)
+    const body = res.body as { error: { code: string; message: string; retryAfter: number } }
+    expect(body.error.code).toBe('DATABASE_UNAVAILABLE')
+    expect(body.error.message).toBe('Service temporarily unavailable. Please try again.')
+    expect(body.error.retryAfter).toBe(30)
+    expect(res.headers['Retry-After']).toBe('30')
+  })
+
+  it('returns 503 for PostgreSQL admin_shutdown (57P01) error code', () => {
+    const err = Object.assign(new Error('server is shutting down'), {
+      code: '57P01',
+    })
+
+    const req = createMockRequest()
+    const res = createMockResponse()
+
+    errorMiddleware(err, req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(503)
+    const body = res.body as { error: { code: string } }
+    expect(body.error.code).toBe('DATABASE_UNAVAILABLE')
+  })
+
+  it('returns 503 for PostgreSQL cannot_connect_now (57P03) error code', () => {
+    const err = Object.assign(new Error('cannot connect now'), {
+      code: '57P03',
+    })
+
+    const req = createMockRequest()
+    const res = createMockResponse()
+
+    errorMiddleware(err, req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(503)
+    const body = res.body as { error: { code: string } }
+    expect(body.error.code).toBe('DATABASE_UNAVAILABLE')
+  })
+
+  it('returns 503 for PostgreSQL connection_failure (08006) error code', () => {
+    const err = Object.assign(new Error('connection failure'), {
+      code: '08006',
+    })
+
+    const req = createMockRequest()
+    const res = createMockResponse()
+
+    errorMiddleware(err, req, res as unknown as Response, mockNext)
+
+    expect(res.statusCode).toBe(503)
+    const body = res.body as { error: { code: string } }
+    expect(body.error.code).toBe('DATABASE_UNAVAILABLE')
+  })
+
+  it('does not leak database connection strings in 503 response', () => {
+    const err = Object.assign(
+      new Error('connect ECONNREFUSED postgresql://user:pass@host:5432/db'),
+      { code: 'ECONNREFUSED' },
+    )
+
+    const req = createMockRequest()
+    const res = createMockResponse()
+
+    errorMiddleware(err, req, res as unknown as Response, mockNext)
+
+    const body = res.body as { error: { message: string } }
+    expect(body.error.message).not.toContain('postgresql')
+    expect(body.error.message).not.toContain('pass')
+    expect(body.error.message).toBe('Service temporarily unavailable. Please try again.')
+  })
+})
+
 describe('errorMiddleware — credential protection', () => {
   const originalEnv = { ...process.env }
   const mockNext: NextFunction = vi.fn()

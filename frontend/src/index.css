@@ -4,3 +4,197 @@ body {
   min-width: 320px;
   min-height: 100vh;
 }
+
+/* ============================================================================
+ * ANIMATION KEYFRAMES
+ * ============================================================================ */
+
+/* Fade-in-up: cards stagger-reveal on page load */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Subtle fade-in for page-level transitions */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Scale-in for modals */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Pulse for loading dots */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ============================================================================
+ * ANIMATION UTILITY CLASSES
+ * ============================================================================ */
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Stagger delay classes — used by backlog card list */
+.stagger-1 { animation-delay: 0.03s; }
+.stagger-2 { animation-delay: 0.06s; }
+.stagger-3 { animation-delay: 0.09s; }
+.stagger-4 { animation-delay: 0.12s; }
+.stagger-5 { animation-delay: 0.15s; }
+.stagger-6 { animation-delay: 0.18s; }
+.stagger-7 { animation-delay: 0.21s; }
+.stagger-8 { animation-delay: 0.24s; }
+.stagger-9 { animation-delay: 0.27s; }
+.stagger-10 { animation-delay: 0.30s; }
+
+/* ============================================================================
+ * CARD INTERACTION EFFECTS
+ * ============================================================================ */
+
+/* Elevated card hover — lift + shadow bloom */
+.card-interactive {
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s ease;
+}
+
+.card-interactive:hover {
+  transform: translateX(4px);
+  box-shadow:
+    0 4px 12px rgba(62, 69, 67, 0.08),
+    0 1px 3px rgba(62, 69, 67, 0.06);
+}
+
+.card-interactive:focus-visible {
+  transform: translateX(4px);
+}
+
+/* ============================================================================
+ * SUBTLE BACKGROUND TEXTURE (noise grain)
+ * Applied to auth pages and hero areas for depth
+ * ============================================================================ */
+
+.bg-grain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-grain {
+  position: relative;
+}
+
+.bg-grain > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================================================
+ * SECTION DIVIDER — decorative accent
+ * ============================================================================ */
+
+.section-accent {
+  position: relative;
+  padding-left: 12px;
+}
+
+.section-accent::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+  background: #8E992E;
+}
+
+/* ============================================================================
+ * IDENTIFIER MONOSPACE STYLING
+ * ============================================================================ */
+
+.mono-id {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.8em;
+  letter-spacing: -0.02em;
+  opacity: 0.75;
+}
+
+/* ============================================================================
+ * MODAL ENTRANCE OVERRIDE
+ * ============================================================================ */
+
+[data-scope="dialog"][data-part="content"] {
+  animation: scaleIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ============================================================================
+ * PRIORITY LEFT STRIPE COLORS
+ * ============================================================================ */
+
+.priority-stripe-1 { border-left: 3px solid #E53E3E; }   /* Urgent — red */
+.priority-stripe-2 { border-left: 3px solid #956125; }   /* High — copper */
+.priority-stripe-3 { border-left: 3px solid #2C7B80; }   /* Normal — teal */
+.priority-stripe-4 { border-left: 3px solid #395389; }   /* Low — blue */
+.priority-stripe-0 { border-left: 3px solid #CBD5E0; }   /* None — light gray */
+
+/* ============================================================================
+ * DARK MODE OVERRIDES
+ * ============================================================================ */
+
+.dark .card-interactive:hover {
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.dark .priority-stripe-0 {
+  border-left-color: #4A4E4C;
+}
+
+.dark .section-accent::before {
+  background: #A3B235;
+}
+
+.dark .mono-id {
+  opacity: 0.55;
+}
+
+/* Dark mode grain texture — lighter for dark bg */
+.dark .bg-grain::before {
+  opacity: 0.015;
+  filter: invert(1);
+}

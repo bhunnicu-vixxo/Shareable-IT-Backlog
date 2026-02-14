@@ -25,6 +25,8 @@ export interface GetBacklogItemsOptions {
 export interface BacklogListResult extends PaginatedResponse<BacklogItemDto> {
   /** Set to true when data was served from the in-memory sync cache. */
   _servedFromCache?: boolean
+  /** ISO 8601 timestamp of the last successful sync, or null if never synced. */
+  lastSyncedAt?: string | null
 }
 
 /** Detail response type including item, comments, and activities. */
@@ -110,6 +112,7 @@ export class BacklogService {
           pageInfo: { hasNextPage, endCursor },
           totalCount: cached.length,
           _servedFromCache: true,
+          lastSyncedAt: syncService.getStatus().lastSyncedAt,
         }
       }
 
@@ -154,6 +157,7 @@ export class BacklogService {
           pageInfo: { hasNextPage: false, endCursor: null },
           totalCount: 0,
           _servedFromCache: false,
+          lastSyncedAt: syncService.getStatus().lastSyncedAt,
         }
       }
       // Cache bypass path (different projectId): propagate the error
@@ -180,6 +184,7 @@ export class BacklogService {
       },
       totalCount: sorted.length,
       _servedFromCache: false,
+      lastSyncedAt: syncService.getStatus().lastSyncedAt,
     }
   }
 

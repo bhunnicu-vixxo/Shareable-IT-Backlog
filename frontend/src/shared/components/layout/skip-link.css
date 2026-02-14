@@ -4,18 +4,20 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
-  background-color: var(--chakra-colors-brand-green, #38a169);
+  background-color: var(--chakra-colors-brand-green, #8E992E);
   color: white;
   font-weight: bold;
   font-size: 0.875rem;
+  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
   padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   text-decoration: none;
   transition: top 0.15s ease-in-out;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .skip-link:focus-visible {
   top: 8px;
-  outline: 2px solid var(--chakra-colors-brand-green, #38a169);
+  outline: 2px solid var(--chakra-colors-brand-green, #8E992E);
   outline-offset: 2px;
 }

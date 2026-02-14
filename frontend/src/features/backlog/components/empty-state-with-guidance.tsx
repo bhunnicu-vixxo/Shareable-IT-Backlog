@@ -10,12 +10,16 @@ export interface EmptyStateWithGuidanceProps {
   businessUnit: string | null
   /** Whether the "New only" toggle is active. */
   showNewOnly: boolean
+  /** Whether completed/cancelled items are hidden. */
+  hideDone?: boolean
   /** Callback to clear the keyword search. */
   onClearKeyword: () => void
   /** Callback to clear the business unit filter. */
   onClearBusinessUnit: () => void
   /** Callback to clear the "New only" toggle. */
   onClearNewOnly: () => void
+  /** Callback to show completed/cancelled items (clear hideDone filter). */
+  onClearHideDone?: () => void
   /** Callback to clear all active filters at once. */
   onClearAll: () => void
   /** When true, renders a condensed layout suitable for tight spaces. */
@@ -27,6 +31,7 @@ function getHeading(
   keyword: string,
   businessUnit: string | null,
   showNewOnly: boolean,
+  hideDone: boolean,
 ): string {
   const trimmedKeyword = keyword.trim()
 
@@ -50,6 +55,11 @@ function getHeading(
     return 'No new items'
   }
 
+  // Hide done only (all items are completed/cancelled)
+  if (hideDone) {
+    return 'All items are completed'
+  }
+
   // Fallback (shouldn't normally happen if at least one filter is active)
   return 'No items found'
 }
@@ -59,6 +69,7 @@ function getDescription(
   keyword: string,
   businessUnit: string | null,
   showNewOnly: boolean,
+  hideDone: boolean,
 ): string {
   const trimmedKeyword = keyword.trim()
 
@@ -78,6 +89,10 @@ function getDescription(
     return 'All items have been reviewed. Remove the filter to see all items.'
   }
 
+  if (hideDone) {
+    return 'Click "Show done" to view completed and cancelled items.'
+  }
+
   return 'Try adjusting your filters to find what you are looking for.'
 }
 
@@ -91,9 +106,11 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
   keyword,
   businessUnit,
   showNewOnly,
+  hideDone = false,
   onClearKeyword,
   onClearBusinessUnit,
   onClearNewOnly,
+  onClearHideDone,
   onClearAll,
   compact = false,
 }: EmptyStateWithGuidanceProps) {
@@ -109,9 +126,10 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
       data-testid="empty-state-with-guidance"
       data-compact={compact || undefined}
       borderWidth="1px"
-      borderRadius="md"
-      borderColor="gray.200"
-      bg="white"
+      borderRadius="lg"
+      borderColor="border.subtle"
+      bg="surface.raised"
+      boxShadow="0 1px 2px rgba(62,69,67,0.04)"
       px={compact ? '4' : '6'}
       py={compact ? '6' : '10'}
       textAlign="center"
@@ -135,17 +153,17 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
           </EmptyState.Indicator>
         )}
         <EmptyState.Title
-          color="brand.gray"
+          color="fg.brand"
           fontSize={compact ? 'sm' : undefined}
         >
-          {getHeading(keyword, businessUnit, showNewOnly)}
+          {getHeading(keyword, businessUnit, showNewOnly, hideDone)}
         </EmptyState.Title>
         <EmptyState.Description
-          color="brand.grayLight"
+          color="fg.brandMuted"
           maxW="72ch"
           fontSize={compact ? 'xs' : undefined}
         >
-          {getDescription(keyword, businessUnit, showNewOnly)}
+          {getDescription(keyword, businessUnit, showNewOnly, hideDone)}
         </EmptyState.Description>
       </EmptyState.Content>
       <HStack gap="2" flexWrap="wrap" justifyContent="center">
@@ -165,6 +183,11 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
         {!compact && showNewOnly && (
           <Button onClick={onClearNewOnly} variant="outline" size="sm">
             Turn off New only
+          </Button>
+        )}
+        {!compact && hideDone && onClearHideDone && (
+          <Button onClick={onClearHideDone} variant="outline" size="sm">
+            Show done
           </Button>
         )}
       </HStack>

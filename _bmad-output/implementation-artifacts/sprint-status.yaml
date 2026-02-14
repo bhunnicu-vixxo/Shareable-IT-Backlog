@@ -260,5 +260,8 @@ development_status:
     status: done
     linear_id: "VIX-391"
     linear_url: "https://linear.app/vixxo/issue/VIX-391/create-deployment-documentation"
-  12-4-implement-error-recovery-mechanisms: backlog
+  12-4-implement-error-recovery-mechanisms:
+    status: done
+    linear_id: "VIX-392"
+    linear_url: "https://linear.app/vixxo/issue/VIX-392/implement-error-recovery-mechanisms"
   epic-12-retrospective: optional
