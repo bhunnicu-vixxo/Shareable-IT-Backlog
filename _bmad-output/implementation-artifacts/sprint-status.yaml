@@ -293,3 +293,63 @@ development_status:
     linear_id: "VIX-427"
     linear_url: "https://linear.app/vixxo/issue/VIX-427/implement-role-based-screen-access-and-privilege-levels"
   epic-13-retrospective: optional
+
+  # Epic 14: Sharing & Collaboration (Quick Wins)
+  epic-14: backlog
+  14-1-shareable-url-for-filtered-backlog-views:
+    status: ready-for-dev
+    linear_id: "VIX-432"
+    linear_url: "https://linear.app/vixxo/issue/VIX-432/shareable-url-for-filtered-backlog-views-deep-link-filter-state"
+  14-2-add-copy-link-button-to-backlog-items:
+    status: ready-for-dev
+    linear_id: "VIX-433"
+    linear_url: "https://linear.app/vixxo/issue/VIX-433/add-copy-link-button-to-backlog-items-for-easy-sharing"
+  epic-14-retrospective: optional
+
+  # Epic 15: UI/UX Polish (Quick Wins)
+  epic-15: backlog
+  15-1-keyboard-shortcut-focus-search:
+    status: ready-for-dev
+    linear_id: "VIX-434"
+    linear_url: "https://linear.app/vixxo/issue/VIX-434/add-keyboard-shortcut-to-focus-search-bar-instantly"
+  15-2-status-color-indicators-for-list-items:
+    status: ready-for-dev
+    linear_id: "VIX-435"
+    linear_url: "https://linear.app/vixxo/issue/VIX-435/add-status-color-indicators-to-backlog-list-items"
+  15-3-whats-new-badge-with-seen-tracking:
+    status: ready-for-dev
+    linear_id: "VIX-436"
+    linear_url: "https://linear.app/vixxo/issue/VIX-436/personalized-whats-new-badge-with-per-user-seen-tracking"
+  epic-15-retrospective: optional
+
+  # Epic 16: Roadmap & Timeline View (Do Next)
+  epic-16: backlog
+  16-1-roadmap-timeline-view:
+    status: ready-for-dev
+    linear_id: "VIX-437"
+    linear_url: "https://linear.app/vixxo/issue/VIX-437/roadmap-timeline-view-for-annual-it-planning"
+  epic-16-retrospective: optional
+
+  # Epic 17: AI-Powered Weekly Digest (Do Next)
+  epic-17: backlog
+  17-1-ai-powered-weekly-digest:
+    status: ready-for-dev
+    linear_id: "VIX-438"
+    linear_url: "https://linear.app/vixxo/issue/VIX-438/ai-powered-weekly-digest-this-week-in-it-stakeholder-notifications"
+  epic-17-retrospective: optional
+
+  # Epic 18: Request Submission Pipeline (Explore)
+  epic-18: backlog
+  18-1-request-submission-pipeline:
+    status: ready-for-dev
+    linear_id: "VIX-439"
+    linear_url: "https://linear.app/vixxo/issue/VIX-439/request-submission-pipeline-business-users-submit-it-requests-through"
+  epic-18-retrospective: optional
+
+  # Epic 19: Stakeholder Voting & Prioritization (Explore)
+  epic-19: backlog
+  19-1-stakeholder-voting-and-prioritization:
+    status: ready-for-dev
+    linear_id: "VIX-440"
+    linear_url: "https://linear.app/vixxo/issue/VIX-440/stakeholder-voting-and-prioritization-input-on-backlog-items"
+  epic-19-retrospective: optional
