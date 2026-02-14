@@ -113,7 +113,6 @@ export const LabelFilter = memo(function LabelFilter({
 
   // Determine sizing based on compact prop
   const selectSize = compact ? 'xs' : 'sm'
-  const triggerMinW = compact ? '140px' : '160px'
   const triggerWidth = compact
     ? ({ base: '100%', sm: '140px' } as const)
     : ({ base: '100%', sm: '160px' } as const)
