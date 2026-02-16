@@ -309,7 +309,7 @@ development_status:
   # Epic 15: UI/UX Polish (Quick Wins)
   epic-15: backlog
   15-1-keyboard-shortcut-focus-search:
-    status: ready-for-dev
+    status: done
     linear_id: "VIX-434"
     linear_url: "https://linear.app/vixxo/issue/VIX-434/add-keyboard-shortcut-to-focus-search-bar-instantly"
   15-2-status-color-indicators-for-list-items:

@@ -1,4 +1,5 @@
-import { Box, IconButton, Input } from '@chakra-ui/react'
+import { useEffect, useRef, useState } from 'react'
+import { Box, IconButton, Input, Kbd } from '@chakra-ui/react'
 import { Search } from 'lucide-react'
 
 export interface KeywordSearchProps {
@@ -12,6 +13,10 @@ export interface KeywordSearchProps {
   placeholder?: string
 }
 
+const FOCUSABLE_TAGS = new Set(['input', 'textarea', 'select'])
+const OPEN_DIALOG_SELECTOR =
+  '[data-scope="dialog"][data-state="open"],[data-scope="dialog"][data-part="backdrop"][data-state="open"],[data-scope="dialog"][data-part="content"][data-state="open"]'
+
 /**
  * Accessible keyword search input with search icon and clear button.
  *
@@ -20,6 +25,8 @@ export interface KeywordSearchProps {
  * - Clear button appears only when the input has a value.
  * - Search icon provides visual affordance.
  * - Focus indicator uses Vixxo Green (`brand.green`).
+ * - Press `/` from anywhere on the page to focus the search input.
+ * - Press `Escape` to blur the search input (and clear if value exists).
  */
 export function KeywordSearch({
   value,
@@ -27,6 +34,37 @@ export function KeywordSearch({
   onClear,
   placeholder = 'Search items…',
 }: KeywordSearchProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [isFocused, setIsFocused] = useState(false)
+
+  useEffect(() => {
+    function handleSlashShortcut(e: KeyboardEvent) {
+      if (e.key !== '/') return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.repeat) return
+
+      const active = document.activeElement
+      if (active instanceof HTMLElement) {
+        // Guard against hijacking while user is typing in rich text / contenteditable regions.
+        // Use both `isContentEditable` and attribute checks for robustness (jsdom + nested editable nodes).
+        if (active.isContentEditable) return
+        const contentEditableAttr = active.getAttribute('contenteditable')
+        if (contentEditableAttr !== null && contentEditableAttr !== 'false') return
+        if (active.closest('[contenteditable]:not([contenteditable="false"])')) return
+      }
+      const tag = active?.tagName?.toLowerCase() ?? ''
+      if (FOCUSABLE_TAGS.has(tag)) return
+
+      if (document.querySelector(OPEN_DIALOG_SELECTOR)) return
+
+      e.preventDefault()
+      inputRef.current?.focus()
+    }
+
+    document.addEventListener('keydown', handleSlashShortcut)
+    return () => document.removeEventListener('keydown', handleSlashShortcut)
+  }, [])
+
   return (
     <Box position="relative" w="full">
       {/* Visually-hidden label for screen readers */}
@@ -56,6 +94,7 @@ export function KeywordSearch({
         <Search size={14} />
       </Box>
       <Input
+        ref={inputRef}
         id="backlog-search-input"
         role="searchbox"
         aria-label="Search backlog items"
@@ -65,13 +104,16 @@ export function KeywordSearch({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Escape' && value) {
+          if (e.key === 'Escape') {
             e.preventDefault()
-            onClear()
+            if (value) onClear()
+            inputRef.current?.blur()
           }
         }}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         pl="8"
-        pr={value ? '8' : undefined}
+        pr={value ? '8' : '7'}
         borderRadius="lg"
         bg="surface.sunken"
         color="fg.brand"
@@ -85,6 +127,32 @@ export function KeywordSearch({
           bg: 'surface.raised',
         }}
       />
+      {/* Shortcut hint — hidden when focused or when value present */}
+      {!isFocused && !value && (
+        <Box
+          position="absolute"
+          right="2"
+          top="50%"
+          transform="translateY(-50%)"
+          pointerEvents="none"
+          zIndex="1"
+          aria-hidden="true"
+        >
+          <Kbd
+            fontSize="2xs"
+            px="1.5"
+            py="0"
+            borderRadius="sm"
+            bg="surface.sunken"
+            color="fg.brandMuted"
+            borderWidth="1px"
+            borderColor="border.subtle"
+            opacity={0.6}
+          >
+            /
+          </Kbd>
+        </Box>
+      )}
       {value && (
         <IconButton
           aria-label="Clear search input"

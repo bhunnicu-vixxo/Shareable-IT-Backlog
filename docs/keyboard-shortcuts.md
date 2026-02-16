@@ -6,11 +6,12 @@ The Shareable IT Backlog application is fully navigable using only a keyboard, f
 
 | Shortcut | Action |
 |---|---|
+| `/` | Focus the search bar from anywhere on the page (does not trigger when typing in an input or when a modal is open) |
 | `Tab` | Move focus to the next interactive element |
 | `Shift + Tab` | Move focus to the previous interactive element |
 | `Enter` | Activate the focused element (buttons, links, cards) |
 | `Space` | Activate the focused element (buttons, toggles) |
-| `Escape` | Close an open modal; clear the search input |
+| `Escape` | Close an open modal; clear and blur the search input |
 
 ## Skip Navigation
 
