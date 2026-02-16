@@ -26,6 +26,9 @@ build/
 !.vscode/extensions.json
 !.vscode/tasks.json
 .idea/
+.agents/
+.cursor/docs/
+.cursor/skills/
 *.swp
 *.swo
 *~
