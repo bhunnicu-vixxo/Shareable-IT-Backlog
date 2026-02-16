@@ -59,7 +59,14 @@ export interface BacklogItemCardProps {
  */
 export const BacklogItemCard = memo(
   forwardRef<HTMLDivElement, BacklogItemCardProps>(function BacklogItemCard(
-    { item, onClick, highlightTokens = [], variant, stackRank, visibleLabelNames }: BacklogItemCardProps,
+    {
+      item,
+      onClick,
+      highlightTokens = [],
+      variant,
+      stackRank,
+      visibleLabelNames,
+    }: BacklogItemCardProps,
     ref,
   ) {
     const { canViewLinearLinks } = usePermissions()
@@ -67,8 +74,9 @@ export const BacklogItemCard = memo(
     const hasExplicitVariant = variant !== undefined
     const effectiveVariant = variant ?? 'default'
     const isCompact = effectiveVariant === 'compact'
-    const descriptionPreview =
-      item.description ? descriptionPreviewFromMarkdown(item.description, 240) : null
+    const descriptionPreview = item.description
+      ? descriptionPreviewFromMarkdown(item.description, 240)
+      : null
     const labelsToRender = visibleLabelNames
       ? item.labels.filter((l) => visibleLabelNames.has(l.name))
       : item.labels
@@ -84,13 +92,11 @@ export const BacklogItemCard = memo(
       }
     }
 
-    const stripeClass = `priority-stripe-${item.priority}`
-
     return (
       <Tooltip.Root openDelay={400} closeDelay={100}>
         <Flex
           ref={ref}
-          className={`${isClickable ? 'card-interactive' : ''} ${stripeClass}`}
+          className={isClickable ? 'card-interactive' : undefined}
           p={hasExplicitVariant ? (isCompact ? '2' : '4') : { base: '2', md: '4' }}
           bg="surface.raised"
           borderWidth="1px"
@@ -130,121 +136,112 @@ export const BacklogItemCard = memo(
               data-testid="status-indicator"
             />
           </Tooltip.Trigger>
-        {/* Left: Stack rank badge */}
-        <StackRankBadge
-          priority={item.priority}
-          priorityLabel={item.priorityLabel}
-          stackRank={stackRank}
-          {...(isCompact ? { size: 'sm' } : {})}
-        />
+          {/* Left: Stack rank badge */}
+          <StackRankBadge
+            priority={item.priority}
+            priorityLabel={item.priorityLabel}
+            stackRank={stackRank}
+            {...(isCompact ? { size: 'sm' } : {})}
+          />
 
-        {/* Center: Content */}
-        <Box flex="1" minWidth="0">
-          {/* Title */}
-          <Text fontWeight="bold" fontSize="md" truncate color="fg.brand" letterSpacing="-0.01em">
-            {highlightTokens.length > 0
-              ? highlightText(item.title, highlightTokens)
-              : item.title}
-          </Text>
-
-          {/* Description (truncated to 2 lines) — hidden in compact mode / mobile when no variant set */}
-          {descriptionPreview && (
-            <Text
-              fontSize="sm"
-              color="fg.brandMuted"
-              lineClamp={2}
-              data-testid="card-description"
-              mt="0.5"
-              lineHeight="1.5"
-              display={
-                hasExplicitVariant ? (isCompact ? 'none' : 'block') : { base: 'none', md: 'block' }
-              }
-            >
-              {highlightTokens.length > 0
-                ? highlightText(descriptionPreview, highlightTokens)
-                : descriptionPreview}
+          {/* Center: Content */}
+          <Box flex="1" minWidth="0">
+            {/* Title */}
+            <Text fontWeight="bold" fontSize="md" truncate color="fg.brand" letterSpacing="-0.01em">
+              {highlightTokens.length > 0 ? highlightText(item.title, highlightTokens) : item.title}
             </Text>
-          )}
 
-          {/* Metadata row */}
-          <HStack gap="2" mt="1.5" flexWrap="wrap">
-            <StatusBadge status={item.status} statusType={item.statusType} />
-            {item.isNew && <NewItemBadge />}
-            <Text fontSize="sm" color="fg.brandMuted">
-              {item.teamName}
-            </Text>
-            {canViewLinearLinks && item.url ? (
-              <Link
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
+            {/* Description (truncated to 2 lines) — hidden in compact mode / mobile when no variant set */}
+            {descriptionPreview && (
+              <Text
                 fontSize="sm"
                 color="fg.brandMuted"
-                className="mono-id"
-                textDecoration="none"
-                _hover={{ textDecoration: 'underline', color: 'brand.greenAccessible' }}
-                onClick={(e) => e.stopPropagation()}
+                lineClamp={2}
+                data-testid="card-description"
+                mt="0.5"
+                lineHeight="1.5"
+                display={
+                  hasExplicitVariant
+                    ? isCompact
+                      ? 'none'
+                      : 'block'
+                    : { base: 'none', md: 'block' }
+                }
               >
-                {item.identifier}
-              </Link>
-            ) : (
-              <Text fontSize="sm" color="fg.brandMuted" className="mono-id">
-                {item.identifier}
+                {highlightTokens.length > 0
+                  ? highlightText(descriptionPreview, highlightTokens)
+                  : descriptionPreview}
               </Text>
             )}
-            <Text fontSize="xs" color="fg.brandMuted">
-              {item.updatedAt === item.createdAt
-                ? `Created ${formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}`
-                : `Updated ${formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}`}
-            </Text>
-          </HStack>
 
-          {/* Labels row — hidden in compact mode / mobile when no variant set */}
-          {labelsToRender.length > 0 && (
-            <HStack
-              gap="1"
-              mt="1.5"
-              flexWrap="wrap"
-              display={
-                hasExplicitVariant ? (isCompact ? 'none' : 'flex') : { base: 'none', md: 'flex' }
-              }
-            >
-              {labelsToRender.map((label) => {
-                const labelColor = getLabelColor(label.name)
-                return (
-                  <HStack
-                    key={label.id}
-                    gap="1.5"
-                    px="2"
-                    py="0.5"
-                    borderRadius="full"
-                    fontSize="xs"
-                    bg={labelColor.bg}
-                    color={labelColor.color}
-                    fontWeight="600"
-                  >
-                    <Box
-                      w="6px"
-                      h="6px"
-                      borderRadius="full"
-                      bg={labelColor.dot}
-                      flexShrink={0}
-                    />
-                    {label.name}
-                  </HStack>
-                )
-              })}
+            {/* Metadata row */}
+            <HStack gap="2" mt="1.5" flexWrap="wrap">
+              <StatusBadge status={item.status} statusType={item.statusType} />
+              {item.isNew && <NewItemBadge />}
+              <Text fontSize="sm" color="fg.brandMuted">
+                {item.teamName}
+              </Text>
+              {canViewLinearLinks && item.url ? (
+                <Link
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  fontSize="sm"
+                  color="fg.brandMuted"
+                  className="mono-id"
+                  textDecoration="none"
+                  _hover={{ textDecoration: 'underline', color: 'brand.greenAccessible' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {item.identifier}
+                </Link>
+              ) : (
+                <Text fontSize="sm" color="fg.brandMuted" className="mono-id">
+                  {item.identifier}
+                </Text>
+              )}
+              <Text fontSize="xs" color="fg.brandMuted">
+                {item.updatedAt === item.createdAt
+                  ? `Created ${formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}`
+                  : `Updated ${formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}`}
+              </Text>
             </HStack>
-          )}
-        </Box>
+
+            {/* Labels row — hidden in compact mode / mobile when no variant set */}
+            {labelsToRender.length > 0 && (
+              <HStack
+                gap="1"
+                mt="1.5"
+                flexWrap="wrap"
+                display={
+                  hasExplicitVariant ? (isCompact ? 'none' : 'flex') : { base: 'none', md: 'flex' }
+                }
+              >
+                {labelsToRender.map((label) => {
+                  const labelColor = getLabelColor(label.name)
+                  return (
+                    <HStack
+                      key={label.id}
+                      gap="1.5"
+                      px="2"
+                      py="0.5"
+                      borderRadius="full"
+                      fontSize="xs"
+                      bg={labelColor.bg}
+                      color={labelColor.color}
+                      fontWeight="600"
+                    >
+                      <Box w="6px" h="6px" borderRadius="full" bg={labelColor.dot} flexShrink={0} />
+                      {label.name}
+                    </HStack>
+                  )
+                })}
+              </HStack>
+            )}
+          </Box>
         </Flex>
         <Tooltip.Positioner>
-          <Tooltip.Content
-            px="3"
-            py="1.5"
-            fontSize="xs"
-            borderRadius="md"
-          >
+          <Tooltip.Content px="3" py="1.5" fontSize="xs" borderRadius="md">
             Status: {statusColor.label}
           </Tooltip.Content>
         </Tooltip.Positioner>
@@ -277,13 +274,7 @@ function NewItemBadge() {
 }
 
 /** Status badge component with color coding based on workflow state type. */
-function StatusBadge({
-  status,
-  statusType,
-}: {
-  status: string
-  statusType: string
-}) {
+function StatusBadge({ status, statusType }: { status: string; statusType: string }) {
   const colors = getStatusColor(statusType)
 
   return (
