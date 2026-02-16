@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slb-config
+  namespace: bridge
+  labels:
+    app.kubernetes.io/part-of: shareable-linear-backlog
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  LOG_LEVEL: "info"
+  DB_NAME: "linear"
+  DB_PORT: "5432"
+  SYNC_ENABLED: "true"
+  SYNC_CRON_SCHEDULE: "0 8,16 * * 1-5"
+  DB_SSL_ENABLED: "true"
+  NETWORK_CHECK_ENABLED: "true"
+  ALLOWED_NETWORKS: "10.0.0.0/8,172.16.0.0/12"
+  HEALTH_CHECK_INTERVAL_MS: "60000"
+  HEALTH_CHECK_LINEAR_TIMEOUT_MS: "5000"
+  ALERT_COOLDOWN_MS: "300000"

@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: slb-migrate
+  namespace: bridge
+  labels:
+    app.kubernetes.io/name: slb-migrate
+    app.kubernetes.io/part-of: shareable-linear-backlog
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: slb-migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ghcr.io/bhunnicu-vixxo/shareable-it-backlog/backend:latest
+          command: ["npm", "run", "migrate:up"]
+          envFrom:
+            - configMapRef:
+                name: slb-config
+            - secretRef:
+                name: slb-secrets
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
