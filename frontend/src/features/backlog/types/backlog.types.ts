@@ -11,6 +11,7 @@ export type PriorityLabel = 'None' | 'Urgent' | 'High' | 'Normal' | 'Low'
 
 export type WorkflowStateType =
   | 'backlog'
+  | 'triage'
   | 'unstarted'
   | 'started'
   | 'completed'
