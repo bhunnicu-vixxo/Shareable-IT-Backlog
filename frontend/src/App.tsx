@@ -25,6 +25,7 @@ function AppContent() {
     isIdentifying,
     identifyError,
     checkSession,
+    logout,
   } = useAuth()
   const { isServiceUnavailable, retry: retryService } = useServiceHealth()
 
@@ -78,6 +79,7 @@ function AppContent() {
     return (
       <PendingApproval
         onCheckStatus={() => checkSession()}
+        onSignOut={() => logout()}
         email={user?.email}
       />
     )

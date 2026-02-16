@@ -3,6 +3,7 @@ import { Clock } from 'lucide-react'
 
 interface PendingApprovalProps {
   onCheckStatus: () => void
+  onSignOut?: () => void
   email?: string
 }
 
@@ -11,7 +12,7 @@ interface PendingApprovalProps {
  * Provides a "Check Status" button to re-check approval status.
  * Features branded dark background with centered white card layout.
  */
-export function PendingApproval({ onCheckStatus, email }: PendingApprovalProps) {
+export function PendingApproval({ onCheckStatus, onSignOut, email }: PendingApprovalProps) {
   return (
     <Box
       as="main"
@@ -71,6 +72,19 @@ export function PendingApproval({ onCheckStatus, email }: PendingApprovalProps) 
         >
           Check Status
         </Button>
+
+        {onSignOut && (
+          <Button
+            onClick={onSignOut}
+            variant="ghost"
+            size="sm"
+            color="#718096"
+            fontWeight="normal"
+            _hover={{ color: '#2C7B80', textDecoration: 'underline' }}
+          >
+            Sign out and use a different email
+          </Button>
+        )}
       </VStack>
     </Box>
   )
