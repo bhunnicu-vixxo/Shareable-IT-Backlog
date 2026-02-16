@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@/utils/test-utils'
+import { render, screen, fireEvent, waitFor } from '@/utils/test-utils'
+import userEvent from '@testing-library/user-event'
 import { BacklogItemCard, BacklogItemCardSkeleton } from './backlog-item-card'
 import type { BacklogItem } from '../types/backlog.types'
 
@@ -391,6 +392,68 @@ describe('BacklogItemCard', () => {
 
     expect(screen.getByText('VIX-42')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'VIX-42' })).not.toBeInTheDocument()
+  })
+
+  // --- Story 15.2: Status color indicators (left-border + tooltip) ---
+
+  it('renders data-status-type attribute matching item statusType', () => {
+    render(<BacklogItemCard item={createMockItem({ statusType: 'started' })} />)
+    const card = screen.getByRole('article')
+    expect(card).toHaveAttribute('data-status-type', 'started')
+  })
+
+  it('renders data-status-type for each known status type', () => {
+    const statusTypes = ['backlog', 'unstarted', 'started', 'completed', 'cancelled'] as const
+    for (const statusType of statusTypes) {
+      const { unmount } = render(
+        <BacklogItemCard item={createMockItem({ statusType, status: statusType })} />,
+      )
+      const card = screen.getByRole('article')
+      expect(card).toHaveAttribute('data-status-type', statusType)
+      unmount()
+    }
+  })
+
+  it('renders left border (borderLeftWidth) on the card', () => {
+    render(<BacklogItemCard item={createMockItem({ statusType: 'started' })} />)
+    const card = screen.getByRole('article')
+    expect(card).toHaveStyle({ borderLeftWidth: '4px' })
+  })
+
+  it('shows tooltip content with status label on hover', async () => {
+    const user = userEvent.setup()
+    render(<BacklogItemCard item={createMockItem({ statusType: 'started' })} />)
+    const indicator = screen.getByTestId('status-indicator')
+    await user.hover(indicator)
+    await waitFor(() => {
+      expect(screen.getByText('Status: In Progress')).toBeInTheDocument()
+    })
+  })
+
+  it('shows correct tooltip label for unstarted status', async () => {
+    const user = userEvent.setup()
+    render(<BacklogItemCard item={createMockItem({ statusType: 'unstarted', status: 'Todo' })} />)
+    const indicator = screen.getByTestId('status-indicator')
+    await user.hover(indicator)
+    await waitFor(() => {
+      expect(screen.getByText('Status: Planned')).toBeInTheDocument()
+    })
+  })
+
+  it('shows correct tooltip label for completed status', async () => {
+    const user = userEvent.setup()
+    render(<BacklogItemCard item={createMockItem({ statusType: 'completed', status: 'Done' })} />)
+    const indicator = screen.getByTestId('status-indicator')
+    await user.hover(indicator)
+    await waitFor(() => {
+      expect(screen.getByText('Status: Done')).toBeInTheDocument()
+    })
+  })
+
+  it('exposes status border color token for testability', () => {
+    render(<BacklogItemCard item={createMockItem({ statusType: 'cancelled' })} />)
+    const card = screen.getByRole('article')
+    expect(card).toHaveAttribute('data-status-border-color', 'error.red')
   })
 })
 

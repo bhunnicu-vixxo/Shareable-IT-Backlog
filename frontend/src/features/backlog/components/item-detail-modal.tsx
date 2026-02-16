@@ -14,7 +14,7 @@ import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
 import { ApiError } from '@/utils/api-error'
 import { formatDateOnly } from '@/utils/formatters'
 import { useBacklogItemDetail } from '../hooks/use-backlog-item-detail'
-import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
+import { getStatusColor } from '../utils/status-colors'
 import { getLabelColor } from '../utils/label-colors'
 import { ActivityTimeline } from './activity-timeline'
 import { CommentThread } from './comment-thread'
@@ -120,6 +120,8 @@ export function ItemDetailModal({
   const isNotFoundError =
     isError && error instanceof ApiError && error.isNotFound
 
+  const statusColor = data?.item ? getStatusColor(data.item.statusType) : null
+
   const handleOpenChange = (details: { open: boolean }) => {
     if (!details.open) onClose()
   }
@@ -188,8 +190,8 @@ export function ItemDetailModal({
                   <Flex gap="2" mt="2" flexWrap="wrap" alignItems="center">
                     <Badge
                       fontSize="sm"
-                      bg={(STATUS_COLORS[data.item.statusType] ?? DEFAULT_STATUS_COLORS).bg}
-                      color={(STATUS_COLORS[data.item.statusType] ?? DEFAULT_STATUS_COLORS).color}
+                      bg={statusColor?.bg}
+                      color={statusColor?.color}
                       px="2"
                       py="0.5"
                       borderRadius="full"

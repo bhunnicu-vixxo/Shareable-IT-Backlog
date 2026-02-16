@@ -1,9 +1,9 @@
 import { memo, forwardRef } from 'react'
-import { Badge, Box, Flex, HStack, Link, Skeleton, Text, VStack } from '@chakra-ui/react'
+import { Badge, Box, Flex, HStack, Link, Skeleton, Text, Tooltip, VStack } from '@chakra-ui/react'
 import { formatDistanceToNow } from 'date-fns'
 import { usePermissions } from '@/features/auth/hooks/use-permissions'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
-import { STATUS_COLORS, DEFAULT_STATUS_COLORS } from '../utils/status-colors'
+import { getStatusColor } from '../utils/status-colors'
 import { getLabelColor } from '../utils/label-colors'
 import { highlightText } from '../utils/highlight'
 import type { BacklogItem } from '../types/backlog.types'
@@ -73,10 +73,10 @@ export const BacklogItemCard = memo(
       ? item.labels.filter((l) => visibleLabelNames.has(l.name))
       : item.labels
 
+    const statusColor = getStatusColor(item.statusType)
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
       if (!isClickable) return
-      // If focus is on a nested interactive element (e.g., the Linear link),
-      // let that element handle keyboard activation instead of the card.
       if (e.currentTarget !== e.target) return
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
@@ -84,36 +84,52 @@ export const BacklogItemCard = memo(
       }
     }
 
-    // Priority stripe CSS class
     const stripeClass = `priority-stripe-${item.priority}`
 
     return (
-      <Flex
-        ref={ref}
-        className={`${isClickable ? 'card-interactive' : ''} ${stripeClass}`}
-        p={hasExplicitVariant ? (isCompact ? '2' : '4') : { base: '2', md: '4' }}
-        bg="surface.raised"
-        borderWidth="1px"
-        borderColor="border.subtle"
-        borderRadius="lg"
-        boxShadow="0 1px 2px rgba(62,69,67,0.04)"
-        gap="4"
-        alignItems="flex-start"
-        _hover={{ bg: 'surface.hover' }}
-        _focusVisible={{
-          outline: '2px solid',
-          outlineColor: 'brand.green',
-          outlineOffset: '2px',
-          borderColor: 'brand.green',
-        }}
-        aria-label={`${stackRank != null ? `Rank ${stackRank}, ` : ''}${item.title}, Priority ${item.priorityLabel}, Status: ${item.status}, Business Unit: ${item.teamName}${item.isNew ? ', New item' : ''}`}
-        role={isClickable ? 'button' : 'article'}
-        tabIndex={isClickable ? 0 : undefined}
-        cursor={isClickable ? 'pointer' : undefined}
-        onClick={onClick}
-        onKeyDown={handleKeyDown}
-        data-variant={effectiveVariant}
-      >
+      <Tooltip.Root openDelay={400} closeDelay={100}>
+        <Flex
+          ref={ref}
+          className={`${isClickable ? 'card-interactive' : ''} ${stripeClass}`}
+          p={hasExplicitVariant ? (isCompact ? '2' : '4') : { base: '2', md: '4' }}
+          bg="surface.raised"
+          borderWidth="1px"
+          borderColor="border.subtle"
+          borderRadius="lg"
+          borderLeftWidth="4px"
+          borderLeftColor={statusColor.borderColor}
+          boxShadow="0 1px 2px rgba(62,69,67,0.04)"
+          gap="4"
+          alignItems="flex-start"
+          _hover={{ bg: 'surface.hover' }}
+          _focusVisible={{
+            outline: '2px solid',
+            outlineColor: 'brand.green',
+            outlineOffset: '2px',
+            borderColor: 'brand.green',
+          }}
+          aria-label={`${stackRank != null ? `Rank ${stackRank}, ` : ''}${item.title}, Priority ${item.priorityLabel}, Status: ${item.status}, Business Unit: ${item.teamName}${item.isNew ? ', New item' : ''}`}
+          role={isClickable ? 'button' : 'article'}
+          tabIndex={isClickable ? 0 : undefined}
+          cursor={isClickable ? 'pointer' : undefined}
+          onClick={onClick}
+          onKeyDown={handleKeyDown}
+          data-variant={effectiveVariant}
+          data-status-type={item.statusType}
+          data-status-border-color={statusColor.borderColor}
+          position="relative"
+        >
+          {/* Tooltip trigger only over the indicator area (left border). */}
+          <Tooltip.Trigger asChild>
+            <Box
+              position="absolute"
+              left="0"
+              top="0"
+              bottom="0"
+              w="10px"
+              data-testid="status-indicator"
+            />
+          </Tooltip.Trigger>
         {/* Left: Stack rank badge */}
         <StackRankBadge
           priority={item.priority}
@@ -221,7 +237,18 @@ export const BacklogItemCard = memo(
             </HStack>
           )}
         </Box>
-      </Flex>
+        </Flex>
+        <Tooltip.Positioner>
+          <Tooltip.Content
+            px="3"
+            py="1.5"
+            fontSize="xs"
+            borderRadius="md"
+          >
+            Status: {statusColor.label}
+          </Tooltip.Content>
+        </Tooltip.Positioner>
+      </Tooltip.Root>
     )
   }),
 )
@@ -257,7 +284,7 @@ function StatusBadge({
   status: string
   statusType: string
 }) {
-  const colors = STATUS_COLORS[statusType] ?? DEFAULT_STATUS_COLORS
+  const colors = getStatusColor(statusType)
 
   return (
     <Badge
