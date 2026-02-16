@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Box, Button, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { useBacklogItems } from '../hooks/use-backlog-items'
+import { useFilterParams } from '../hooks/use-filter-params'
 import { useDebouncedValue } from '../hooks/use-debounced-value'
 import { tokenizeQuery } from '../utils/highlight'
 import { BacklogItemCard } from './backlog-item-card'
@@ -9,7 +10,7 @@ import { LabelFilter } from './label-filter'
 import { KeywordSearch } from './keyword-search'
 import { EmptyStateWithGuidance } from './empty-state-with-guidance'
 import { SortControl } from './sort-control'
-import type { SortField, SortDirection } from './sort-control'
+import type { SortField } from './sort-control'
 import { ItemDetailModal } from './item-detail-modal'
 
 /** Human-readable labels for sort fields (used in screen reader announcements). */
@@ -146,11 +147,21 @@ function BacklogErrorState({ message, onRetry }: { message: string; onRetry: () 
  */
 export function BacklogList() {
   const { data, isLoading, isError, error, refetch } = useBacklogItems()
-  const [showNewOnly, setShowNewOnly] = useState(false)
-  const [selectedLabels, setSelectedLabels] = useState<string[]>([])
-  const [keywordQuery, setKeywordQuery] = useState('')
-  const [sortBy, setSortBy] = useState<SortField>('priority')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const {
+    selectedLabels,
+    sortBy,
+    sortDirection,
+    searchTerm: keywordQuery,
+    showNewOnly,
+    hideDone,
+    setSelectedLabels,
+    setSortBy,
+    setSortDirection,
+    setSearchTerm: setKeywordQuery,
+    setShowNewOnly,
+    setHideDone,
+    clearAll: clearAllFilters,
+  } = useFilterParams()
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const lastClickedCardRef = useRef<HTMLDivElement | null>(null)
@@ -169,10 +180,13 @@ export function BacklogList() {
 
   const items = useMemo(() => data?.items ?? [], [data?.items])
 
-  // Base items: permanently exclude completed/cancelled items from the backlog view
+  // Base items: exclude completed/cancelled items when hideDone is true (default)
   const baseItems = useMemo(
-    () => items.filter((item) => item.statusType !== 'completed' && item.statusType !== 'cancelled'),
-    [items],
+    () =>
+      hideDone
+        ? items.filter((item) => item.statusType !== 'completed' && item.statusType !== 'cancelled')
+        : items,
+    [items, hideDone],
   )
 
   // Canonical stack rank map: every item gets a stable rank based on
@@ -314,15 +328,17 @@ export function BacklogList() {
 
   // Stabilize callback handlers with useCallback to maintain referential stability
   // for memoized child components (React.memo). State setters are stable references.
-  const handleClearKeyword = useCallback(() => setKeywordQuery(''), [])
-  const handleClearLabels = useCallback(() => setSelectedLabels([]), [])
-  const handleClearNewOnly = useCallback(() => setShowNewOnly(false), [])
+  const handleClearKeyword = useCallback(() => setKeywordQuery(''), [setKeywordQuery])
+  const handleClearLabels = useCallback(() => setSelectedLabels([]), [setSelectedLabels])
+  const handleClearNewOnly = useCallback(() => setShowNewOnly(false), [setShowNewOnly])
+  const handleToggleHideDone = useCallback(
+    () => setHideDone(!hideDone),
+    [hideDone, setHideDone],
+  )
   const handleClearAll = useCallback(() => {
-    setKeywordQuery('')
-    setSelectedLabels([])
-    setShowNewOnly(false)
-  }, [])
-  const handleToggleNewOnly = useCallback(() => setShowNewOnly((prev) => !prev), [])
+    clearAllFilters()
+  }, [clearAllFilters])
+  const handleToggleNewOnly = useCallback(() => setShowNewOnly(!showNewOnly), [showNewOnly, setShowNewOnly])
   // Note: Each card still gets a per-item inline closure in the .map() below
   // (to capture item.id). This means BacklogItemCard's onClick prop changes on
   // every parent render, partially defeating React.memo for that prop. This is
@@ -553,6 +569,15 @@ export function BacklogList() {
               : `New only (${selectedLabels.length > 0 ? scopedNewItemCount : newItemCount})`}
           </Button>
         )}
+        <Button
+          size="sm"
+          variant={hideDone ? 'solid' : 'outline'}
+          onClick={handleToggleHideDone}
+          aria-pressed={hideDone}
+          aria-label={hideDone ? 'Hide done items, currently on' : 'Hide done items, currently off'}
+        >
+          {hideDone ? 'Hide done' : 'Show done'}
+        </Button>
         <Box flex="1" minW="180px">
           <KeywordSearch
             value={keywordQuery}

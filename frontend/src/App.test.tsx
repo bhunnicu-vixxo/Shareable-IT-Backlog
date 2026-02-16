@@ -44,7 +44,6 @@ const adminUser = {
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    window.history.pushState({}, '', '/')
   })
 
   it('renders backlog page when user is authenticated and approved', async () => {
@@ -93,8 +92,7 @@ describe('App', () => {
   it('renders access denied when non-admin visits /admin', async () => {
     mockUseAuth.mockReturnValue(authenticatedUser)
 
-    window.history.pushState({}, '', '/admin')
-    render(<App />)
+    render(<App />, { initialEntries: ['/admin'] })
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /access denied/i })).toBeInTheDocument()
