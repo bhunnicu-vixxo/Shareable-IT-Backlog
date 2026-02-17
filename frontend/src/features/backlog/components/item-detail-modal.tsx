@@ -16,6 +16,7 @@ import { formatDateOnly } from '@/utils/formatters'
 import { useBacklogItemDetail } from '../hooks/use-backlog-item-detail'
 import { getStatusColor } from '../utils/status-colors'
 import { getLabelColor } from '../utils/label-colors'
+import { CopyLinkButton } from './copy-link-button'
 import { ActivityTimeline } from './activity-timeline'
 import { CommentThread } from './comment-thread'
 import { ItemErrorState } from './item-error-state'
@@ -216,6 +217,7 @@ export function ItemDetailModal({
                         {data.item.identifier}
                       </Text>
                     )}
+                    <CopyLinkButton identifier={data.item.identifier} variant="button" />
                     <Text fontSize="sm" color="fg.brandMuted">
                       {data.item.teamName}
                     </Text>

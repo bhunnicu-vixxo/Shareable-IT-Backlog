@@ -22,6 +22,7 @@ const PARAM = {
   q: 'q',
   new: 'new',
   hideDone: 'hideDone',
+  item: 'item',
 } as const
 
 export interface FilterParamsState {
@@ -93,15 +94,28 @@ function parseSearchParams(params: URLSearchParams): FilterParamsState {
  *
  * Labels are comma-separated for human-readable URLs.
  * Each label value is URL-encoded individually.
+ *
+ * `preserveParams` carries through non-filter params (e.g. `item`)
+ * so they aren't dropped when the hook writes filter state to the URL.
  */
-function buildSearchString(state: FilterParamsState): string {
+function buildSearchString(
+  state: FilterParamsState,
+  preserveParams?: URLSearchParams,
+): string {
   const pairs: Array<[string, string]> = []
+
+  // Preserve the `item` deep-link param so filter changes don't drop it
+  if (preserveParams) {
+    const itemVal = preserveParams.get(PARAM.item)
+    if (itemVal) {
+      pairs.push([PARAM.item, itemVal])
+    }
+  }
 
   const normalizedLabels = Array.from(
     new Set(state.selectedLabels.map((l) => l.trim()).filter(Boolean)),
   )
   if (normalizedLabels.length > 0) {
-    // Encode each label and join with comma separator
     const encodedLabels = normalizedLabels.map((l) => encodeURIComponent(l)).join(',')
     pairs.push([PARAM.labels, encodedLabels])
   }
@@ -128,7 +142,6 @@ function buildSearchString(state: FilterParamsState): string {
     .map(([k, v]) => {
       const encodedKey = encodeURIComponent(k)
       if (k === PARAM.labels) {
-        // Labels are already encoded with comma separator in the value
         return `${encodedKey}=${v}`
       }
       return `${encodedKey}=${encodeURIComponent(v)}`
@@ -200,7 +213,8 @@ export function useFilterParams(): UseFilterParamsReturn {
       isUrlSync.current = false
       return
     }
-    const newSearch = buildSearchString(state)
+    const currentParams = new URLSearchParams(location.search)
+    const newSearch = buildSearchString(state, currentParams)
     // Avoid redundant replace() calls if URL is already canonical.
     if (newSearch !== location.search) {
       lastPushedSearch.current = newSearch

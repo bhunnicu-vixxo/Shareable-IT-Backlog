@@ -301,7 +301,7 @@ development_status:
     linear_id: "VIX-432"
     linear_url: "https://linear.app/vixxo/issue/VIX-432/shareable-url-for-filtered-backlog-views-deep-link-filter-state"
   14-2-add-copy-link-button-to-backlog-items:
-    status: ready-for-dev
+    status: done
     linear_id: "VIX-433"
     linear_url: "https://linear.app/vixxo/issue/VIX-433/add-copy-link-button-to-backlog-items-for-easy-sharing"
   epic-14-retrospective: optional

@@ -3,6 +3,7 @@ import { Badge, Box, Flex, HStack, Link, Skeleton, Text, Tooltip, VStack } from 
 import { formatDistanceToNow } from 'date-fns'
 import { usePermissions } from '@/features/auth/hooks/use-permissions'
 import { StackRankBadge } from '@/shared/components/ui/stack-rank-badge'
+import { CopyLinkButton } from './copy-link-button'
 import { getStatusColor } from '../utils/status-colors'
 import { getLabelColor } from '../utils/label-colors'
 import { highlightText } from '../utils/highlight'
@@ -93,159 +94,182 @@ export const BacklogItemCard = memo(
     }
 
     return (
-      <Tooltip.Root openDelay={400} closeDelay={100}>
-        <Flex
-          ref={ref}
-          className={isClickable ? 'card-interactive' : undefined}
-          p={hasExplicitVariant ? (isCompact ? '2' : '4') : { base: '2', md: '4' }}
-          bg="surface.raised"
-          borderWidth="1px"
-          borderColor="border.subtle"
-          borderRadius="lg"
-          borderLeftWidth="4px"
-          borderLeftColor={statusColor.borderColor}
-          boxShadow="0 1px 2px rgba(62,69,67,0.04)"
-          gap="4"
-          alignItems="flex-start"
-          _hover={{ bg: 'surface.hover' }}
-          _focusVisible={{
-            outline: '2px solid',
-            outlineColor: 'brand.green',
-            outlineOffset: '2px',
-            borderColor: 'brand.green',
-          }}
-          aria-label={`${stackRank != null ? `Rank ${stackRank}, ` : ''}${item.title}, Priority ${item.priorityLabel}, Status: ${item.status}, Business Unit: ${item.teamName}${item.isNew ? ', New item' : ''}`}
-          role={isClickable ? 'button' : 'article'}
-          tabIndex={isClickable ? 0 : undefined}
-          cursor={isClickable ? 'pointer' : undefined}
-          onClick={onClick}
-          onKeyDown={handleKeyDown}
-          data-variant={effectiveVariant}
-          data-status-type={item.statusType}
-          data-status-border-color={statusColor.borderColor}
-          position="relative"
-        >
-          {/* Tooltip trigger only over the indicator area (left border). */}
-          <Tooltip.Trigger asChild>
-            <Box
-              position="absolute"
-              left="0"
-              top="0"
-              bottom="0"
-              w="10px"
-              data-testid="status-indicator"
+      <Box
+        position="relative"
+        className="card-wrapper"
+        _hover={{ '& .copy-link-reveal': { opacity: 1 } }}
+        // Keyboard: when the card itself is focused, reveal the copy-link affordance
+        // (AC: hover OR focus should show the button).
+        _focusWithin={{ '& .copy-link-reveal': { opacity: 1 } }}
+      >
+        <Tooltip.Root openDelay={400} closeDelay={100}>
+          <Flex
+            ref={ref}
+            className={isClickable ? 'card-interactive' : undefined}
+            p={hasExplicitVariant ? (isCompact ? '2' : '4') : { base: '2', md: '4' }}
+            bg="surface.raised"
+            borderWidth="1px"
+            borderColor="border.subtle"
+            borderRadius="lg"
+            borderLeftWidth="4px"
+            borderLeftColor={statusColor.borderColor}
+            boxShadow="0 1px 2px rgba(62,69,67,0.04)"
+            gap="4"
+            alignItems="flex-start"
+            _hover={{ bg: 'surface.hover' }}
+            _focusVisible={{
+              outline: '2px solid',
+              outlineColor: 'brand.green',
+              outlineOffset: '2px',
+              borderColor: 'brand.green',
+            }}
+            aria-label={`${stackRank != null ? `Rank ${stackRank}, ` : ''}${item.title}, Priority ${item.priorityLabel}, Status: ${item.status}, Business Unit: ${item.teamName}${item.isNew ? ', New item' : ''}`}
+            role={isClickable ? 'button' : 'article'}
+            tabIndex={isClickable ? 0 : undefined}
+            cursor={isClickable ? 'pointer' : undefined}
+            onClick={onClick}
+            onKeyDown={handleKeyDown}
+            data-variant={effectiveVariant}
+            data-status-type={item.statusType}
+            data-status-border-color={statusColor.borderColor}
+            position="relative"
+          >
+            {/* Tooltip trigger only over the indicator area (left border). */}
+            <Tooltip.Trigger asChild>
+              <Box
+                position="absolute"
+                left="0"
+                top="0"
+                bottom="0"
+                w="10px"
+                data-testid="status-indicator"
+              />
+            </Tooltip.Trigger>
+            {/* Left: Stack rank badge */}
+            <StackRankBadge
+              priority={item.priority}
+              priorityLabel={item.priorityLabel}
+              stackRank={stackRank}
+              {...(isCompact ? { size: 'sm' } : {})}
             />
-          </Tooltip.Trigger>
-          {/* Left: Stack rank badge */}
-          <StackRankBadge
-            priority={item.priority}
-            priorityLabel={item.priorityLabel}
-            stackRank={stackRank}
-            {...(isCompact ? { size: 'sm' } : {})}
-          />
 
-          {/* Center: Content */}
-          <Box flex="1" minWidth="0">
-            {/* Title */}
-            <Text fontWeight="bold" fontSize="md" truncate color="fg.brand" letterSpacing="-0.01em">
-              {highlightTokens.length > 0 ? highlightText(item.title, highlightTokens) : item.title}
-            </Text>
-
-            {/* Description (truncated to 2 lines) — hidden in compact mode / mobile when no variant set */}
-            {descriptionPreview && (
-              <Text
-                fontSize="sm"
-                color="fg.brandMuted"
-                lineClamp={2}
-                data-testid="card-description"
-                mt="0.5"
-                lineHeight="1.5"
-                display={
-                  hasExplicitVariant
-                    ? isCompact
-                      ? 'none'
-                      : 'block'
-                    : { base: 'none', md: 'block' }
-                }
-              >
-                {highlightTokens.length > 0
-                  ? highlightText(descriptionPreview, highlightTokens)
-                  : descriptionPreview}
+            {/* Center: Content */}
+            <Box flex="1" minWidth="0">
+              {/* Title */}
+              <Text fontWeight="bold" fontSize="md" truncate color="fg.brand" letterSpacing="-0.01em">
+                {highlightTokens.length > 0 ? highlightText(item.title, highlightTokens) : item.title}
               </Text>
-            )}
 
-            {/* Metadata row */}
-            <HStack gap="2" mt="1.5" flexWrap="wrap">
-              <StatusBadge status={item.status} statusType={item.statusType} />
-              {item.isNew && <NewItemBadge />}
-              <Text fontSize="sm" color="fg.brandMuted">
-                {item.teamName}
-              </Text>
-              {canViewLinearLinks && item.url ? (
-                <Link
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {/* Description (truncated to 2 lines) — hidden in compact mode / mobile when no variant set */}
+              {descriptionPreview && (
+                <Text
                   fontSize="sm"
                   color="fg.brandMuted"
-                  className="mono-id"
-                  textDecoration="none"
-                  _hover={{ textDecoration: 'underline', color: 'brand.greenAccessible' }}
-                  onClick={(e) => e.stopPropagation()}
+                  lineClamp={2}
+                  data-testid="card-description"
+                  mt="0.5"
+                  lineHeight="1.5"
+                  display={
+                    hasExplicitVariant
+                      ? isCompact
+                        ? 'none'
+                        : 'block'
+                      : { base: 'none', md: 'block' }
+                  }
                 >
-                  {item.identifier}
-                </Link>
-              ) : (
-                <Text fontSize="sm" color="fg.brandMuted" className="mono-id">
-                  {item.identifier}
+                  {highlightTokens.length > 0
+                    ? highlightText(descriptionPreview, highlightTokens)
+                    : descriptionPreview}
                 </Text>
               )}
-              <Text fontSize="xs" color="fg.brandMuted">
-                {item.updatedAt === item.createdAt
-                  ? `Created ${formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}`
-                  : `Updated ${formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}`}
-              </Text>
-            </HStack>
 
-            {/* Labels row — hidden in compact mode / mobile when no variant set */}
-            {labelsToRender.length > 0 && (
-              <HStack
-                gap="1"
-                mt="1.5"
-                flexWrap="wrap"
-                display={
-                  hasExplicitVariant ? (isCompact ? 'none' : 'flex') : { base: 'none', md: 'flex' }
-                }
-              >
-                {labelsToRender.map((label) => {
-                  const labelColor = getLabelColor(label.name)
-                  return (
-                    <HStack
-                      key={label.id}
-                      gap="1.5"
-                      px="2"
-                      py="0.5"
-                      borderRadius="full"
-                      fontSize="xs"
-                      bg={labelColor.bg}
-                      color={labelColor.color}
-                      fontWeight="600"
-                    >
-                      <Box w="6px" h="6px" borderRadius="full" bg={labelColor.dot} flexShrink={0} />
-                      {label.name}
-                    </HStack>
-                  )
-                })}
+              {/* Metadata row */}
+              <HStack gap="2" mt="1.5" flexWrap="wrap">
+                <StatusBadge status={item.status} statusType={item.statusType} />
+                {item.isNew && <NewItemBadge />}
+                <Text fontSize="sm" color="fg.brandMuted">
+                  {item.teamName}
+                </Text>
+                {canViewLinearLinks && item.url ? (
+                  <Link
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    fontSize="sm"
+                    color="fg.brandMuted"
+                    className="mono-id"
+                    textDecoration="none"
+                    _hover={{ textDecoration: 'underline', color: 'brand.greenAccessible' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {item.identifier}
+                  </Link>
+                ) : (
+                  <Text fontSize="sm" color="fg.brandMuted" className="mono-id">
+                    {item.identifier}
+                  </Text>
+                )}
+                <Text fontSize="xs" color="fg.brandMuted">
+                  {item.updatedAt === item.createdAt
+                    ? `Created ${formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}`
+                    : `Updated ${formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}`}
+                </Text>
               </HStack>
-            )}
-          </Box>
-        </Flex>
-        <Tooltip.Positioner>
-          <Tooltip.Content px="3" py="1.5" fontSize="xs" borderRadius="md">
-            Status: {statusColor.label}
-          </Tooltip.Content>
-        </Tooltip.Positioner>
-      </Tooltip.Root>
+
+              {/* Labels row — hidden in compact mode / mobile when no variant set */}
+              {labelsToRender.length > 0 && (
+                <HStack
+                  gap="1"
+                  mt="1.5"
+                  flexWrap="wrap"
+                  display={
+                    hasExplicitVariant ? (isCompact ? 'none' : 'flex') : { base: 'none', md: 'flex' }
+                  }
+                >
+                  {labelsToRender.map((label) => {
+                    const labelColor = getLabelColor(label.name)
+                    return (
+                      <HStack
+                        key={label.id}
+                        gap="1.5"
+                        px="2"
+                        py="0.5"
+                        borderRadius="full"
+                        fontSize="xs"
+                        bg={labelColor.bg}
+                        color={labelColor.color}
+                        fontWeight="600"
+                      >
+                        <Box w="6px" h="6px" borderRadius="full" bg={labelColor.dot} flexShrink={0} />
+                        {label.name}
+                      </HStack>
+                    )
+                  })}
+                </HStack>
+              )}
+            </Box>
+          </Flex>
+          <Tooltip.Positioner>
+            <Tooltip.Content px="3" py="1.5" fontSize="xs" borderRadius="md">
+              Status: {statusColor.label}
+            </Tooltip.Content>
+          </Tooltip.Positioner>
+        </Tooltip.Root>
+
+        {/* Copy link button — positioned outside the role="button" card to avoid nested-interactive a11y violation */}
+        <Box
+          className="copy-link-reveal"
+          position="absolute"
+          top="2"
+          right="2"
+          opacity={0}
+          transition="opacity 0.15s ease"
+          _focusWithin={{ opacity: 1 }}
+          zIndex={1}
+        >
+          <CopyLinkButton identifier={item.identifier} variant="icon" />
+        </Box>
+      </Box>
     )
   }),
 )
