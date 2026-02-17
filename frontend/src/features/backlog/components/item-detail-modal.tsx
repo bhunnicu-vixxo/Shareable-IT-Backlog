@@ -299,6 +299,7 @@ function ItemDetailContent({
         borderRadius="lg"
       >
         <DetailField label="Priority" value={item.priorityLabel} />
+        <DetailField label="Business Unit" value={item.teamName} />
         <DetailField label="Assignee" value={item.assigneeName} />
         <DetailField label="Due date" value={item.dueDate ? formatDateOnly(item.dueDate) : null} />
         <DetailField label="Created" value={formatDateOnly(item.createdAt)} />

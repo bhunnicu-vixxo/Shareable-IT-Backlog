@@ -31,17 +31,18 @@ export async function upsertBacklogItemsFromSync(items: BacklogItemDto[]): Promi
 
       for (let j = 0; j < chunk.length; j++) {
         const item = chunk[j]
-        const offset = j * 4
-        placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`)
-        values.push(item.id, item.identifier, item.title, item.createdAt)
+        const offset = j * 5
+        placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`)
+        values.push(item.id, item.identifier, item.title, item.status, item.createdAt)
       }
 
       await client.query(
-        `INSERT INTO backlog_items (id, identifier, title, created_at)
+        `INSERT INTO backlog_items (id, identifier, title, status, created_at)
          VALUES ${placeholders.join(', ')}
          ON CONFLICT (id) DO UPDATE SET
            identifier = EXCLUDED.identifier,
            title      = EXCLUDED.title,
+           status     = EXCLUDED.status,
            updated_at = NOW()`,
         values,
       )

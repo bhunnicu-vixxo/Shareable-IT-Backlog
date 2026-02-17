@@ -4,7 +4,9 @@ import { UserApprovalList } from './user-approval-list'
 import { UserManagementList } from './user-management-list'
 import { AuditLogList } from './audit-log-list'
 import { LabelVisibilityManager } from './label-visibility-manager'
+import { TriageQueue } from '@/features/requests/components/triage-queue'
 import { useLabelVisibility } from '../hooks/use-label-visibility'
+import { useTriageQueue } from '@/features/requests/hooks/use-requests'
 
 /**
  * Admin dashboard with tabbed navigation.
@@ -19,6 +21,10 @@ import { useLabelVisibility } from '../hooks/use-label-visibility'
  */
 export function AdminPage() {
   const { unreviewedCount } = useLabelVisibility()
+  const { data: triageRequests } = useTriageQueue()
+  const pendingRequestCount = triageRequests?.filter(
+    (r) => r.status === 'submitted' || r.status === 'reviewing',
+  ).length ?? 0
 
   return (
     <Box maxW="960px" mx="auto" p={{ base: '4', md: '6' }}>
@@ -57,6 +63,27 @@ export function AdminPage() {
               _selected={{ bg: 'brand.greenLight', color: 'brand.greenAccessible' }}
             >
               Users
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="triage"
+              data-testid="tab-triage"
+              borderRadius="md"
+              fontWeight="600"
+              fontSize="sm"
+              _selected={{ bg: 'orange.50', color: 'orange.700' }}
+            >
+              <HStack gap={1.5}>
+                <Text>Triage</Text>
+                {pendingRequestCount > 0 && (
+                  <Badge
+                    colorPalette="orange"
+                    size="sm"
+                    data-testid="triage-pending-badge"
+                  >
+                    {pendingRequestCount}
+                  </Badge>
+                )}
+              </HStack>
             </Tabs.Trigger>
             <Tabs.Trigger
               value="sync"
@@ -107,6 +134,12 @@ export function AdminPage() {
                 <UserApprovalList />
                 <UserManagementList />
               </VStack>
+            </Box>
+          </Tabs.Content>
+
+          <Tabs.Content value="triage">
+            <Box pt={5}>
+              <TriageQueue />
             </Box>
           </Tabs.Content>
 

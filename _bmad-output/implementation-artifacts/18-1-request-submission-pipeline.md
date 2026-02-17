@@ -1,7 +1,7 @@
 # Story 18.1: Request Submission Pipeline — Business Users Submit IT Requests
 
 Linear Issue ID: VIX-439
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -22,8 +22,8 @@ so that I have a single, trackable place to ask for IT work — instead of sendi
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Backend — Create requests data model and migrations (AC: #2, #7)
-  - [ ] Create migration: `requests` table with columns:
+- [x] Task 1: Backend — Create requests data model and migrations (AC: #2, #7)
+  - [x] Create migration: `requests` table with columns:
     - `id` (UUID primary key)
     - `user_id` (FK to users)
     - `title` (varchar, required)
@@ -36,64 +36,64 @@ so that I have a single, trackable place to ask for IT work — instead of sendi
     - `rejection_reason` (text, nullable)
     - `linear_issue_id` (varchar, nullable — set on approval)
     - `created_at`, `updated_at` (timestamps)
-- [ ] Task 2: Backend — Create request API endpoints (AC: #1-#7)
-  - [ ] Create `backend/src/routes/requests.routes.ts`
-  - [ ] Create `backend/src/controllers/requests.controller.ts`
-  - [ ] Create `backend/src/services/requests/request.service.ts`
-  - [ ] `POST /api/requests` — submit new request (authenticated users)
-  - [ ] `GET /api/requests/mine` — user's own requests (authenticated)
-  - [ ] `GET /api/admin/requests` — triage queue (admin only)
-  - [ ] `GET /api/admin/requests/:id` — single request detail (admin only)
-  - [ ] `PUT /api/admin/requests/:id/approve` — approve + create Linear issue (admin only)
-  - [ ] `PUT /api/admin/requests/:id/reject` — reject with reason (admin only)
-  - [ ] `PUT /api/admin/requests/:id/merge` — link to existing item (admin only, Phase 2)
-- [ ] Task 3: Backend — Linear issue creation on approval (AC: #5)
-  - [ ] On approval, use `@linear/sdk` to create a new Linear issue
-  - [ ] Map request fields: title → issue title, description → issue description
-  - [ ] Add label based on category if provided
-  - [ ] Add a note: "Submitted by {user.name} via Shareable IT Backlog"
-  - [ ] Store the created `linear_issue_id` back on the request record
-  - [ ] Trigger a sync so the new issue appears in the backlog
-- [ ] Task 4: Backend — Duplicate detection endpoint (AC: #3)
-  - [ ] `GET /api/requests/similar?title={searchText}` — returns top 5 similar backlog items
-  - [ ] Use simple text search (ILIKE or ts_vector) against backlog item titles
-  - [ ] Return `{ identifier, title, status }` for each match
-- [ ] Task 5: Frontend — Create request submission form (AC: #1, #2, #3)
-  - [ ] Create `frontend/src/features/requests/` feature directory
-  - [ ] Create `frontend/src/features/requests/components/request-form.tsx`
-  - [ ] Form fields: Title (required), Description (required, textarea), Business Impact (dropdown), Category (dropdown of labels), Urgency (dropdown)
-  - [ ] Use Chakra UI form components with validation
-  - [ ] Add debounced title search for duplicate detection (call `/api/requests/similar`)
-  - [ ] Show similar items panel when matches found
-  - [ ] On submit success: show confirmation toast and redirect to "My Requests"
-- [ ] Task 6: Frontend — Create "My Requests" view (AC: #2, #7)
-  - [ ] Create `frontend/src/features/requests/components/my-requests-page.tsx`
-  - [ ] List user's requests with status badges (Submitted, Under Review, Approved, Rejected)
-  - [ ] Show admin feedback/rejection reason when available
-  - [ ] Show link to created Linear issue when approved
-  - [ ] Add to `/my-requests` route
-- [ ] Task 7: Frontend — Create admin triage queue (AC: #4, #5, #6)
-  - [ ] Create `frontend/src/features/requests/components/triage-queue.tsx`
-  - [ ] Add triage queue tab/section to admin page
-  - [ ] List pending requests sorted by date
-  - [ ] For each request: show details, approve button, reject button (with reason textarea)
-  - [ ] Approve action: calls API, shows success with created issue link
-  - [ ] Reject action: prompts for reason, calls API, shows confirmation
-- [ ] Task 8: Frontend — Navigation and routing (AC: #1)
-  - [ ] Add "Submit Request" button to `AppHeader` (prominent placement)
-  - [ ] Add `/submit-request` route for the form
-  - [ ] Add `/my-requests` route for user's request history
-  - [ ] Add triage queue to admin section
-- [ ] Task 9: Write tests (AC: #8)
-  - [ ] Backend: Test CRUD operations on requests
-  - [ ] Backend: Test approval creates Linear issue (mock Linear SDK)
-  - [ ] Backend: Test rejection stores reason
-  - [ ] Backend: Test duplicate detection returns similar items
-  - [ ] Frontend: Test form renders all fields with validation
-  - [ ] Frontend: Test duplicate detection shows similar items
-  - [ ] Frontend: Test My Requests page lists requests with status
-  - [ ] Frontend: Test triage queue shows pending requests
-  - [ ] Frontend: Test approve/reject actions call correct APIs
+- [x] Task 2: Backend — Create request API endpoints (AC: #1-#7)
+  - [x] Create `backend/src/routes/requests.routes.ts`
+  - [x] Create `backend/src/controllers/requests.controller.ts`
+  - [x] Create `backend/src/services/requests/request.service.ts`
+  - [x] `POST /api/requests` — submit new request (authenticated users)
+  - [x] `GET /api/requests/mine` — user's own requests (authenticated)
+  - [x] `GET /api/admin/requests` — triage queue (admin only)
+  - [x] `GET /api/admin/requests/:id` — single request detail (admin only)
+  - [x] `PUT /api/admin/requests/:id/approve` — approve + create Linear issue (admin only)
+  - [x] `PUT /api/admin/requests/:id/reject` — reject with reason (admin only)
+  - [x] `PUT /api/admin/requests/:id/merge` — link to existing item (admin only, Phase 2)
+- [x] Task 3: Backend — Linear issue creation on approval (AC: #5)
+  - [x] On approval, use `@linear/sdk` to create a new Linear issue
+  - [x] Map request fields: title → issue title, description → issue description
+  - [x] Add label based on category if provided
+  - [x] Add a note: "Submitted by {user.name} via Shareable IT Backlog"
+  - [x] Store the created `linear_issue_id` back on the request record
+  - [x] Trigger a sync so the new issue appears in the backlog
+- [x] Task 4: Backend — Duplicate detection endpoint (AC: #3)
+  - [x] `GET /api/requests/similar?title={searchText}` — returns top 5 similar backlog items
+  - [x] Use simple text search (ILIKE or ts_vector) against backlog item titles
+  - [x] Return `{ identifier, title, status }` for each match
+- [x] Task 5: Frontend — Create request submission form (AC: #1, #2, #3)
+  - [x] Create `frontend/src/features/requests/` feature directory
+  - [x] Create `frontend/src/features/requests/components/request-form.tsx`
+  - [x] Form fields: Title (required), Description (required, textarea), Business Impact (dropdown), Category (dropdown of labels), Urgency (dropdown)
+  - [x] Use Chakra UI form components with validation
+  - [x] Add debounced title search for duplicate detection (call `/api/requests/similar`)
+  - [x] Show similar items panel when matches found
+  - [x] On submit success: show confirmation toast and redirect to "My Requests"
+- [x] Task 6: Frontend — Create "My Requests" view (AC: #2, #7)
+  - [x] Create `frontend/src/features/requests/components/my-requests-page.tsx`
+  - [x] List user's requests with status badges (Submitted, Under Review, Approved, Rejected)
+  - [x] Show admin feedback/rejection reason when available
+  - [x] Show link to created Linear issue when approved
+  - [x] Add to `/my-requests` route
+- [x] Task 7: Frontend — Create admin triage queue (AC: #4, #5, #6)
+  - [x] Create `frontend/src/features/requests/components/triage-queue.tsx`
+  - [x] Add triage queue tab/section to admin page
+  - [x] List pending requests sorted by date
+  - [x] For each request: show details, approve button, reject button (with reason textarea)
+  - [x] Approve action: calls API, shows success with created issue link
+  - [x] Reject action: prompts for reason, calls API, shows confirmation
+- [x] Task 8: Frontend — Navigation and routing (AC: #1)
+  - [x] Add "Submit Request" button to `AppHeader` (prominent placement)
+  - [x] Add `/submit-request` route for the form
+  - [x] Add `/my-requests` route for user's request history
+  - [x] Add triage queue to admin section
+- [x] Task 9: Write tests (AC: #8)
+  - [x] Backend: Test CRUD operations on requests
+  - [x] Backend: Test approval creates Linear issue (mock Linear SDK)
+  - [x] Backend: Test rejection stores reason
+  - [x] Backend: Test duplicate detection returns similar items
+  - [x] Frontend: Test form renders all fields with validation
+  - [x] Frontend: Test duplicate detection shows similar items
+  - [x] Frontend: Test My Requests page lists requests with status
+  - [x] Frontend: Test triage queue shows pending requests
+  - [x] Frontend: Test approve/reject actions call correct APIs
 
 ## Dev Notes
 
@@ -169,9 +169,71 @@ so that I have a single, trackable place to ask for IT work — instead of sendi
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude claude-4.6-opus-high-thinking (via Cursor)
 
 ### Debug Log References
+- No blocking issues encountered during implementation.
+- Code review follow-up: fixed the pre-existing frontend test failures by restoring Business Unit display in backlog card + item detail modal.
+- node-pg-migrate had issues with pre-existing migration state; migration applied directly via Node.js pg module.
 
 ### Completion Notes List
+- **Task 1**: Created `014_create-requests-table.sql` migration with `request_business_impact` and `request_status` PostgreSQL enums. Table has UUID primary key, FK to users, all required columns per spec, and performance indexes.
+- **Task 2**: Full REST API: POST /api/requests, GET /api/requests/mine, GET /api/admin/requests, GET /api/admin/requests/:id, PUT /api/admin/requests/:id/approve, PUT /api/admin/requests/:id/reject. Server-side validation (title >= 10 chars, description >= 50 chars, valid impact/urgency enums).
+- **Task 3**: On approval, uses `@linear/sdk` to create a Linear issue with mapped priority, submitter attribution, category labels, and project assignment. Linear issue creation is best-effort (approval succeeds even if Linear fails). Uses transactional DB flow with SELECT FOR UPDATE.
+- **Task 4**: GET /api/requests/similar?title= uses PostgreSQL ILIKE against backlog_items table, returns top 5 matches with identifier, title, and status.
+- **Task 5**: Full request form with Chakra UI, inline validation, debounced duplicate detection (400ms), similar items panel, category populated from visible labels, urgency dropdown, success toast and redirect on submit.
+- **Task 6**: My Requests page with request cards showing status badges, rejection reasons, admin notes, and business impact/urgency/category metadata. Empty state with CTA to submit.
+- **Task 7**: Triage Queue with pending/processed sections, approve and reject actions, inline rejection reason form, toast notifications, badge count on admin tab.
+- **Task 8**: Routes added: /submit-request, /my-requests. "Submit Request" button with Plus icon added to AppHeader. "My Requests" nav link added. "Triage" tab added to admin page with pending count badge.
+- **Task 9**: 26 backend tests (12 service + 14 controller) and 16 frontend tests (6 form + 5 my-requests + 5 triage-queue). All 742 backend tests pass, all new frontend tests pass.
 
 ### File List
+
+**New files:**
+- `database/migrations/014_create-requests-table.sql`
+- `database/migrations/015_request-pipeline-hardening.sql`
+- `backend/src/services/requests/request.service.ts`
+- `backend/src/services/requests/request.service.test.ts`
+- `backend/src/controllers/requests.controller.ts`
+- `backend/src/controllers/requests.controller.test.ts`
+- `backend/src/routes/requests.routes.ts`
+- `frontend/src/features/requests/types/request.types.ts`
+- `frontend/src/features/requests/hooks/use-requests.ts`
+- `frontend/src/features/requests/components/request-form.tsx`
+- `frontend/src/features/requests/components/request-form.test.tsx`
+- `frontend/src/features/requests/components/my-requests-page.tsx`
+- `frontend/src/features/requests/components/my-requests-page.test.tsx`
+- `frontend/src/features/requests/components/triage-queue.tsx`
+- `frontend/src/features/requests/components/triage-queue.test.tsx`
+
+**Modified files:**
+- `backend/src/routes/index.ts` (added requestsRoutes import and registration)
+- `backend/src/services/sync/sync-backlog-items.ts` (persist backlog item status for duplicate detection)
+- `database/migrations/014_create-requests-table.sql` (UUID default removed — app generates UUIDs)
+- `frontend/src/App.tsx` (added /submit-request and /my-requests routes)
+- `frontend/src/shared/components/layout/app-header.tsx` (added Submit Request button and My Requests nav link)
+- `frontend/src/features/admin/components/admin-page.tsx` (added Triage tab with pending count badge)
+- `frontend/src/features/admin/components/user-approval-list.tsx`
+- `frontend/src/features/admin/components/user-approval-list.test.tsx`
+- `frontend/src/features/admin/components/user-management-list.tsx`
+- `frontend/src/features/admin/components/user-management-list.test.tsx`
+- `frontend/src/features/backlog/components/backlog-item-card.tsx` (restore Business Unit display)
+- `frontend/src/features/backlog/components/item-detail-modal.tsx` (restore Business Unit display)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (status: in-progress → review)
+- `_bmad-output/implementation-artifacts/18-1-request-submission-pipeline.md` (this file)
+
+## Senior Developer Review (AI)
+
+_Reviewer: Rhunnicutt on 2026-02-17_
+
+### Summary
+
+- Fixed migration portability: removed `gen_random_uuid()` default from `requests.id` (no `pgcrypto` dependency) and generate UUIDs in the backend service.
+- Added missing API surface area: implemented `PUT /api/admin/requests/:id/merge`.
+- Improved duplicate detection correctness: persisted `backlog_items.status` during sync and return real status values from `/api/requests/similar`.
+- Improved request approval UX: store Linear issue `identifier` + `url`, and show real “Open in Linear” links in admin triage + My Requests.
+- Fixed pre-existing frontend test failures (Business Unit display), and verified `npm run build` + `npm run test:run` pass.
+
+## Change Log
+- 2026-02-17: Story 18.1 implementation complete — Request Submission Pipeline with full CRUD, Linear integration on approval, duplicate detection, admin triage queue, and comprehensive tests (42 new tests).
+- 2026-02-17: Senior dev review fixes — migration portability, merge endpoint, duplicate detection status, Linear links for approved requests, and pre-existing test repairs. `npm run build` + `npm run test:run` passing.

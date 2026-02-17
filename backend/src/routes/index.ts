@@ -7,6 +7,7 @@ import syncRoutes from './sync.routes.js'
 import itRoutes from './it.routes.js'
 import labelsRoutes from './labels.routes.js'
 import userRoutes from './user.routes.js'
+import requestsRoutes from './requests.routes.js'
 import { requireAuth, requireApproved } from '../middleware/auth.middleware.js'
 import { databaseHealthMiddleware } from '../middleware/database-health.middleware.js'
 
@@ -31,7 +32,7 @@ const router = Router()
 // Auth routes — no auth middleware (they handle auth internally)
 router.use(authRoutes)
 
-// Admin routes — auth + admin middleware applied inside admin.routes.ts and audit.routes.ts
+// Admin routes — auth + admin middleware applied inside admin.routes.ts, audit.routes.ts, and requests.routes.ts
 router.use(adminRoutes)
 router.use(auditRoutes)
 
@@ -41,6 +42,7 @@ router.use(auditRoutes)
 const protectedRouter = Router()
 protectedRouter.use(requireAuth, requireApproved)
 protectedRouter.use(asyncMiddleware(databaseHealthMiddleware))
+protectedRouter.use(requestsRoutes)
 protectedRouter.use(backlogRoutes)
 protectedRouter.use(syncRoutes)
 protectedRouter.use(itRoutes)
