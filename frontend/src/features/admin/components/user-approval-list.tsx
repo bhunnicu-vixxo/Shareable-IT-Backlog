@@ -1,6 +1,9 @@
 import { Box, Button, Heading, Skeleton, Text, VStack, HStack, Badge } from '@chakra-ui/react'
 import { usePendingUsers } from '../hooks/use-pending-users'
 import { useApproveUser } from '../hooks/use-approve-user'
+import { useRejectUser } from '../hooks/use-reject-user'
+import { ConfirmationDialog } from '@/shared/components/confirmation-dialog'
+import { toaster } from '@/components/ui/toaster'
 import { useState } from 'react'
 
 function formatDate(iso: string): string {
@@ -37,23 +40,62 @@ export function UserApprovalListSkeleton() {
 }
 
 /**
- * Admin component showing a list of pending users with approve buttons.
+ * Admin component showing a list of pending users with approve and reject buttons.
  */
 export function UserApprovalList() {
   const { pendingUsers, isLoading, error } = usePendingUsers()
   const { approveUser, isApproving } = useApproveUser()
+  const { rejectUser, isRejecting } = useRejectUser()
   const [approvingId, setApprovingId] = useState<number | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<{ id: number; email: string } | null>(null)
+
+  const isMutating = isApproving || isRejecting
 
   const handleApprove = async (userId: number, email: string) => {
     setApprovingId(userId)
-    setSuccessMessage(null)
     try {
       await approveUser(userId)
-      setSuccessMessage(`${email} has been approved`)
-      setTimeout(() => setSuccessMessage(null), 3000)
+      toaster.create({
+        title: 'User approved',
+        description: `${email} has been approved`,
+        type: 'success',
+        duration: 3000,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to approve user'
+      toaster.create({
+        title: 'Approval failed',
+        description: message,
+        type: 'error',
+        duration: null,
+      })
     } finally {
       setApprovingId(null)
+    }
+  }
+
+  const handleRejectConfirm = async () => {
+    if (!rejectTarget) return
+    setApprovingId(rejectTarget.id)
+    try {
+      await rejectUser(rejectTarget.id)
+      toaster.create({
+        title: 'User rejected',
+        description: `${rejectTarget.email} has been rejected`,
+        type: 'success',
+        duration: 3000,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reject user'
+      toaster.create({
+        title: 'Rejection failed',
+        description: message,
+        type: 'error',
+        duration: null,
+      })
+    } finally {
+      setApprovingId(null)
+      setRejectTarget(null)
     }
   }
 
@@ -66,12 +108,6 @@ export function UserApprovalList() {
             {pendingUsers.length} pending
           </Badge>
         </HStack>
-
-        {successMessage && (
-          <Text color="fg.success" fontSize="sm" role="alert">
-            ✓ {successMessage}
-          </Text>
-        )}
 
         {isLoading && <UserApprovalListSkeleton />}
 
@@ -103,20 +139,44 @@ export function UserApprovalList() {
                   Requested {formatDate(user.createdAt)}
                 </Text>
               </VStack>
-              <Button
-                size="sm"
-                colorPalette="green"
-                onClick={() => handleApprove(user.id, user.email)}
-                loading={isApproving && approvingId === user.id}
-                disabled={isApproving}
-                aria-label={`Approve ${user.email}`}
-              >
-                Approve
-              </Button>
+              <HStack gap={2}>
+                <Button
+                  size="sm"
+                  colorPalette="red"
+                  variant="outline"
+                  onClick={() => setRejectTarget({ id: user.id, email: user.email })}
+                  loading={isRejecting && approvingId === user.id}
+                  disabled={isMutating}
+                  aria-label={`Reject ${user.email}`}
+                >
+                  Reject
+                </Button>
+                <Button
+                  size="sm"
+                  colorPalette="green"
+                  onClick={() => handleApprove(user.id, user.email)}
+                  loading={isApproving && approvingId === user.id}
+                  disabled={isMutating}
+                  aria-label={`Approve ${user.email}`}
+                >
+                  Approve
+                </Button>
+              </HStack>
             </HStack>
           </Box>
         ))}
       </VStack>
+
+      <ConfirmationDialog
+        title="Reject User"
+        body={`Are you sure you want to reject ${rejectTarget?.email ?? 'this user'}? This user will be moved to the disabled list.`}
+        confirmLabel="Reject"
+        confirmColorPalette="red"
+        isOpen={rejectTarget !== null}
+        isLoading={isRejecting}
+        onConfirm={handleRejectConfirm}
+        onCancel={() => setRejectTarget(null)}
+      />
     </Box>
   )
 }

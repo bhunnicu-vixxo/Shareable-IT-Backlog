@@ -19,8 +19,12 @@ export type AuditAction =
   | 'TRIGGER_SYNC'
   | 'SYNC_SCHEDULE_UPDATED'
   | 'USER_APPROVED'
+  | 'USER_REJECTED'
   | 'USER_DISABLED'
   | 'USER_ENABLED'
+  | 'USER_REMOVED'
+  | 'USER_ADMIN_ROLE_UPDATED'
+  | 'USER_IT_ROLE_UPDATED'
   | 'API_ACCESS'
 
 /** Resource categories targeted by audited actions. */

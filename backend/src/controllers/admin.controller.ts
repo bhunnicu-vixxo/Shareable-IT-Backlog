@@ -7,6 +7,9 @@ import {
   disableUser,
   enableUser,
   updateUserITRole,
+  rejectUser,
+  removeUser,
+  updateUserAdminRole,
 } from '../services/users/user.service.js'
 import {
   listAllLabels,
@@ -173,6 +176,103 @@ export async function updateUserITRoleHandler(
     const updatedUser = await updateUserITRole(userId, isIT, adminId, req.ip ?? '')
 
     logger.info({ userId, adminId, isIT }, 'Admin updated user IT role')
+
+    res.json(updatedUser)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * POST /api/admin/users/:id/reject
+ * Rejects a pending user. Sets is_disabled = true on a non-approved user.
+ */
+export async function rejectUserHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = Number(req.params.id)
+    if (isNaN(userId) || userId <= 0) {
+      res.status(400).json({ error: { message: 'Invalid user ID', code: 'VALIDATION_ERROR' } })
+      return
+    }
+
+    const adminId = Number(req.session.userId)
+    const result = await rejectUser(userId, adminId, req.ip ?? '')
+
+    logger.info({ userId, adminId }, 'Admin rejected pending user')
+
+    res.json(result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * DELETE /api/admin/users/:id
+ * Permanently removes a disabled user from the system (hard delete).
+ */
+export async function removeUserHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = Number(req.params.id)
+    if (isNaN(userId) || userId <= 0) {
+      res.status(400).json({ error: { message: 'Invalid user ID', code: 'VALIDATION_ERROR' } })
+      return
+    }
+
+    const adminId = Number(req.session.userId)
+    const result = await removeUser(userId, adminId, req.ip ?? '')
+
+    logger.info({ userId, adminId }, 'Admin permanently removed user')
+
+    res.json(result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * PUT /api/admin/users/:id/admin-role
+ * Promotes or demotes a user's admin role. Body: { isAdmin: boolean }
+ */
+export async function updateUserAdminRoleHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = Number(req.params.id)
+    if (isNaN(userId) || userId <= 0) {
+      res.status(400).json({
+        error: {
+          message: 'Invalid user ID',
+          code: 'VALIDATION_ERROR',
+        },
+      })
+      return
+    }
+
+    const { isAdmin } = req.body as { isAdmin?: boolean }
+    if (typeof isAdmin !== 'boolean') {
+      res.status(400).json({
+        error: {
+          message: 'Missing required field: isAdmin (boolean)',
+          code: 'VALIDATION_ERROR',
+        },
+      })
+      return
+    }
+
+    const adminId = Number(req.session.userId)
+    const updatedUser = await updateUserAdminRole(userId, isAdmin, adminId, req.ip ?? '')
+
+    logger.info({ userId, adminId, isAdmin }, 'Admin updated user admin role')
 
     res.json(updatedUser)
   } catch (err) {

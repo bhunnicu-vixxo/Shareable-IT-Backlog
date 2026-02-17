@@ -24,7 +24,7 @@ vi.mock('../../utils/logger.js', () => ({
   },
 }))
 
-import { getPendingUsers, approveUser, getAllUsers, disableUser, enableUser, getUnseenCount, markSeen } from './user.service.js'
+import { getPendingUsers, approveUser, getAllUsers, disableUser, enableUser, getUnseenCount, markSeen, rejectUser, removeUser, updateUserAdminRole } from './user.service.js'
 
 const makePendingRow = (overrides: Record<string, unknown> = {}) => ({
   id: 2,
@@ -377,6 +377,256 @@ describe('user.service', () => {
       mockClient.query.mockResolvedValueOnce({ rows: [] })
 
       await expect(enableUser(2, 1)).rejects.toThrow('is not disabled')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+  })
+
+  describe('rejectUser', () => {
+    beforeEach(() => {
+      mockClient.query.mockReset()
+      mockClient.release.mockReset()
+    })
+
+    it('should set is_disabled = true on a pending user and create USER_REJECTED audit log', async () => {
+      // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+      // SELECT FOR UPDATE — pending user (not approved, not disabled)
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ is_approved: false, is_disabled: false })] })
+      // UPDATE user
+      const rejectedRow = makeFullUserRow({ is_approved: false, is_disabled: true, is_it: false })
+      mockClient.query.mockResolvedValueOnce({ rows: [rejectedRow] })
+      // INSERT audit log
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+      // COMMIT
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+
+      const result = await rejectUser(2, 1, '192.168.1.1')
+
+      expect(result.isDisabled).toBe(true)
+      expect(result.isApproved).toBe(false)
+      expect(mockClient.query).toHaveBeenCalledTimes(5)
+      expect(mockClient.query.mock.calls[0][0]).toBe('BEGIN')
+      expect(mockClient.query.mock.calls[2][0]).toContain('UPDATE users SET is_disabled = true')
+      expect(mockClient.query.mock.calls[3][0]).toContain('USER_REJECTED')
+      const auditParams = mockClient.query.mock.calls[3][1] as unknown[]
+      expect(auditParams[0]).toBe(1) // adminId
+      expect(auditParams[1]).toBe('2') // target user id
+      expect(auditParams[3]).toBe('192.168.1.1') // ip
+      expect(mockClient.query.mock.calls[4][0]).toBe('COMMIT')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 404 for non-existent user', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // SELECT — not found
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(rejectUser(999, 1)).rejects.toThrow('User with ID 999 not found')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 409 for already approved user', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ is_approved: true })] }) // SELECT
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(rejectUser(2, 1)).rejects.toThrow('already approved')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 409 for already disabled user', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ is_approved: false, is_disabled: true })] }) // SELECT
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(rejectUser(2, 1)).rejects.toThrow('already disabled/rejected')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+  })
+
+  describe('removeUser', () => {
+    beforeEach(() => {
+      mockClient.query.mockReset()
+      mockClient.release.mockReset()
+    })
+
+    it('should hard-delete a disabled user, clean up FKs, and create USER_REMOVED audit log', async () => {
+      // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+      // SELECT FOR UPDATE — disabled user
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ is_disabled: true, is_it: false })] })
+      // SELECT users approved_by = removed user (for audit details)
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+      // INSERT audit log (BEFORE deletion)
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+      // DELETE user_preferences
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+      // UPDATE users SET approved_by = NULL
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+      // DELETE users
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+      // COMMIT
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+
+      const result = await removeUser(2, 1, '192.168.1.1')
+
+      expect(result).toEqual({ success: true })
+      expect(mockClient.query).toHaveBeenCalledTimes(8)
+      expect(mockClient.query.mock.calls[0][0]).toBe('BEGIN')
+      expect(mockClient.query.mock.calls[3][0]).toContain('USER_REMOVED')
+      expect(mockClient.query.mock.calls[4][0]).toContain('DELETE FROM user_preferences')
+      expect(mockClient.query.mock.calls[5][0]).toContain('UPDATE users SET approved_by = NULL')
+      expect(mockClient.query.mock.calls[6][0]).toContain('DELETE FROM users')
+      expect(mockClient.query.mock.calls[7][0]).toBe('COMMIT')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 404 for non-existent user', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // SELECT — not found
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(removeUser(999, 1)).rejects.toThrow('User with ID 999 not found')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 409 for non-disabled user', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ is_disabled: false })] }) // SELECT
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(removeUser(2, 1)).rejects.toThrow('must be disabled before removal')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 400 for self-removal attempt', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ id: 1, is_disabled: true })] }) // SELECT
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(removeUser(1, 1)).rejects.toThrow('Cannot remove your own account')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 409 when attempting to remove the last admin account', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ id: 2, is_disabled: true, is_admin: true })] }) // SELECT
+      mockClient.query.mockResolvedValueOnce({ rows: [{ count: 0 }] }) // SELECT COUNT other admins
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(removeUser(2, 1)).rejects.toThrow('Cannot remove the last admin account')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+  })
+
+  describe('updateUserAdminRole', () => {
+    beforeEach(() => {
+      mockClient.query.mockReset()
+      mockClient.release.mockReset()
+    })
+
+    it('should promote a user to admin and create USER_ADMIN_ROLE_UPDATED audit log', async () => {
+      // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+      // SELECT FOR UPDATE — approved, non-disabled user
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ is_approved: true, is_admin: false, is_disabled: false, is_it: false })] })
+      // UPDATE user
+      const promotedRow = makeFullUserRow({ is_approved: true, is_admin: true, is_disabled: false, is_it: false })
+      mockClient.query.mockResolvedValueOnce({ rows: [promotedRow] })
+      // INSERT audit log
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+      // COMMIT
+      mockClient.query.mockResolvedValueOnce({ rows: [] })
+
+      const result = await updateUserAdminRole(2, true, 1, '192.168.1.1')
+
+      expect(result.isAdmin).toBe(true)
+      expect(mockClient.query).toHaveBeenCalledTimes(5)
+      expect(mockClient.query.mock.calls[2][0]).toContain('UPDATE users SET is_admin')
+      expect(mockClient.query.mock.calls[3][0]).toContain('USER_ADMIN_ROLE_UPDATED')
+      const auditParams = mockClient.query.mock.calls[3][1] as unknown[]
+      const details = JSON.parse(String(auditParams[2])) as Record<string, unknown>
+      expect(details).toEqual(
+        expect.objectContaining({
+          target: { userId: 2, email: 'pending@vixxo.com' },
+          before: { isAdmin: false },
+          after: { isAdmin: true },
+        }),
+      )
+      expect(mockClient.query.mock.calls[4][0]).toBe('COMMIT')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should demote an admin back to regular user', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ id: 3, is_approved: true, is_admin: true, is_disabled: false, is_it: false })] }) // SELECT
+      mockClient.query.mockResolvedValueOnce({ rows: [{ count: 1 }] }) // SELECT COUNT other active admins
+      const demotedRow = makeFullUserRow({ id: 3, is_approved: true, is_admin: false, is_disabled: false, is_it: false })
+      mockClient.query.mockResolvedValueOnce({ rows: [demotedRow] }) // UPDATE
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // INSERT audit
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // COMMIT
+
+      const result = await updateUserAdminRole(3, false, 1, '192.168.1.1')
+
+      expect(result.isAdmin).toBe(false)
+      expect(mockClient.query.mock.calls[4][0]).toContain('USER_ADMIN_ROLE_UPDATED')
+    })
+
+    it('should throw 400 for self-demotion attempt', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ id: 1, is_approved: true, is_admin: true })] }) // SELECT
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(updateUserAdminRole(1, false, 1)).rejects.toThrow('Cannot demote your own admin role')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 409 when attempting to demote the last active admin', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ id: 2, is_approved: true, is_admin: true, is_disabled: false })] }) // SELECT
+      mockClient.query.mockResolvedValueOnce({ rows: [{ count: 0 }] }) // SELECT COUNT other active admins
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(updateUserAdminRole(2, false, 1)).rejects.toThrow('Cannot demote the last active admin')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 404 for non-existent user', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // SELECT — not found
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(updateUserAdminRole(999, true, 1)).rejects.toThrow('User with ID 999 not found')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 409 for disabled user', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ is_approved: true, is_disabled: true })] }) // SELECT
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(updateUserAdminRole(2, true, 1)).rejects.toThrow('disabled and cannot have role changes')
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
+    })
+
+    it('should throw 409 for unapproved user', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      mockClient.query.mockResolvedValueOnce({ rows: [makeFullUserRow({ is_approved: false, is_disabled: false })] }) // SELECT
+      mockClient.query.mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+      await expect(updateUserAdminRole(2, true, 1)).rejects.toThrow('is not approved')
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
       expect(mockClient.release).toHaveBeenCalled()
     })

@@ -176,6 +176,10 @@ development_status:
     status: review
     linear_id: "VIX-428"
     linear_url: "https://linear.app/vixxo/issue/VIX-428/admin-label-visibility-configuration"
+  7-7-flesh-out-admin-user-management:
+    status: done
+    linear_id: "VIX-453"
+    linear_url: "https://linear.app/vixxo/issue/VIX-453/flesh-out-admin-user-management-reject-remove-promote-and-confirmation"
   epic-7-retrospective: optional
 
   # Epic 8: Design System & UI Components
