@@ -72,7 +72,10 @@ export function ConfirmationDialog({
             </Button>
             <Button
               colorPalette={confirmColorPalette}
-              onClick={onConfirm}
+              onClick={() => {
+                closeRequestedRef.current = true
+                onConfirm()
+              }}
               loading={isLoading}
             >
               {confirmLabel}

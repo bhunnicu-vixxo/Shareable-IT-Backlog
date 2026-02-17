@@ -611,6 +611,20 @@ export async function updateUserAdminRole(
       throw err
     }
 
+    if (user.is_disabled) {
+      const err = new Error(`User with ID ${userId} is disabled and cannot have role changes`) as Error & { statusCode: number; code: string }
+      err.statusCode = 409
+      err.code = 'USER_DISABLED'
+      throw err
+    }
+
+    if (!user.is_approved) {
+      const err = new Error(`User with ID ${userId} is not approved`) as Error & { statusCode: number; code: string }
+      err.statusCode = 409
+      err.code = 'USER_NOT_APPROVED'
+      throw err
+    }
+
     // Prevent demoting the last active admin (approved + not disabled).
     if (user.is_admin && !isAdmin) {
       const otherActiveAdminCountResult = await client.query(
@@ -629,20 +643,6 @@ export async function updateUserAdminRole(
         err.code = 'LAST_ADMIN_DEMOTE_FORBIDDEN'
         throw err
       }
-    }
-
-    if (user.is_disabled) {
-      const err = new Error(`User with ID ${userId} is disabled and cannot have role changes`) as Error & { statusCode: number; code: string }
-      err.statusCode = 409
-      err.code = 'USER_DISABLED'
-      throw err
-    }
-
-    if (!user.is_approved) {
-      const err = new Error(`User with ID ${userId} is not approved`) as Error & { statusCode: number; code: string }
-      err.statusCode = 409
-      err.code = 'USER_NOT_APPROVED'
-      throw err
     }
 
     const result = await client.query(
