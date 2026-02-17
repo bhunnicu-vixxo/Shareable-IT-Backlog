@@ -108,10 +108,9 @@ export async function createRequest(input: CreateRequestInput): Promise<ITReques
  * Get all requests submitted by a specific user, newest first.
  */
 export async function getRequestsByUser(userId: number): Promise<ITRequest[]> {
-  const result = await query(
-    `SELECT * FROM requests WHERE user_id = $1 ORDER BY created_at DESC`,
-    [userId],
-  )
+  const result = await query(`SELECT * FROM requests WHERE user_id = $1 ORDER BY created_at DESC`, [
+    userId,
+  ])
   return result.rows.map(mapRowToRequest)
 }
 
@@ -159,9 +158,9 @@ export async function getRequestById(requestId: string): Promise<ITRequest | nul
 /** Map business impact to Linear priority number. */
 const IMPACT_TO_PRIORITY: Record<RequestBusinessImpact, number> = {
   critical: 1, // Urgent
-  high: 2,     // High
-  medium: 3,   // Normal
-  low: 4,      // Low
+  high: 2, // High
+  medium: 3, // Normal
+  low: 4, // Low
 }
 
 /**
@@ -192,10 +191,9 @@ export async function approveRequest(
     const request = lockResult.rows[0]
 
     if (request.status !== 'submitted' && request.status !== 'reviewing') {
-      throw Object.assign(
-        new Error(`Cannot approve request in "${request.status}" status`),
-        { code: 'INVALID_STATUS' },
-      )
+      throw Object.assign(new Error(`Cannot approve request in "${request.status}" status`), {
+        code: 'INVALID_STATUS',
+      })
     }
 
     // Create Linear issue
@@ -236,7 +234,9 @@ export async function approveRequest(
         `**Business Impact:** ${request.business_impact}`,
         request.urgency ? `**Urgency:** ${request.urgency}` : null,
         request.category ? `**Category:** ${request.category}` : null,
-      ].filter(Boolean).join('\n')
+      ]
+        .filter((item) => item != null)
+        .join('\n')
 
       const issuePayload: {
         teamId: string
@@ -310,7 +310,9 @@ export async function approveRequest(
     if (linearIssueId) {
       syncService
         .runSync({ triggerType: 'manual', triggeredBy: input.adminId })
-        .catch((err) => logger.warn({ requestId, err }, 'Failed to trigger sync after request approval'))
+        .catch((err) =>
+          logger.warn({ requestId, err }, 'Failed to trigger sync after request approval'),
+        )
     }
 
     logger.info({ requestId, adminId: input.adminId, linearIssueId }, 'Request approved')
@@ -348,10 +350,9 @@ export async function rejectRequest(
     if (exists.rows.length === 0) {
       throw Object.assign(new Error('Request not found'), { code: 'NOT_FOUND' })
     }
-    throw Object.assign(
-      new Error(`Cannot reject request in "${exists.rows[0].status}" status`),
-      { code: 'INVALID_STATUS' },
-    )
+    throw Object.assign(new Error(`Cannot reject request in "${exists.rows[0].status}" status`), {
+      code: 'INVALID_STATUS',
+    })
   }
 
   logger.info({ requestId, adminId: input.adminId }, 'Request rejected')
@@ -430,10 +431,9 @@ export async function mergeRequest(
     if (exists.rows.length === 0) {
       throw Object.assign(new Error('Request not found'), { code: 'NOT_FOUND' })
     }
-    throw Object.assign(
-      new Error(`Cannot merge request in "${exists.rows[0].status}" status`),
-      { code: 'INVALID_STATUS' },
-    )
+    throw Object.assign(new Error(`Cannot merge request in "${exists.rows[0].status}" status`), {
+      code: 'INVALID_STATUS',
+    })
   }
 
   logger.info(
