@@ -1,6 +1,6 @@
 import { Box, Button, HStack, IconButton, Text } from '@chakra-ui/react'
 import { Link, useLocation } from 'react-router'
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, Plus } from 'lucide-react'
 import { useAuth } from '@/features/auth/hooks/use-auth'
 import { useColorMode } from '@/components/ui/color-mode'
 import { UnseenBadge } from '@/shared/components/unseen-badge'
@@ -78,6 +78,25 @@ export function AppHeader() {
               </Box>
             </Link>
 
+            <Link to="/my-requests">
+              <Box
+                px={3}
+                py={1.5}
+                borderRadius="md"
+                bg={location.pathname === '/my-requests' ? 'whiteAlpha.150' : 'transparent'}
+                transition="background 0.15s"
+                _hover={{ bg: 'whiteAlpha.100' }}
+              >
+                <Text
+                  fontSize="sm"
+                  fontWeight={location.pathname === '/my-requests' ? '600' : '400'}
+                  color={location.pathname === '/my-requests' ? 'white' : 'whiteAlpha.700'}
+                >
+                  My Requests
+                </Text>
+              </Box>
+            </Link>
+
             {isAdmin && (
               <Link to="/admin">
                 <Box
@@ -101,6 +120,20 @@ export function AppHeader() {
           </HStack>
 
           <UnseenBadge />
+
+          <Link to="/submit-request">
+            <Button
+              size="xs"
+              bg="brand.green"
+              color="white"
+              _hover={{ bg: 'brand.greenHover' }}
+              borderRadius="md"
+              fontWeight="600"
+            >
+              <Plus size={14} />
+              Submit Request
+            </Button>
+          </Link>
         </HStack>
 
         {/* Right: User info + color mode + sign out */}

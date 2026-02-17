@@ -122,7 +122,7 @@ export function UserManagementList() {
   }
 
   const showError = (title: string, description: string) => {
-    toaster.create({ title, description, type: 'error', duration: null })
+    toaster.create({ title, description, type: 'error', duration: undefined })
   }
 
   const handleToggleIT = async (userId: number, email: string, currentIsIT: boolean) => {

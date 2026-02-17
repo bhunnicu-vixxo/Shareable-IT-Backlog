@@ -107,7 +107,7 @@ const otherAdminUser = {
 
 describe('UserManagementList', () => {
   beforeEach(() => {
-    toasterCreateSpy = vi.spyOn(toaster, 'create').mockImplementation(() => undefined)
+    toasterCreateSpy = vi.spyOn(toaster, 'create').mockImplementation(() => 'mock-toast-id')
     mockUseToggleUserStatus.mockReturnValue({
       toggleStatus: vi.fn().mockResolvedValue(undefined),
       isToggling: false,

@@ -2,6 +2,8 @@ import { Routes, Route } from 'react-router'
 import { Box, Heading, Spinner, Text, VStack } from '@chakra-ui/react'
 import { BacklogPage } from '@/features/backlog/components/backlog-page'
 import { AdminPage } from '@/features/admin/components/admin-page'
+import { RequestForm } from '@/features/requests/components/request-form'
+import { MyRequestsPage } from '@/features/requests/components/my-requests-page'
 import { AccessDenied } from '@/features/auth/components/access-denied'
 import { useNetworkAccess } from '@/features/auth/hooks/use-network-access'
 import { useAuth } from '@/features/auth/hooks/use-auth'
@@ -90,6 +92,8 @@ function AppContent() {
     <AppLayout>
       <Routes>
         <Route path="/" element={<BacklogPage />} />
+        <Route path="/submit-request" element={<RequestForm />} />
+        <Route path="/my-requests" element={<MyRequestsPage />} />
         <Route
           path="/admin"
           element={

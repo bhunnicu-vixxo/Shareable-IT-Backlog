@@ -67,7 +67,7 @@ export function UserApprovalList() {
         title: 'Approval failed',
         description: message,
         type: 'error',
-        duration: null,
+        duration: undefined,
       })
     } finally {
       setApprovingId(null)
@@ -91,7 +91,7 @@ export function UserApprovalList() {
         title: 'Rejection failed',
         description: message,
         type: 'error',
-        duration: null,
+        duration: undefined,
       })
     } finally {
       setApprovingId(null)

@@ -27,7 +27,7 @@ let toasterCreateSpy: ReturnType<typeof vi.spyOn>
 
 describe('UserApprovalList', () => {
   beforeEach(() => {
-    toasterCreateSpy = vi.spyOn(toaster, 'create').mockImplementation(() => undefined)
+    toasterCreateSpy = vi.spyOn(toaster, 'create').mockImplementation(() => 'mock-toast-id')
     mockUseApproveUser.mockReturnValue({
       approveUser: vi.fn().mockResolvedValue(undefined),
       isApproving: false,

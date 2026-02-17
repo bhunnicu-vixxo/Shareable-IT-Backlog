@@ -345,7 +345,7 @@ development_status:
   # Epic 18: Request Submission Pipeline (Explore)
   epic-18: backlog
   18-1-request-submission-pipeline:
-    status: ready-for-dev
+    status: done
     linear_id: "VIX-439"
     linear_url: "https://linear.app/vixxo/issue/VIX-439/request-submission-pipeline-business-users-submit-it-requests-through"
   epic-18-retrospective: optional
