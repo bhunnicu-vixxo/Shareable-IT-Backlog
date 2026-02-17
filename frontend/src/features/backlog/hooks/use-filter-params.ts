@@ -8,6 +8,7 @@ const DEFAULTS = {
   sortDirection: 'asc' as SortDirection,
   searchTerm: '',
   showNewOnly: false,
+  showUnseenOnly: false,
   hideDone: true,
 } as const
 
@@ -21,6 +22,7 @@ const PARAM = {
   dir: 'dir',
   q: 'q',
   new: 'new',
+  unseen: 'unseen',
   hideDone: 'hideDone',
   item: 'item',
 } as const
@@ -31,6 +33,7 @@ export interface FilterParamsState {
   sortDirection: SortDirection
   searchTerm: string
   showNewOnly: boolean
+  showUnseenOnly: boolean
   hideDone: boolean
 }
 
@@ -40,8 +43,10 @@ export interface FilterParamsActions {
   setSortDirection: (dir: SortDirection) => void
   setSearchTerm: (term: string) => void
   setShowNewOnly: (show: boolean) => void
+  setShowUnseenOnly: (show: boolean) => void
   setHideDone: (hide: boolean) => void
   toggleShowNewOnly: () => void
+  toggleShowUnseenOnly: () => void
   toggleHideDone: () => void
   clearAll: () => void
 }
@@ -82,10 +87,13 @@ function parseSearchParams(params: URLSearchParams): FilterParamsState {
   const newRaw = params.get(PARAM.new)
   const showNewOnly = newRaw === '1'
 
+  const unseenRaw = params.get(PARAM.unseen)
+  const showUnseenOnly = unseenRaw === '1'
+
   const hideDoneRaw = params.get(PARAM.hideDone)
   const hideDone = hideDoneRaw === '0' ? false : DEFAULTS.hideDone
 
-  return { selectedLabels, sortBy, sortDirection, searchTerm, showNewOnly, hideDone }
+  return { selectedLabels, sortBy, sortDirection, searchTerm, showNewOnly, showUnseenOnly, hideDone }
 }
 
 /**
@@ -131,6 +139,9 @@ function buildSearchString(
   }
   if (state.showNewOnly) {
     pairs.push([PARAM.new, '1'])
+  }
+  if (state.showUnseenOnly) {
+    pairs.push([PARAM.unseen, '1'])
   }
   if (!state.hideDone) {
     pairs.push([PARAM.hideDone, '0'])
@@ -198,6 +209,7 @@ export function useFilterParams(): UseFilterParamsReturn {
         prev.sortDirection === urlState.sortDirection &&
         prev.searchTerm === urlState.searchTerm &&
         prev.showNewOnly === urlState.showNewOnly &&
+        prev.showUnseenOnly === urlState.showUnseenOnly &&
         prev.hideDone === urlState.hideDone
       ) {
         return prev
@@ -251,6 +263,11 @@ export function useFilterParams(): UseFilterParamsReturn {
     [],
   )
 
+  const setShowUnseenOnly = useCallback(
+    (show: boolean) => setState((s) => ({ ...s, showUnseenOnly: show })),
+    [],
+  )
+
   const setHideDone = useCallback(
     (hide: boolean) => setState((s) => ({ ...s, hideDone: hide })),
     [],
@@ -258,6 +275,11 @@ export function useFilterParams(): UseFilterParamsReturn {
 
   const toggleShowNewOnly = useCallback(
     () => setState((s) => ({ ...s, showNewOnly: !s.showNewOnly })),
+    [],
+  )
+
+  const toggleShowUnseenOnly = useCallback(
+    () => setState((s) => ({ ...s, showUnseenOnly: !s.showUnseenOnly })),
     [],
   )
 
@@ -274,6 +296,7 @@ export function useFilterParams(): UseFilterParamsReturn {
         sortDirection: DEFAULTS.sortDirection,
         searchTerm: DEFAULTS.searchTerm,
         showNewOnly: DEFAULTS.showNewOnly,
+        showUnseenOnly: DEFAULTS.showUnseenOnly,
         hideDone: DEFAULTS.hideDone,
       }),
     [],
@@ -286,8 +309,10 @@ export function useFilterParams(): UseFilterParamsReturn {
     setSortDirection,
     setSearchTerm,
     setShowNewOnly,
+    setShowUnseenOnly,
     setHideDone,
     toggleShowNewOnly,
+    toggleShowUnseenOnly,
     toggleHideDone,
     clearAll,
   }

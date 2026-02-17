@@ -317,7 +317,7 @@ development_status:
     linear_id: "VIX-435"
     linear_url: "https://linear.app/vixxo/issue/VIX-435/add-status-color-indicators-to-backlog-list-items"
   15-3-whats-new-badge-with-seen-tracking:
-    status: ready-for-dev
+    status: done
     linear_id: "VIX-436"
     linear_url: "https://linear.app/vixxo/issue/VIX-436/personalized-whats-new-badge-with-per-user-seen-tracking"
   epic-15-retrospective: optional

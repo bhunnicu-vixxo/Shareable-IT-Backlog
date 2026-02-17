@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router'
 import { Moon, Sun } from 'lucide-react'
 import { useAuth } from '@/features/auth/hooks/use-auth'
 import { useColorMode } from '@/components/ui/color-mode'
+import { UnseenBadge } from '@/shared/components/unseen-badge'
 
 /**
  * Shared application header with navigation and user controls.
@@ -98,6 +99,8 @@ export function AppHeader() {
               </Link>
             )}
           </HStack>
+
+          <UnseenBadge />
         </HStack>
 
         {/* Right: User info + color mode + sign out */}

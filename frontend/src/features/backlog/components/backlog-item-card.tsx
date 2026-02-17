@@ -123,7 +123,7 @@ export const BacklogItemCard = memo(
               outlineOffset: '2px',
               borderColor: 'brand.green',
             }}
-            aria-label={`${stackRank != null ? `Rank ${stackRank}, ` : ''}${item.title}, Priority ${item.priorityLabel}, Status: ${item.status}, Business Unit: ${item.teamName}${item.isNew ? ', New item' : ''}`}
+            aria-label={`${stackRank != null ? `Rank ${stackRank}, ` : ''}${item.title}, Priority ${item.priorityLabel}, Status: ${item.status}${item.isNew ? ', New item' : ''}`}
             role={isClickable ? 'button' : 'article'}
             tabIndex={isClickable ? 0 : undefined}
             cursor={isClickable ? 'pointer' : undefined}
@@ -187,9 +187,6 @@ export const BacklogItemCard = memo(
               <HStack gap="2" mt="1.5" flexWrap="wrap">
                 <StatusBadge status={item.status} statusType={item.statusType} />
                 {item.isNew && <NewItemBadge />}
-                <Text fontSize="sm" color="fg.brandMuted">
-                  {item.teamName}
-                </Text>
                 {canViewLinearLinks && item.url ? (
                   <Link
                     href={item.url}

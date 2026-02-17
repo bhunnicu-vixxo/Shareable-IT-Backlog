@@ -412,3 +412,67 @@ export async function getAllUsers(): Promise<ManagedUser[]> {
     createdAt: (row.created_at as Date).toISOString(),
   }))
 }
+
+// ── Unseen / "What's New" tracking ────────────────────────────────────
+
+export interface UnseenCountResult {
+  unseenCount: number
+  lastSeenAt: string | null
+}
+
+/**
+ * Count backlog items the user has not yet seen.
+ * An item is "unseen" when its created_at is after the user's last_seen_at.
+ * If last_seen_at is NULL (first-time user), all items are unseen.
+ */
+export async function getUnseenCount(userId: number): Promise<UnseenCountResult> {
+  const userResult = await query('SELECT last_seen_at FROM users WHERE id = $1', [userId])
+
+  if (userResult.rows.length === 0) {
+    const err = new Error(`User with ID ${userId} not found`) as Error & { statusCode: number; code: string }
+    err.statusCode = 404
+    err.code = 'USER_NOT_FOUND'
+    throw err
+  }
+
+  const lastSeenAt: Date | null = (userResult.rows[0].last_seen_at as Date | null) ?? null
+
+  let countResult
+  if (lastSeenAt) {
+    countResult = await query(
+      'SELECT COUNT(*)::int AS count FROM backlog_items WHERE created_at > $1',
+      [lastSeenAt],
+    )
+  } else {
+    countResult = await query('SELECT COUNT(*)::int AS count FROM backlog_items')
+  }
+
+  return {
+    unseenCount: (countResult.rows[0].count as number) ?? 0,
+    lastSeenAt: lastSeenAt ? lastSeenAt.toISOString() : null,
+  }
+}
+
+/**
+ * Mark all current backlog items as "seen" by updating the user's last_seen_at to NOW().
+ * Returns the updated timestamp.
+ */
+export async function markSeen(userId: number): Promise<{ lastSeenAt: string }> {
+  const result = await query(
+    `UPDATE users SET last_seen_at = NOW(), updated_at = NOW()
+     WHERE id = $1
+     RETURNING last_seen_at`,
+    [userId],
+  )
+
+  if (result.rows.length === 0) {
+    const err = new Error(`User with ID ${userId} not found`) as Error & { statusCode: number; code: string }
+    err.statusCode = 404
+    err.code = 'USER_NOT_FOUND'
+    throw err
+  }
+
+  return {
+    lastSeenAt: (result.rows[0].last_seen_at as Date).toISOString(),
+  }
+}

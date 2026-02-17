@@ -4,6 +4,8 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { Box, Button, Flex, HStack, Skeleton, Text, VStack } from '@chakra-ui/react'
 import { useBacklogItems } from '../hooks/use-backlog-items'
 import { useFilterParams } from '../hooks/use-filter-params'
+import { useUnseenCount } from '../hooks/use-unseen-count'
+import { useMarkSeen } from '../hooks/use-mark-seen'
 import { useDebouncedValue } from '../hooks/use-debounced-value'
 import { tokenizeQuery } from '../utils/highlight'
 import { BacklogItemCard } from './backlog-item-card'
@@ -155,17 +157,36 @@ export function BacklogList() {
     sortDirection,
     searchTerm: keywordQuery,
     showNewOnly,
+    showUnseenOnly,
     hideDone,
     setSelectedLabels,
     setSortBy,
     setSortDirection,
     setSearchTerm: setKeywordQuery,
     setShowNewOnly,
+    setShowUnseenOnly,
     toggleShowNewOnly,
-    toggleHideDone,
     clearAll: clearAllFilters,
   } = useFilterParams()
+
+  const { data: unseenData } = useUnseenCount()
+  // "What's New" tracking: mark as seen only after user interaction (scroll or open detail),
+  // and only if there is something to mark.
+  const { trigger: triggerMarkSeen } = useMarkSeen({
+    // If unseen count hasn't loaded yet, allow triggering so we don't miss early interactions.
+    enabled: unseenData ? unseenData.unseenCount > 0 : true,
+    delayMs: 2000,
+  })
+  const hasTriggeredSeen = useRef(false)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+
+  // Mark as seen when user opens an item detail view (AC #2).
+  useEffect(() => {
+    if (!selectedItemId) return
+    if (hasTriggeredSeen.current) return
+    hasTriggeredSeen.current = true
+    triggerMarkSeen()
+  }, [selectedItemId, triggerMarkSeen])
 
   // Deep-link: auto-open detail modal when ?item=VIX-XXX is present in URL
   const deepLinkHandled = useRef(false)
@@ -229,7 +250,7 @@ export function BacklogList() {
   }, [baseItems])
 
   // Client-side chained filters + sort — O(n log n), instant re-render, no API call
-  // Chain: labels → "New only" → keyword search → sort
+  // Chain: labels → "New only" → "Unseen only" → keyword search → sort
   const displayedItems = useMemo(() => {
     let filtered = baseItems
     if (selectedLabels.length > 0) {
@@ -239,6 +260,18 @@ export function BacklogList() {
     }
     if (showNewOnly) {
       filtered = filtered.filter((item) => item.isNew)
+    }
+    if (showUnseenOnly && unseenData?.lastSeenAt) {
+      const lastSeenMs = Date.parse(unseenData.lastSeenAt)
+      if (!Number.isNaN(lastSeenMs)) {
+        filtered = filtered.filter((item) => {
+          const createdMs = Date.parse(item.createdAt)
+          if (Number.isNaN(createdMs)) return false
+          return createdMs > lastSeenMs
+        })
+      }
+    } else if (showUnseenOnly && !unseenData?.lastSeenAt) {
+      // First-time user (null lastSeenAt) — all items are unseen, show all
     }
     if (searchTokens.length > 0) {
       filtered = filtered.filter((item) => {
@@ -288,7 +321,7 @@ export function BacklogList() {
     })
 
     return sorted
-  }, [baseItems, selectedLabels, showNewOnly, searchTokens, sortBy, sortDirection])
+  }, [baseItems, selectedLabels, showNewOnly, showUnseenOnly, unseenData?.lastSeenAt, searchTokens, sortBy, sortDirection])
 
   // Virtual scrolling — only renders visible items in the DOM
   const virtualizer = useVirtualizer({
@@ -353,7 +386,7 @@ export function BacklogList() {
   const handleClearKeyword = useCallback(() => setKeywordQuery(''), [setKeywordQuery])
   const handleClearLabels = useCallback(() => setSelectedLabels([]), [setSelectedLabels])
   const handleClearNewOnly = useCallback(() => setShowNewOnly(false), [setShowNewOnly])
-  const handleToggleHideDone = toggleHideDone
+  const handleClearUnseenOnly = useCallback(() => setShowUnseenOnly(false), [setShowUnseenOnly])
   const handleClearAll = useCallback(() => {
     clearAllFilters()
   }, [clearAllFilters])
@@ -440,6 +473,15 @@ export function BacklogList() {
     [focusCardAtIndex],
   )
 
+  const handleListScroll = useCallback(() => {
+    if (hasTriggeredSeen.current) return
+    const el = parentRef.current
+    if (!el) return
+    if (el.scrollTop <= 0) return
+    hasTriggeredSeen.current = true
+    triggerMarkSeen()
+  }, [triggerMarkSeen])
+
   const handleCloseDetail = useCallback(() => {
     // Scroll the previously clicked card into view before closing the modal
     // so that it is rendered in the DOM for focus restoration.
@@ -516,6 +558,7 @@ export function BacklogList() {
     const isFiltered = count !== total
     const parts: string[] = []
     if (showNewOnly) parts.push('new')
+    if (showUnseenOnly) parts.push('unseen')
     // When showing "X of Y", Y >= 2 so always plural; otherwise pluralize on count
     const itemWord = isFiltered ? 'items' : count === 1 ? 'item' : 'items'
     const filterParts = parts.length > 0 ? `${parts.join(' ')} ` : ''
@@ -532,7 +575,7 @@ export function BacklogList() {
   }
 
   /** Whether any filter is active (used for empty-state detection). */
-  const hasActiveFilters = showNewOnly || selectedLabels.length > 0 || debouncedQuery.trim().length > 0
+  const hasActiveFilters = showNewOnly || showUnseenOnly || selectedLabels.length > 0 || debouncedQuery.trim().length > 0
 
   return (
     <Box>
@@ -588,15 +631,7 @@ export function BacklogList() {
               : `New only (${selectedLabels.length > 0 ? scopedNewItemCount : newItemCount})`}
           </Button>
         )}
-        <Button
-          size="sm"
-          variant={hideDone ? 'solid' : 'outline'}
-          onClick={handleToggleHideDone}
-          aria-pressed={hideDone}
-          aria-label={hideDone ? 'Hide done items, currently on' : 'Hide done items, currently off'}
-        >
-          {hideDone ? 'Hide done' : 'Show done'}
-        </Button>
+
         <Box flex="1" minW="180px">
           <KeywordSearch
             value={keywordQuery}
@@ -629,9 +664,11 @@ export function BacklogList() {
           keyword={debouncedQuery}
           selectedLabels={selectedLabels}
           showNewOnly={showNewOnly}
+          showUnseenOnly={showUnseenOnly}
           onClearKeyword={handleClearKeyword}
           onClearLabels={handleClearLabels}
           onClearNewOnly={handleClearNewOnly}
+          onClearUnseenOnly={handleClearUnseenOnly}
           onClearAll={handleClearAll}
         />
       ) : (
@@ -644,6 +681,7 @@ export function BacklogList() {
           role="list"
           aria-label="Backlog items"
           onKeyDown={handleListKeyDown}
+          onScroll={handleListScroll}
         >
           <div
             style={{
