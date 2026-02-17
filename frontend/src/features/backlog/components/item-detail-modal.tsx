@@ -218,9 +218,6 @@ export function ItemDetailModal({
                       </Text>
                     )}
                     <CopyLinkButton identifier={data.item.identifier} variant="button" />
-                    <Text fontSize="sm" color="fg.brandMuted">
-                      {data.item.teamName}
-                    </Text>
                   </Flex>
                 </Box>
               </Flex>

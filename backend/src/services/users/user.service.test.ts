@@ -24,7 +24,7 @@ vi.mock('../../utils/logger.js', () => ({
   },
 }))
 
-import { getPendingUsers, approveUser, getAllUsers, disableUser, enableUser } from './user.service.js'
+import { getPendingUsers, approveUser, getAllUsers, disableUser, enableUser, getUnseenCount, markSeen } from './user.service.js'
 
 const makePendingRow = (overrides: Record<string, unknown> = {}) => ({
   id: 2,
@@ -379,6 +379,78 @@ describe('user.service', () => {
       await expect(enableUser(2, 1)).rejects.toThrow('is not disabled')
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
       expect(mockClient.release).toHaveBeenCalled()
+    })
+  })
+
+  describe('getUnseenCount', () => {
+    it('should return unseen count when last_seen_at is set', async () => {
+      const lastSeen = new Date('2026-02-15T10:00:00Z')
+      // First query: get user's last_seen_at
+      mockQuery.mockResolvedValueOnce({ rows: [{ last_seen_at: lastSeen }] })
+      // Second query: count items with created_at > last_seen_at
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: 5 }] })
+
+      const result = await getUnseenCount(1)
+
+      expect(result).toEqual({
+        unseenCount: 5,
+        lastSeenAt: '2026-02-15T10:00:00.000Z',
+      })
+      expect(mockQuery).toHaveBeenCalledTimes(2)
+      expect(mockQuery.mock.calls[1][0]).toContain('WHERE created_at > $1')
+      expect(mockQuery.mock.calls[1][1]).toEqual([lastSeen])
+    })
+
+    it('should count all items when last_seen_at is NULL (first-time user)', async () => {
+      // First query: user has null last_seen_at
+      mockQuery.mockResolvedValueOnce({ rows: [{ last_seen_at: null }] })
+      // Second query: count all items
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: 42 }] })
+
+      const result = await getUnseenCount(1)
+
+      expect(result).toEqual({
+        unseenCount: 42,
+        lastSeenAt: null,
+      })
+      expect(mockQuery).toHaveBeenCalledTimes(2)
+      expect(mockQuery.mock.calls[1][0]).not.toContain('WHERE')
+    })
+
+    it('should throw 404 for non-existent user', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] })
+
+      await expect(getUnseenCount(999)).rejects.toThrow('User with ID 999 not found')
+    })
+
+    it('should return 0 when no items exist', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ last_seen_at: new Date('2026-02-15T10:00:00Z') }] })
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: 0 }] })
+
+      const result = await getUnseenCount(1)
+
+      expect(result.unseenCount).toBe(0)
+    })
+  })
+
+  describe('markSeen', () => {
+    it('should update last_seen_at to NOW() and return the timestamp', async () => {
+      const now = new Date('2026-02-17T12:00:00Z')
+      mockQuery.mockResolvedValueOnce({ rows: [{ last_seen_at: now }] })
+
+      const result = await markSeen(1)
+
+      expect(result).toEqual({ lastSeenAt: '2026-02-17T12:00:00.000Z' })
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE users SET last_seen_at = NOW()'),
+        [1],
+      )
+    })
+
+    it('should throw 404 for non-existent user', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] })
+
+      await expect(markSeen(999)).rejects.toThrow('User with ID 999 not found')
     })
   })
 })

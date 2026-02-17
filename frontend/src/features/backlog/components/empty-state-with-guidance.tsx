@@ -10,12 +10,16 @@ export interface EmptyStateWithGuidanceProps {
   selectedLabels: string[]
   /** Whether the "New only" toggle is active. */
   showNewOnly: boolean
+  /** Whether the "Unseen only" filter is active. */
+  showUnseenOnly?: boolean
   /** Callback to clear the keyword search. */
   onClearKeyword: () => void
   /** Callback to clear the label filter. */
   onClearLabels: () => void
   /** Callback to clear the "New only" toggle. */
   onClearNewOnly: () => void
+  /** Callback to clear the "Unseen only" filter. */
+  onClearUnseenOnly?: () => void
   /** Callback to clear all active filters at once. */
   onClearAll: () => void
   /** When true, renders a condensed layout suitable for tight spaces. */
@@ -56,6 +60,11 @@ function getHeading(
   return 'No items found'
 }
 
+/** Returns heading text when "unseen only" filter is active. */
+function getUnseenHeading(): string {
+  return 'No unseen items'
+}
+
 /** Returns the contextual description with actionable suggestions. */
 function getDescription(
   keyword: string,
@@ -93,9 +102,11 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
   keyword,
   selectedLabels,
   showNewOnly,
+  showUnseenOnly = false,
   onClearKeyword,
   onClearLabels,
   onClearNewOnly,
+  onClearUnseenOnly,
   onClearAll,
   compact = false,
 }: EmptyStateWithGuidanceProps) {
@@ -142,14 +153,18 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
           color="fg.brand"
           fontSize={compact ? 'sm' : undefined}
         >
-          {getHeading(keyword, selectedLabels, showNewOnly)}
+          {showUnseenOnly && !keyword.trim() && selectedLabels.length === 0 && !showNewOnly
+            ? getUnseenHeading()
+            : getHeading(keyword, selectedLabels, showNewOnly)}
         </EmptyState.Title>
         <EmptyState.Description
           color="fg.brandMuted"
           maxW="72ch"
           fontSize={compact ? 'xs' : undefined}
         >
-          {getDescription(keyword, selectedLabels, showNewOnly)}
+          {showUnseenOnly && !keyword.trim() && selectedLabels.length === 0 && !showNewOnly
+            ? 'You have seen all items. Click the badge or remove the filter to see everything.'
+            : getDescription(keyword, selectedLabels, showNewOnly)}
         </EmptyState.Description>
       </EmptyState.Content>
       <HStack gap="2" flexWrap="wrap" justifyContent="center">
@@ -169,6 +184,11 @@ export const EmptyStateWithGuidance = memo(function EmptyStateWithGuidance({
         {!compact && showNewOnly && (
           <Button onClick={onClearNewOnly} variant="outline" size="sm">
             Turn off New only
+          </Button>
+        )}
+        {!compact && showUnseenOnly && onClearUnseenOnly && (
+          <Button onClick={onClearUnseenOnly} variant="outline" size="sm">
+            Turn off Unseen only
           </Button>
         )}
       </HStack>
