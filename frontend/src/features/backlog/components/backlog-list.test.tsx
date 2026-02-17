@@ -1076,4 +1076,59 @@ describe('BacklogList', () => {
     expect(screen.queryByText('Siebel new')).not.toBeInTheDocument()
     expect(screen.queryByText('Gateway old')).not.toBeInTheDocument()
   })
+
+  // ─── Deep-link: ?item=VIX-XXX opens detail modal ───
+
+  it('auto-opens detail modal when ?item= query param matches an item identifier', async () => {
+    const listResponse: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'abc-123', title: 'Deep Link Target', identifier: 'VIX-338' }),
+        createMockItem({ id: 'abc-456', title: 'Other Item', identifier: 'VIX-100' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 2,
+    }
+    const detailResponse: BacklogDetailResponse = {
+      item: createMockItem({ id: 'abc-123', title: 'Deep Link Target', identifier: 'VIX-338', description: 'Deep linked item' }),
+      comments: [] as BacklogItemComment[],
+      activities: [],
+    }
+
+    globalThis.fetch = vi.fn().mockImplementation((url: string | URL) => {
+      const urlStr = typeof url === 'string' ? url : url.toString()
+      const isDetailRequest = urlStr.includes('/backlog-items/') && urlStr.split('/').pop() !== 'backlog-items'
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(isDetailRequest ? detailResponse : listResponse),
+      })
+    })
+
+    render(<BacklogList />, { initialEntries: ['/?item=VIX-338'] })
+
+    // The detail modal should open for VIX-338
+    await waitFor(() => {
+      expect(screen.getByLabelText('Backlog item details')).toBeInTheDocument()
+    })
+  })
+
+  it('does not open detail modal when ?item= does not match any identifier', async () => {
+    const response: BacklogListResponse = {
+      items: [
+        createMockItem({ id: 'abc-123', title: 'Some Item', identifier: 'VIX-338' }),
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 1,
+    }
+    mockFetchSuccess(response)
+
+    render(<BacklogList />, { initialEntries: ['/?item=VIX-999'] })
+
+    await waitFor(() => {
+      expect(screen.getByText('Some Item')).toBeInTheDocument()
+    })
+
+    // No dialog should open
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })
