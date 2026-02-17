@@ -208,7 +208,7 @@ export function useFilterParams(): UseFilterParamsReturn {
   )
 
   const setSearchTerm = useCallback(
-    (term: string) => setState((s) => ({ ...s, searchTerm: term.trim() })),
+    (term: string) => setState((s) => ({ ...s, searchTerm: term })),
     [],
   )
 
