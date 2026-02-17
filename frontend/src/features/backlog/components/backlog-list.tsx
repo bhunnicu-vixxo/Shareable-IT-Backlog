@@ -635,63 +635,63 @@ export function BacklogList() {
           onClearAll={handleClearAll}
         />
       ) : (
-        <>
-          <Box
-            ref={parentRef}
-            height="calc(100vh - 220px)"
-            overflowY="auto"
-            px="1"
-            mx="-1"
-            role="list"
-            aria-label="Backlog items"
-            onKeyDown={handleListKeyDown}
+        <Box
+          ref={parentRef}
+          height="calc(100vh - 220px)"
+          overflowY="auto"
+          px="1"
+          mx="-1"
+          role="list"
+          aria-label="Backlog items"
+          onKeyDown={handleListKeyDown}
+        >
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
           >
-            <div
-              style={{
-                height: `${virtualizer.getTotalSize()}px`,
-                width: '100%',
-                position: 'relative',
-              }}
-            >
-              {virtualizer.getVirtualItems().map((virtualItem) => {
-                const item = displayedItems[virtualItem.index]
-                return (
-                  <div
-                    key={item.id}
-                    data-index={virtualItem.index}
-                    ref={virtualizer.measureElement}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualItem.start}px)`,
-                    }}
-                  >
-                    <Box pb="4">
-                      <BacklogItemCard
-                        ref={(el: HTMLDivElement | null) => {
-                          cardRefs.current[item.id] = el
-                        }}
-                        item={item}
-                        stackRank={stackRankMap.get(item.id) ?? virtualItem.index + 1}
-                        highlightTokens={searchTokens}
-                        onClick={() => handleItemClick(item.id)}
-                      />
-                    </Box>
-                  </div>
-                )
-              })}
-            </div>
-          </Box>
-          <ItemDetailModal
-            isOpen={!!selectedItemId}
-            itemId={selectedItemId}
-            onClose={handleCloseDetail}
-            triggerRef={lastClickedCardRef}
-          />
-        </>
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const item = displayedItems[virtualItem.index]
+              return (
+                <div
+                  key={item.id}
+                  data-index={virtualItem.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                >
+                  <Box pb="4">
+                    <BacklogItemCard
+                      ref={(el: HTMLDivElement | null) => {
+                        cardRefs.current[item.id] = el
+                      }}
+                      item={item}
+                      stackRank={stackRankMap.get(item.id) ?? virtualItem.index + 1}
+                      highlightTokens={searchTokens}
+                      onClick={() => handleItemClick(item.id)}
+                    />
+                  </Box>
+                </div>
+              )
+            })}
+          </div>
+        </Box>
       )}
+
+      {/* Always render modal so deep-links work even when filters yield empty results */}
+      <ItemDetailModal
+        isOpen={!!selectedItemId}
+        itemId={selectedItemId}
+        onClose={handleCloseDetail}
+        triggerRef={lastClickedCardRef}
+      />
     </Box>
   )
 }
