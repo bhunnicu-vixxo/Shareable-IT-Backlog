@@ -159,7 +159,8 @@ export function BacklogList() {
     setSortDirection,
     setSearchTerm: setKeywordQuery,
     setShowNewOnly,
-    setHideDone,
+    toggleShowNewOnly,
+    toggleHideDone,
     clearAll: clearAllFilters,
   } = useFilterParams()
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
@@ -331,14 +332,11 @@ export function BacklogList() {
   const handleClearKeyword = useCallback(() => setKeywordQuery(''), [setKeywordQuery])
   const handleClearLabels = useCallback(() => setSelectedLabels([]), [setSelectedLabels])
   const handleClearNewOnly = useCallback(() => setShowNewOnly(false), [setShowNewOnly])
-  const handleToggleHideDone = useCallback(
-    () => setHideDone(!hideDone),
-    [hideDone, setHideDone],
-  )
+  const handleToggleHideDone = toggleHideDone
   const handleClearAll = useCallback(() => {
     clearAllFilters()
   }, [clearAllFilters])
-  const handleToggleNewOnly = useCallback(() => setShowNewOnly(!showNewOnly), [showNewOnly, setShowNewOnly])
+  const handleToggleNewOnly = toggleShowNewOnly
   // Note: Each card still gets a per-item inline closure in the .map() below
   // (to capture item.id). This means BacklogItemCard's onClick prop changes on
   // every parent render, partially defeating React.memo for that prop. This is

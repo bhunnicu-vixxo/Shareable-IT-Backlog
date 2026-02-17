@@ -40,6 +40,8 @@ export interface FilterParamsActions {
   setSearchTerm: (term: string) => void
   setShowNewOnly: (show: boolean) => void
   setHideDone: (hide: boolean) => void
+  toggleShowNewOnly: () => void
+  toggleHideDone: () => void
   clearAll: () => void
 }
 
@@ -51,11 +53,19 @@ export type UseFilterParamsReturn = FilterParamsState & FilterParamsActions
  */
 function parseSearchParams(params: URLSearchParams): FilterParamsState {
   const labelsRaw = params.get(PARAM.labels)
+  // Labels are separated by '|' to avoid conflicts with commas in label names.
+  // Each label is URL-encoded, so we split first then decode individually.
   const selectedLabels =
     labelsRaw && labelsRaw.trim().length > 0
       ? labelsRaw
-          .split(',')
-          .map((l) => l.trim())
+          .split('|')
+          .map((l) => {
+            try {
+              return decodeURIComponent(l.trim())
+            } catch {
+              return l.trim()
+            }
+          })
           .filter(Boolean)
       : []
 
@@ -81,8 +91,8 @@ function parseSearchParams(params: URLSearchParams): FilterParamsState {
  * Build a query string (including leading '?') from filter state,
  * omitting any parameter whose value matches its default.
  *
- * Intentionally avoids `URLSearchParams.toString()` to keep commas readable
- * for the `labels` parameter (e.g., `labels=Siebel,Dynamics`).
+ * Labels are joined with '|' to avoid conflicts with commas in label names.
+ * Each label value is URL-encoded individually.
  */
 function buildSearchString(state: FilterParamsState): string {
   const pairs: Array<[string, string]> = []
@@ -91,7 +101,9 @@ function buildSearchString(state: FilterParamsState): string {
     new Set(state.selectedLabels.map((l) => l.trim()).filter(Boolean)),
   )
   if (normalizedLabels.length > 0) {
-    pairs.push([PARAM.labels, normalizedLabels.join(',')])
+    // Encode each label and join with '|' separator
+    const encodedLabels = normalizedLabels.map((l) => encodeURIComponent(l)).join('|')
+    pairs.push([PARAM.labels, encodedLabels])
   }
   if (state.sortBy !== DEFAULTS.sortBy) {
     pairs.push([PARAM.sort, state.sortBy])
@@ -116,12 +128,8 @@ function buildSearchString(state: FilterParamsState): string {
     .map(([k, v]) => {
       const encodedKey = encodeURIComponent(k)
       if (k === PARAM.labels) {
-        // Encode each label value, but keep commas readable as separators.
-        const encodedLabels = v
-          .split(',')
-          .map((label) => encodeURIComponent(label))
-          .join(',')
-        return `${encodedKey}=${encodedLabels}`
+        // Labels are already encoded with '|' separator in the value
+        return `${encodedKey}=${v}`
       }
       return `${encodedKey}=${encodeURIComponent(v)}`
     })
@@ -152,29 +160,23 @@ export function useFilterParams(): UseFilterParamsReturn {
     parseSearchParams(searchParams),
   )
 
-  // Track whether state changes are from user interaction (needs URL sync)
-  // vs from URL changes (should not re-sync to URL).
+  // Track whether URL was recently updated by this hook (to avoid feedback loop).
+  const lastPushedSearch = useRef<string | null>(null)
+  // Track if state change originated from URL sync (to avoid state→URL feedback).
   const isUrlSync = useRef(false)
 
-  // Sync state → URL whenever state changes (skip if change came from URL)
+  // Sync URL → state when user navigates (back/forward, manual URL edit).
+  // This effect MUST run before the state→URL effect so external URL changes
+  // update state before the state→URL effect can overwrite the URL.
   useEffect(() => {
-    if (isUrlSync.current) {
-      isUrlSync.current = false
+    // Skip if this URL change originated from our own navigation
+    if (lastPushedSearch.current === location.search) {
       return
     }
-    const newSearch = buildSearchString(state)
-    // Avoid redundant replace() calls if URL is already canonical.
-    if (newSearch !== location.search) {
-      navigate({ pathname: location.pathname, search: newSearch }, { replace: true })
-    }
-  }, [state, navigate, location.pathname, location.search])
-
-  // Sync URL → state when user navigates (back/forward, manual URL edit)
-  useEffect(() => {
     const urlState = parseSearchParams(new URLSearchParams(location.search))
     setState((prev) => {
       if (
-        prev.selectedLabels.join(',') === urlState.selectedLabels.join(',') &&
+        prev.selectedLabels.join('\0') === urlState.selectedLabels.join('\0') &&
         prev.sortBy === urlState.sortBy &&
         prev.sortDirection === urlState.sortDirection &&
         prev.searchTerm === urlState.searchTerm &&
@@ -187,6 +189,20 @@ export function useFilterParams(): UseFilterParamsReturn {
       return urlState
     })
   }, [location.search])
+
+  // Sync state → URL whenever state changes (skip if change came from URL)
+  useEffect(() => {
+    if (isUrlSync.current) {
+      isUrlSync.current = false
+      return
+    }
+    const newSearch = buildSearchString(state)
+    // Avoid redundant replace() calls if URL is already canonical.
+    if (newSearch !== location.search) {
+      lastPushedSearch.current = newSearch
+      navigate({ pathname: location.pathname, search: newSearch }, { replace: true })
+    }
+  }, [state, navigate, location.pathname, location.search])
 
   const setSelectedLabels = useCallback(
     (labels: string[]) =>
@@ -222,6 +238,16 @@ export function useFilterParams(): UseFilterParamsReturn {
     [],
   )
 
+  const toggleShowNewOnly = useCallback(
+    () => setState((s) => ({ ...s, showNewOnly: !s.showNewOnly })),
+    [],
+  )
+
+  const toggleHideDone = useCallback(
+    () => setState((s) => ({ ...s, hideDone: !s.hideDone })),
+    [],
+  )
+
   const clearAll = useCallback(
     () =>
       setState({
@@ -243,6 +269,8 @@ export function useFilterParams(): UseFilterParamsReturn {
     setSearchTerm,
     setShowNewOnly,
     setHideDone,
+    toggleShowNewOnly,
+    toggleHideDone,
     clearAll,
   }
 }
