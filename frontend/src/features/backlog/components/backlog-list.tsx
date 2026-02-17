@@ -166,6 +166,7 @@ export function BacklogList() {
     setShowNewOnly,
     setShowUnseenOnly,
     toggleShowNewOnly,
+    toggleHideDone,
     clearAll: clearAllFilters,
   } = useFilterParams()
 
@@ -631,7 +632,15 @@ export function BacklogList() {
               : `New only (${selectedLabels.length > 0 ? scopedNewItemCount : newItemCount})`}
           </Button>
         )}
-
+        <Button
+          size="sm"
+          variant={hideDone ? 'solid' : 'outline'}
+          onClick={toggleHideDone}
+          aria-pressed={hideDone}
+          aria-label={hideDone ? 'Hide done items, currently on' : 'Hide done items, currently off'}
+        >
+          {hideDone ? 'Hide done' : 'Show done'}
+        </Button>
         <Box flex="1" minW="180px">
           <KeywordSearch
             value={keywordQuery}

@@ -1,7 +1,6 @@
 import { Badge, Box } from '@chakra-ui/react'
 import { useLocation, useNavigate } from 'react-router'
 import { useUnseenCount } from '@/features/backlog/hooks/use-unseen-count'
-import { useMarkSeen } from '@/features/backlog/hooks/use-mark-seen'
 
 /**
  * Displays a count of unseen backlog items in the app header.
@@ -10,13 +9,15 @@ import { useMarkSeen } from '@/features/backlog/hooks/use-mark-seen'
  * - count = 0 or loading/error: hidden entirely
  * - Clicking navigates to the backlog page with `?unseen=1` to filter unseen items
  * - If already filtering unseen, clicking removes the filter
- * - Clicking also triggers mark-seen after a short delay (the user has acknowledged the new items)
+ *
+ * Note: Mark-seen is NOT triggered by clicking the badge. It is only triggered
+ * by meaningful interaction (scroll or opening an item detail) in BacklogList,
+ * preventing the unseen-only view from instantly clearing itself.
  */
 export function UnseenBadge() {
   const { data, isLoading } = useUnseenCount()
   const location = useLocation()
   const navigate = useNavigate()
-  const { trigger: triggerMarkSeen } = useMarkSeen({ delayMs: 2000 })
 
   const count = data?.unseenCount ?? 0
   const params = new URLSearchParams(location.search)
@@ -32,8 +33,9 @@ export function UnseenBadge() {
       params.set('unseen', '1')
       const search = params.toString()
       navigate({ pathname: '/', search: search ? `?${search}` : '?unseen=1' })
-      // Clicking the badge is a clear signal the user has seen the new items.
-      triggerMarkSeen()
+      // Note: We intentionally do NOT call triggerMarkSeen() here.
+      // Mark-seen is triggered by meaningful interaction (scroll or opening an item detail)
+      // in BacklogList, preventing the unseen-only view from instantly clearing itself.
     }
   }
 
