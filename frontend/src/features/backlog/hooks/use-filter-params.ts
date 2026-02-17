@@ -53,12 +53,12 @@ export type UseFilterParamsReturn = FilterParamsState & FilterParamsActions
  */
 function parseSearchParams(params: URLSearchParams): FilterParamsState {
   const labelsRaw = params.get(PARAM.labels)
-  // Labels are separated by '|' to avoid conflicts with commas in label names.
-  // Each label is URL-encoded, so we split first then decode individually.
+  // Labels are comma-separated for human-readable URLs.
+  // Each label is URL-decoded after splitting.
   const selectedLabels =
     labelsRaw && labelsRaw.trim().length > 0
       ? labelsRaw
-          .split('|')
+          .split(',')
           .map((l) => {
             try {
               return decodeURIComponent(l.trim())
@@ -91,7 +91,7 @@ function parseSearchParams(params: URLSearchParams): FilterParamsState {
  * Build a query string (including leading '?') from filter state,
  * omitting any parameter whose value matches its default.
  *
- * Labels are joined with '|' to avoid conflicts with commas in label names.
+ * Labels are comma-separated for human-readable URLs.
  * Each label value is URL-encoded individually.
  */
 function buildSearchString(state: FilterParamsState): string {
@@ -101,8 +101,8 @@ function buildSearchString(state: FilterParamsState): string {
     new Set(state.selectedLabels.map((l) => l.trim()).filter(Boolean)),
   )
   if (normalizedLabels.length > 0) {
-    // Encode each label and join with '|' separator
-    const encodedLabels = normalizedLabels.map((l) => encodeURIComponent(l)).join('|')
+    // Encode each label and join with comma separator
+    const encodedLabels = normalizedLabels.map((l) => encodeURIComponent(l)).join(',')
     pairs.push([PARAM.labels, encodedLabels])
   }
   if (state.sortBy !== DEFAULTS.sortBy) {
@@ -128,7 +128,7 @@ function buildSearchString(state: FilterParamsState): string {
     .map(([k, v]) => {
       const encodedKey = encodeURIComponent(k)
       if (k === PARAM.labels) {
-        // Labels are already encoded with '|' separator in the value
+        // Labels are already encoded with comma separator in the value
         return `${encodedKey}=${v}`
       }
       return `${encodedKey}=${encodeURIComponent(v)}`
@@ -171,8 +171,12 @@ export function useFilterParams(): UseFilterParamsReturn {
   useEffect(() => {
     // Skip if this URL change originated from our own navigation
     if (lastPushedSearch.current === location.search) {
+      // Clear the guard after acknowledging our own navigation
+      lastPushedSearch.current = null
       return
     }
+    // Clear guard for external navigation to prevent stale matches
+    lastPushedSearch.current = null
     const urlState = parseSearchParams(new URLSearchParams(location.search))
     setState((prev) => {
       if (
