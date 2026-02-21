@@ -25,8 +25,10 @@ const mockLogUserAccess = vi.mocked(auditService.logUserAccess)
 
 /** Helper: create a minimal mock Request */
 function createMockReq(overrides: Partial<Request> = {}): Request {
+  const path = (overrides.path as string) ?? '/api/backlog-items'
   return {
-    path: '/api/backlog-items',
+    path,
+    originalUrl: path, // originalUrl is used for action resolution (req.path may be stripped by Express mounts)
     method: 'GET',
     ip: '10.0.0.1',
     query: {},
